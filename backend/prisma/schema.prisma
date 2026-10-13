@@ -1,0 +1,672 @@
+// =============================================================================
+// ICEP Intern & Project Management System — Prisma schema (PostgreSQL / Supabase)
+// Owner: Karabo (Backend Leader)
+//
+// One schema, two groups:
+//   GROUP A  – Applicant approval & onboarding, interns, campuses, intakes,
+//              careers positions, documents, email templates / logs
+//   GROUP B  – Projects, teams (assignments), tasks (Kanban / Gantt / Calendar),
+//              evaluations, reports (computed, not stored)
+//   SHARED   – Users + roles, auth tokens, departments, skills, notifications,
+//              audit log
+//
+// Lifecycle:  Application (PENDING) -> INTERVIEWEE -> ACCEPTED (User + Intern
+//             created, password link emailed) -> Project assignment -> Tasks
+//             -> Completed -> Intern status COMPLETED (past intern)
+//
+// Run `npx prisma format` after editing.
+// =============================================================================
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Connection URLs live in prisma.config.ts (Prisma 7+), not here.
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// The 4 roles from the Frontend Design Plan. An Applicant has no account yet.
+enum Role {
+  ADMIN
+  WIL_HANDLER
+  MENTOR // Mentor / Facilitator / Supervisor
+  INTERN
+}
+
+enum TokenPurpose {
+  SET_PASSWORD // link in the acceptance email
+  RESET_PASSWORD // "Forgot password" page
+}
+
+enum PositionStatus {
+  DRAFT
+  OPEN // shown on the public Careers page
+  CLOSED
+}
+
+/// Group A approval flow (sequence diagram: Pending -> Accept / Reject).
+enum ApplicationStatus {
+  PENDING
+  INTERVIEWEE // "applicants selected for interviews"
+  ACCEPTED // user + intern profile created
+  REJECTED
+}
+
+/// Internship state once accepted. The "Interns List" filter
+/// (Applicant / Interviewee / Intern / Past Intern) is built from
+/// Application.status + Intern.status.
+enum InternStatus {
+  ACTIVE
+  COMPLETED // = "Past Intern"
+  WITHDRAWN
+}
+
+enum DocumentType {
+  CV
+  ID_COPY
+  ACADEMIC_RECORD
+  MOTIVATION_LETTER
+  CERTIFICATE
+  OTHER
+}
+
+/// Matches the class diagram (PLANNED / IN_PROGRESS / COMPLETED / ON_HOLD).
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+/// Kanban columns: To Do / In Progress / Completed.
+/// "Overdue" is NOT stored — it is derived (dueDate < now AND status != COMPLETED).
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// Examples given in the proposal: UI/UX, frontend, backend, testing, documentation.
+enum TaskCategory {
+  UI_UX
+  FRONTEND
+  BACKEND
+  TESTING
+  DOCUMENTATION
+  OTHER
+}
+
+enum EmailTemplateKey {
+  APPLICATION_ACCEPTED // includes the set-password link
+  APPLICATION_REJECTED
+  INTERVIEW_INVITE
+  PASSWORD_RESET
+  PROJECT_ASSIGNMENT
+  TASK_APPROVAL
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationType {
+  APPLICATION_UPDATE
+  PROJECT_ASSIGNED
+  TASK_ASSIGNED
+  TASK_APPROVED
+  SYSTEM
+}
+
+// =============================================================================
+// SHARED — users, auth, lookups
+// =============================================================================
+
+model User {
+  id           String    @id @default(uuid())
+  fullName     String
+  /// Store lower-cased (normalise in AuthService).
+  email        String    @unique
+  /// bcrypt hash. NULL until the person sets a password via the emailed link.
+  passwordHash String?
+  phone        String?
+  role         Role
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // 1:1 profiles (a User is either an intern, a mentor, or neither)
+  intern Intern?
+  mentor Mentor?
+
+  passwordTokens PasswordToken[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  emailLogs      EmailLog[]
+
+  // Actions performed by this user
+  reviewedApplications Application[]       @relation("ApplicationReviewer")
+  createdPositions     Position[]          @relation("PositionCreator")
+  createdProjects      Project[]           @relation("ProjectCreator")
+  assignmentsMade      ProjectAssignment[] @relation("AssignmentMadeBy")
+  createdTasks         Task[]              @relation("TaskCreator")
+  approvedTasks        Task[]              @relation("TaskApprover")
+  taskComments         TaskComment[]
+  evaluationsGiven     Evaluation[]
+  updatedTemplates     EmailTemplate[]
+
+  @@index([role])
+  @@map("users")
+}
+
+/// One-time tokens for "set password" (acceptance email) and "forgot password".
+model PasswordToken {
+  id        String       @id @default(uuid())
+  userId    String
+  /// Store a SHA-256 hash of the token, never the raw token.
+  tokenHash String       @unique
+  purpose   TokenPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_tokens")
+}
+
+/// Software Development, Cybersecurity & Informatics, Systems Engineering, ...
+model Department {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  mentors   Mentor[]
+  interns   Intern[]
+  projects  Project[]
+  positions Position[]
+
+  @@map("departments")
+}
+
+/// Shared skills catalogue — used on interns (filtering / Team Builder),
+/// applications, and project requirements (matching).
+model Skill {
+  id   String @id @default(uuid())
+  /// e.g. "Java", "React", "PL/SQL"
+  name String @unique
+
+  interns      InternSkill[]
+  applications ApplicationSkill[]
+  projects     ProjectSkill[]
+
+  @@map("skills")
+}
+
+// =============================================================================
+// GROUP A — campuses, intakes, careers, applications, interns
+// =============================================================================
+
+/// "Show each ICEP location or campus as a card".
+model Campus {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. "Polokwane"
+  address   String?
+  city      String?
+  province  String?
+  createdAt DateTime @default(now())
+
+  interns   Intern[]
+  positions Position[]
+
+  @@map("campuses")
+}
+
+/// Intake period, e.g. "2026 Intake 1" (Jan–Jun).
+model Intake {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  interns   Intern[]
+  positions Position[]
+
+  @@index([startDate])
+  @@map("intakes")
+}
+
+/// Public Careers page card -> Position Detail page -> Apply form.
+model Position {
+  id           String         @id @default(uuid())
+  title        String
+  description  String
+  requirements String
+  campusId     String
+  departmentId String
+  intakeId     String
+  openings     Int?
+  closingDate  DateTime       @db.Date
+  status       PositionStatus @default(DRAFT)
+  createdById  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  campus       Campus        @relation(fields: [campusId], references: [id])
+  department   Department    @relation(fields: [departmentId], references: [id])
+  intake       Intake        @relation(fields: [intakeId], references: [id])
+  createdBy    User?         @relation("PositionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  applications Application[]
+
+  @@index([status, closingDate])
+  @@index([campusId])
+  @@index([intakeId])
+  @@map("positions")
+}
+
+/// Public application form (POST /api/register). Created as PENDING.
+/// Campus / intake / department are taken from the Position.
+model Application {
+  id            String            @id @default(uuid())
+  /// Lets an applicant check "View Application Status" without an account.
+  referenceCode String            @unique @default(uuid())
+  positionId    String
+  status        ApplicationStatus @default(PENDING)
+
+  // Personal details
+  fullName String
+  email    String
+  phone    String?
+  /// SA ID number — POPIA-sensitive. Restrict access; consider encrypting at rest.
+  idNumber String?
+
+  // Studies
+  studentNumber String
+  institution   String
+  qualification String
+  yearOfStudy   Int?
+
+  // Review (WIL Handler)
+  interviewAt     DateTime?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  position   Position           @relation(fields: [positionId], references: [id])
+  reviewedBy User?              @relation("ApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  skills     ApplicationSkill[]
+  documents  Document[]
+  emailLogs  EmailLog[]
+  /// Set once the applicant is accepted.
+  intern     Intern?
+
+  /// Same person can't apply twice for the same position.
+  @@unique([email, positionId])
+  @@index([status])
+  @@index([positionId])
+  @@map("applications")
+}
+
+model ApplicationSkill {
+  applicationId String
+  skillId       String
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  skill       Skill       @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([applicationId, skillId])
+  @@map("application_skills")
+}
+
+/// Uploaded files (stored in Supabase Storage; only the path/URL is kept here).
+/// Belongs to an application and, after acceptance, also to the intern
+/// (set internId so the CV shows on the Intern Profile page).
+model Document {
+  id            String       @id @default(uuid())
+  type          DocumentType
+  fileName      String
+  /// Supabase Storage object path or URL.
+  fileUrl       String
+  mimeType      String?
+  sizeBytes     Int?
+  applicationId String?
+  internId      String?
+  uploadedAt    DateTime     @default(now())
+
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  intern      Intern?      @relation(fields: [internId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([internId])
+  @@map("documents")
+}
+
+/// Created when a WIL Handler accepts an application (status "Intern").
+/// Can also be created manually by an Admin ("Add Intern").
+model Intern {
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  applicationId String? @unique
+
+  studentNumber String
+  institution   String
+  qualification String
+  yearOfStudy   Int?
+
+  campusId     String
+  intakeId     String
+  departmentId String
+  /// Supervising mentor.
+  mentorId     String?
+
+  startDate DateTime?    @db.Date
+  endDate   DateTime?    @db.Date
+  status    InternStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  campus      Campus       @relation(fields: [campusId], references: [id])
+  intake      Intake       @relation(fields: [intakeId], references: [id])
+  department  Department   @relation(fields: [departmentId], references: [id])
+  mentor      Mentor?      @relation(fields: [mentorId], references: [id], onDelete: SetNull)
+
+  skills      InternSkill[]
+  documents   Document[]
+  assignments ProjectAssignment[]
+  tasks       Task[]              @relation("TaskAssignee")
+  evaluations Evaluation[]
+
+  /// Prevents duplicate intern records for the same student.
+  @@unique([institution, studentNumber])
+  @@index([campusId, intakeId])
+  @@index([departmentId])
+  @@index([mentorId])
+  @@index([status])
+  @@map("interns")
+}
+
+model InternSkill {
+  internId String
+  skillId  String
+
+  intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([internId, skillId])
+  @@index([skillId])
+  @@map("intern_skills")
+}
+
+// =============================================================================
+// GROUP B — mentors, projects, teams, tasks, evaluations
+// =============================================================================
+
+/// MentorFacilitator from the class diagram.
+model Mentor {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  departmentId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id])
+
+  interns  Intern[]
+  projects Project[] @relation("ProjectSupervisor")
+
+  @@index([departmentId])
+  @@map("mentors")
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  name         String
+  /// Project cards show "project name + group name".
+  groupName    String?
+  description  String?
+  departmentId String
+  status       ProjectStatus @default(PLANNED)
+  startDate    DateTime?     @db.Date
+  endDate      DateTime?     @db.Date
+  /// 0–100. Cached value — recalculate from tasks in TaskService when tasks change.
+  progress     Int           @default(0)
+  supervisorId String?
+  createdById  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id])
+  supervisor Mentor?    @relation("ProjectSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+  createdBy  User?      @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  requiredSkills ProjectSkill[]
+  /// The project team (group members + their roles).
+  assignments    ProjectAssignment[]
+  tasks          Task[]
+  evaluations    Evaluation[]
+
+  @@index([departmentId])
+  @@index([supervisorId])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectSkill {
+  projectId String
+  skillId   String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, skillId])
+  @@index([skillId])
+  @@map("project_skills")
+}
+
+/// Intern <-> Project (many-to-many). Powers Team Builder, the project member
+/// list, and "current & past projects" on the Intern Profile.
+model ProjectAssignment {
+  id           String    @id @default(uuid())
+  projectId    String
+  internId     String
+  /// Role inside the team, e.g. "Team Lead", "Frontend Developer".
+  projectRole  String?
+  assignedById String?
+  assignedAt   DateTime  @default(now())
+  /// Set when the intern is removed from the team (keeps history).
+  leftAt       DateTime?
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  intern     Intern  @relation(fields: [internId], references: [id], onDelete: Cascade)
+  assignedBy User?   @relation("AssignmentMadeBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, internId])
+  @@index([internId])
+  @@map("project_assignments")
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  projectId   String
+  /// Subtasks: points to the parent task.
+  parentId    String?
+  title       String
+  description String?
+  category    TaskCategory @default(OTHER)
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  /// 0–100, entered by the assignee/mentor.
+  progress    Int          @default(0)
+  /// Gantt needs start + end; Calendar uses dueDate. Both include time.
+  startDate   DateTime?
+  dueDate     DateTime?
+  /// Ordering of the card inside its Kanban column.
+  position    Int          @default(0)
+
+  assignedToId String?
+  createdById  String?
+
+  completedAt  DateTime?
+  /// Mentor approval of completed work (triggers the approval notification).
+  approvedAt   DateTime?
+  approvedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent     Task?   @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks   Task[]  @relation("Subtasks")
+  assignedTo Intern? @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy  User?   @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy User?   @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  comments TaskComment[]
+
+  @@index([projectId, status])
+  @@index([assignedToId])
+  @@index([parentId])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+/// Progress updates from interns and feedback from mentors.
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+/// Phase 2 (AI concept doc): supervisor evaluation of an intern.
+model Evaluation {
+  id          String   @id @default(uuid())
+  internId    String
+  evaluatorId String
+  projectId   String?
+  /// 1–5
+  rating      Int
+  comments    String?
+  createdAt   DateTime @default(now())
+
+  intern    Intern   @relation(fields: [internId], references: [id], onDelete: Cascade)
+  evaluator User     @relation(fields: [evaluatorId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([internId])
+  @@map("evaluations")
+}
+
+// =============================================================================
+// SHARED — emails (Outlook), in-app notifications, audit
+// =============================================================================
+
+/// "Notifications / Emails" page: view + manage templates.
+model EmailTemplate {
+  id          String           @id @default(uuid())
+  key         EmailTemplateKey @unique
+  subject     String
+  /// May contain placeholders such as {{fullName}}, {{passwordLink}}, {{projectName}}.
+  body        String
+  isActive    Boolean          @default(true)
+  updatedById String?
+  updatedAt   DateTime         @updatedAt
+
+  updatedBy User?      @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  logs      EmailLog[]
+
+  @@map("email_templates")
+}
+
+/// Every email sent via OutlookService.
+model EmailLog {
+  id                String      @id @default(uuid())
+  templateId        String?
+  toEmail           String
+  subject           String
+  status            EmailStatus @default(PENDING)
+  error             String?
+  providerMessageId String?
+  userId            String?
+  applicationId     String?
+  createdAt         DateTime    @default(now())
+  sentAt            DateTime?
+
+  template    EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  application Application?   @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([toEmail])
+  @@map("email_logs")
+}
+
+/// Bell icon in the top bar.
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  /// Frontend route to open, e.g. /projects/123
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+/// Security requirement from the concept doc: who did what, when.
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  /// e.g. "APPLICATION_ACCEPTED", "TASK_APPROVED"
+  action    String
+  /// e.g. "Application", "Task"
+  entity    String
+  entityId  String?
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
