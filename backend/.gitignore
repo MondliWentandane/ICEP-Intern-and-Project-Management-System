@@ -1,0 +1,22 @@
+# Dependency directories
+node_modules/
+
+# Environment variables (CRITICAL: Never commit this)
+.env
+.env.local
+.env.development
+.env.production
+
+# Prisma local database/cache
+prisma/*.db
+prisma/*.db-journal
+.prisma/
+
+# npm/yarn debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
