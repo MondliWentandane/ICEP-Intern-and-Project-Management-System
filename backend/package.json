@@ -4,21 +4,29 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:format": "prisma format"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@supabase/supabase-js": "^2.117.3",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
-    "prisma": "^8.0.0-rc.22"
+    "prisma": "^7.10.0"
   }
 }
