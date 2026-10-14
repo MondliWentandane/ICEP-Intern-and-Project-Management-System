@@ -1,32 +1,29 @@
-# React + TypeScript + Vite
+# ICEP Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + TypeScript frontend for the ICEP Intern and Project Management System.
 
-Currently, two official plugins are available:
+## Start developing
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+From this directory, run:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+npm ci
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Use Node.js 20.19+ or 22.12+. The terminal prints the local development URL. Stop the server with `Ctrl+C`.
+
+## Environment
+
+Copy `.env.example` to `.env` only when you need local API proxy settings or the development-only role preview. The backend address and API contract still need confirmation. Never put secrets in `VITE_*` variables.
+
+## Where to code
+
+- `src/features/` contains the assigned page and domain folders.
+- `src/components/` contains shared UI and data components.
+- `src/layouts/` contains public, application, auth, and dashboard shells.
+- `src/routes/` and `src/config/navigation.ts` contain route guards and role navigation.
+- `src/api/` contains the shared Axios client, endpoint map, and resource services.
+- `src/types/`, `src/hooks/`, `src/context/`, and `src/styles/` contain shared contracts and foundations.
+
+See `CONTRIBUTING.md` for team ownership and shared-file coordination, and the repository root `FRONTEND_SETUP.md` for the full handoff and known limitations. Page files are typed starter scaffolds; implement them against the approved Figma designs.

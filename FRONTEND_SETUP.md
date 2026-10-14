@@ -1,19 +1,8 @@
-# ICEP Frontend Setup and Handoff
+# ICEP Frontend Setup and Team Handoff
 
-## What was set up
+## Install and run
 
-The `frontend/` directory is a standalone React frontend starter in the ICEP repository. It gives the team a shared foundation to begin implementing the Figma designs and app pages.
-
-- React with TypeScript, bootstrapped with Vite
-- React Router for the public/auth and app route foundation
-- MUI with Emotion for the component library and theme
-- React Hook Form and Zod for form handling and validation
-- TanStack Query for server-state/API integration
-- `package-lock.json` so everyone installs the same dependency versions
-
-## Run it locally
-
-Use Node.js 20.19+ or 22.12+ (the current Vite requirement) and npm. In the VS Code PowerShell terminal:
+Use Node.js 20.19+ or 22.12+ and npm. In VS Code PowerShell:
 
 ```powershell
 cd frontend
@@ -21,50 +10,18 @@ npm ci
 npm run dev
 ```
 
-Vite prints the local URL in the terminal. Stop it with `Ctrl+C`. To create a production build, run:
+Stop with Ctrl+C. Run `npm run build` for a production build. `package-lock.json` pins the dependency tree. No environment file is required to install.
 
-```powershell
-npm run build
-```
+## Frontend stack
 
-The production build was run successfully when this starter was prepared.
+React + TypeScript + Vite, React Router, MUI/Emotion, Axios, Lucide React, React Hook Form/Zod, and TanStack Query. The working React/Vite/Router versions from the initial setup are retained instead of downgrading to the older version examples in the reference PDF. The expanded frontend structure passes the TypeScript and Vite production build.
 
-## Current source layout
+## Project structure
 
-```text
-frontend/
-├── public/                     Static public assets
-├── src/
-│   ├── app/
-│   │   ├── App.tsx              Router entry
-│   │   ├── router.tsx           Public and app route definitions
-│   │   └── theme.ts             Initial ICEP/MUI theme tokens
-│   ├── features/
-│   │   ├── auth/pages/          Login, Forgot Password, Set Password
-│   │   └── shared/pages/        Shared placeholder page
-│   ├── layouts/
-│   │   ├── AuthLayout.tsx       Layout for auth screens
-│   │   └── AppLayout.tsx        Initial protected-app shell placeholder
-│   ├── styles/global.css        Global layout styles
-│   └── main.tsx                 React bootstrap and providers
-├── package.json
-└── package-lock.json
-```
+The feature-first scaffold includes public site pages, a multi-step application flow, auth pages, role dashboards, applicant/intern/project/task/calendar/report/profile pages, shared layouts, central role navigation and guards, an API client/endpoints/services layer, domain types, auth context/hooks, reusable UI/data components, design tokens, and utilities. All assigned page files exist as typed starter pages under `frontend/src/features/`; they are ready for their owners to implement against Figma.
 
-## Routes and current limits
+See `frontend/CONTRIBUTING.md` for folder ownership and shared-file coordination. See `frontend/.env.example` for optional backend proxy configuration and local page-preview roles. The backend address and API field/routes still need confirmation from the backend team. Do not place secrets in Vite `VITE_*` variables.
 
-The starter has initial routes for `/login`, `/forgot-password`, `/set-password/:token`, `/app`, `/app/dashboard`, and `/app/profile`. These are structural starting points. The pages are placeholders and the app routes do not yet enforce authentication or role permissions. Login, password reset, API calls, final role-based navigation, and the final Figma-matched shell still need implementation.
+## Scope and known decisions
 
-The initial theme uses draft values from the project documents; check them against the final Figma style library before treating them as final design tokens.
-
-## Environment variables
-
-No frontend `.env` file is needed to install or run this starter. The frontend is not connected to the backend yet. Once the backend team confirms the API base URL and authentication approach, add a documented public setting such as `VITE_API_BASE_URL` to `.env.example`. Keep machine-specific `.env` files out of Git, and never place secrets in Vite variables because frontend values are bundled for browser use.
-
-## Suggested next work
-
-1. Add the final Figma shell and role-specific navigation using the agreed duties matrix.
-2. Implement the auth screens and states against the Figma frames.
-3. Add centralized route permissions and authentication state.
-4. Connect forms and data views after the backend API contract is confirmed.
-5. Expand shared buttons, inputs, badges, tables, filters, cards, and modal components as the page owners begin their screens.
+Page files are scaffolds, not completed screens or API integrations. Role access follows the revised duties matrix; unresolved access such as Intern Gantt and Reports is not granted until confirmed. The Users page remains an outline because its Figma frame is missing.

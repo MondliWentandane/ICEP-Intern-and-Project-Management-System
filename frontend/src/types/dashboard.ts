@@ -1,0 +1,2 @@
+export interface DashboardSummary { applicants?: number; interns?: number; activeProjects?: number; upcomingDeadlines?: number }
+export interface ReportFilters { from?: string; to?: string; campusId?: string }

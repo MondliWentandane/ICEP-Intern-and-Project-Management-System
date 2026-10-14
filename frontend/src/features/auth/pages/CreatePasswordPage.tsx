@@ -1,0 +1,1 @@
+export { SetPasswordPage as default, SetPasswordPage as CreatePasswordPage } from './SetPasswordPage'
