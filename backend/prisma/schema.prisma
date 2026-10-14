@@ -18,16 +18,14 @@
 // =============================================================================
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  // Connection URLs live in prisma.config.ts (Prisma 7+), not here.
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
-
 // =============================================================================
 // ENUMS
 // =============================================================================

@@ -22,3 +22,6 @@ yarn-error.log*
 Thumbs.db
 # Generated Prisma client (run: npm run prisma:generate)
 src/generated/
+
+# Compiled output
+dist/
