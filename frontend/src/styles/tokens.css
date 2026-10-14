@@ -1,0 +1,14 @@
+:root {
+  --icep-primary: #1B3A5C;
+  --icep-sidebar: #12283F;
+  --icep-page: #F5F6F8;
+  --icep-heading: #1A202C;
+  --icep-secondary: #718096;
+  --icep-active: #16A34A;
+  --icep-pending: #F59E0B;
+  --icep-completed: #3B82F6;
+  --icep-rejected: #DC2626;
+  --icep-radius-sm: 4px;
+  --icep-radius-md: 8px;
+  --icep-radius-lg: 12px;
+}

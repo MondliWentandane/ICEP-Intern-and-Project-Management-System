@@ -1,0 +1,1 @@
+export { Card as default, Card, CardContent, CardHeader } from '@mui/material'

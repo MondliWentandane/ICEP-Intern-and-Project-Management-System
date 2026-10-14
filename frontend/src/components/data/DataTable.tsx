@@ -1,0 +1,2 @@
+import { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material'
+export function DataTable({ columns = [], rows = [] }: { columns?: string[]; rows?: Array<Record<string, unknown>> }) { return <Table><TableHead><TableRow>{columns.map(column => <TableCell key={column}>{column}</TableCell>)}</TableRow></TableHead><TableBody>{rows.map((row, index) => <TableRow key={String(row.id ?? index)}>{columns.map(column => <TableCell key={column}>{String(row[column] ?? '')}</TableCell>)}</TableRow>)}</TableBody></Table> }

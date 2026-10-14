@@ -1,0 +1,1 @@
+export { PageScaffold as PlaceholderPage } from '@/components/ui/PageScaffold'

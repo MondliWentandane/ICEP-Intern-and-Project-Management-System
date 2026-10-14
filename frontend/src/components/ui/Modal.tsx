@@ -1,0 +1,1 @@
+export { Dialog as Modal, DialogTitle, DialogContent, DialogActions } from '@mui/material'
