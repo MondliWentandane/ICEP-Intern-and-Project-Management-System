@@ -1,0 +1,75 @@
+.authShell {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  padding: 40px 50px;
+  background: #F5F6F8;
+  font-family: Inter, Arial, sans-serif;
+}
+.authFrame {
+  width: min(1100px, 100%);
+  height: min(740px, calc(100vh - 80px));
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(31, 49, 71, .22);
+}
+.brandPanel { display: grid; place-items: center; min-width: 0; background: #12283F; }
+.brandContent { display: flex; flex-direction: column; align-items: center; gap: 22px; transform: translateY(-7px); }
+.welcome { color: #fff; font-size: 24px; font-weight: 500; letter-spacing: 3px; }
+.brandArtwork { display: block; width: 240px; height: 121px; object-fit: contain; filter: grayscale(1) brightness(0) invert(1); }
+.formPanel { position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 36px 30px; box-sizing: border-box; background: #fff; }
+.formPanel :global(.auth-form) { width: min(338px, 100%); height: 100%; position: relative; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; }
+.formPanel :global(.auth-login-form) { padding-bottom: 48px; }
+.formPanel :global(.auth-login-main) { display: flex; flex-direction: column; gap: 25px; width: 100%; }
+.formPanel :global(.auth-heading) { margin: 0 0 12px; color: #1B3A5C; font-size: 28px; font-weight: 700; line-height: 1.3; text-align: center; }
+.formPanel :global(.auth-subtitle) { margin: -8px 0 22px; color: #718096; font-size: 14px; line-height: 1.5; text-align: center; }
+.formPanel :global(.auth-field .MuiInputBase-input) { padding: 12px; color: #1A202C; font-family: Inter, Arial, sans-serif; font-size: 14px; }
+.formPanel :global(.auth-field .MuiInputBase-input::placeholder) { color: #94A3B8; opacity: 1; }
+.formPanel :global(.auth-field .MuiOutlinedInput-root) { border-radius: 8px; background: #fff; }
+.formPanel :global(.auth-field .MuiOutlinedInput-notchedOutline) { border-color: #D1D9E2; }
+.formPanel :global(.auth-field .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline) { border-color: #718096; }
+.formPanel :global(.auth-field .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) { border-width: 2px; border-color: #1B3A5C; }
+.formPanel :global(.password-visibility-icon) { display: inline-flex; margin-right: 8px; color: #718096; }
+.formPanel :global(.auth-forgot-link) { white-space: nowrap; color: #1B3A5C; font-size: 12px; text-decoration: none; }
+.formPanel :global(.auth-forgot-link:hover) { text-decoration: underline; }
+.formPanel :global(.auth-submit) { min-height: 48px; border-radius: 8px; background: #1B3A5C; color: #fff; font-size: 15px; font-weight: 600; }
+.formPanel :global(.auth-submit:hover) { background: #12283F; }
+.formPanel :global(.auth-login-footer) { position: absolute; right: 0; bottom: 0; left: 0; display: flex; justify-content: center; gap: 5px; color: #475569; font-size: 12px; }
+.formPanel :global(.auth-footer-link) { color: #1B3A5C; font-weight: 600; text-decoration: none; }
+.formPanel :global(.auth-footer-link:hover) { text-decoration: underline; }
+.formPanel :global(.auth-create-password-form) { gap: 0; }
+.formPanel :global(.auth-create-password-form .auth-heading) { margin-bottom: 10px; }
+.formPanel :global(.auth-create-password-form .auth-subtitle) { margin: 0 0 26px; }
+.formPanel :global(.auth-password-field) { margin-bottom: 22px; }
+.formPanel :global(.auth-password-helper) { margin-top: -10px; color: #718096; font-size: 12px; }
+.formPanel :global(.auth-password-submit) { margin-top: 22px; }
+.formPanel :global(.auth-forgot-form) { gap: 20px; }
+.formPanel :global(.auth-forgot-form .auth-heading) { margin-bottom: 0; }
+.formPanel :global(.auth-forgot-form .auth-subtitle) { margin: 0; }
+@media (max-width: 760px) {
+  .authShell { min-height: 100vh; padding: 18px; }
+  .authFrame { width: min(100%, 520px); height: auto; min-height: 0; grid-template-columns: 1fr; }
+  .brandPanel { min-height: 190px; }
+  .brandContent { gap: 4px; transform: none; }
+  .welcome { font-size: 18px; }
+  .brandArtwork { width: 165px; height: 84px; }
+  .formPanel { min-height: 470px; padding: 30px 26px; }
+  .formPanel :global(.auth-form) { min-height: 400px; }
+  .formPanel :global(.auth-login-form) { padding-bottom: 36px; }
+  .formPanel :global(.auth-login-main) { gap: 22px; }
+  .formPanel :global(.auth-heading) { margin-bottom: 4px; }
+  .formPanel :global(.auth-subtitle) { margin-bottom: 18px; }
+  .formPanel :global(.auth-create-password-form .auth-password-field) { margin-bottom: 22px; }
+  .formPanel :global(.auth-password-helper) { margin-top: -8px; }
+  .formPanel :global(.auth-password-submit) { margin-top: 18px; }
+}
+@media (max-width: 380px) {
+  .authShell { padding: 10px; }
+  .formPanel { padding: 24px 20px; }
+  .formPanel :global(.auth-forgot-link) { font-size: 11px; }
+}

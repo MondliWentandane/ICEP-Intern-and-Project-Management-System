@@ -1,1 +1,50 @@
-.dashboard-layout { min-height: 100vh; display: flex; background: #F5F6F8; }.dashboard-main { min-width: 0; flex: 1; }.dashboard-content { padding: 32px; }
+.dashboard-layout { min-height: 100vh; display: flex; background: var(--icep-page); color: var(--icep-heading); }
+.dashboard-main { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.dashboard-content { width: 100%; flex: 1; padding: 24px; }
+.sidebar { width: var(--icep-sidebar-width); flex: 0 0 var(--icep-sidebar-width); min-height: 100vh; display: flex; flex-direction: column; padding: 20px 14px 16px; background: var(--icep-sidebar); color: #fff; }
+.sidebar-brand { height: 48px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.brand-wordmark { color: #fff; font-size: 28px; line-height: 1; font-weight: 750; letter-spacing: -.04em; }
+.sidebar-search { height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 12px; margin-bottom: 22px; border-radius: 10px; background: #1B3A5C; color: #D3DCE8; }
+.sidebar-search input { width: 100%; color: #fff; font-size: 14px; }
+.sidebar-search input::placeholder { color: #C2CCDA; opacity: 1; }
+.sidebar-nav { flex: 1; overflow-y: auto; }
+.nav-section { margin: 0 0 20px; }
+.nav-heading { padding: 0 12px; margin: 0 0 8px; color: #B7C3D2; font-size: 11px; line-height: 1.5; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.nav-link { min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 12px; margin: 2px 0; border-radius: 9px; color: #D7DFE9; text-decoration: none; font-size: 14px; transition: background-color .15s ease, color .15s ease; }
+.nav-link:hover { background: rgba(255,255,255,.08); color: #fff; }
+.nav-link-active { background: var(--icep-primary); color: #fff; font-weight: 650; }
+.nav-link-active:hover { background: var(--icep-primary); }
+.read-only { margin-left: auto; color: #B7C3D2; font-size: 10px; }
+.sidebar-user { min-height: 68px; display: flex; align-items: center; gap: 10px; padding: 10px; margin-top: 12px; border-radius: 12px; background: #1B3A5C; }
+.user-avatar { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 50%; background: #fff; color: var(--icep-primary); font-size: 12px; font-weight: 700; }
+.user-copy { min-width: 0; flex: 1; }
+.user-name, .user-role { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-name { color: #fff; font-size: 13px; font-weight: 650; }
+.user-role { color: #D0D9E5; font-size: 12px; }
+.logout-button { color: #D7DFE9; }
+.logout-button:hover { background: rgba(255,255,255,.1); }
+.topbar { border-bottom: 1px solid #E5E9EF; background: #fff; color: var(--icep-heading); }
+.topbar-toolbar { min-height: 64px; padding: 0 24px; }
+.page-title { flex: 1; color: var(--icep-heading); font-size: 21px; font-weight: 700; }
+.topbar-actions { display: flex; align-items: center; gap: 16px; }
+.topbar-search { width: 38px; display: flex; align-items: center; gap: 8px; color: var(--icep-secondary); }
+.topbar-search input { width: 0; }
+.topbar-search:focus-within { width: 220px; }
+.topbar-search:focus-within input { width: 100%; }
+.topbar-icon { color: var(--icep-secondary); }
+.profile-link { padding: 2px; }
+.topbar-avatar { width: 38px; height: 38px; background: #426383; font-size: 13px; font-weight: 700; }
+.mobile-menu, .mobile-close { display: none !important; color: inherit !important; }
+.scrim { display: none; }
+@media (max-width: 760px) {
+  .sidebar { position: fixed; z-index: 1300; inset: 0 auto 0 0; width: min(290px, 84vw); min-height: 100dvh; transform: translateX(-102%); transition: transform .2s ease; box-shadow: 8px 0 24px rgba(0,0,0,.16); }
+  .sidebar-open { transform: translateX(0); }
+  .mobile-close { display: inline-flex !important; color: #fff !important; }
+  .scrim { display: block; position: fixed; z-index: 1299; inset: 0; border: 0; background: rgba(10,20,32,.45); }
+  .mobile-menu { display: inline-flex !important; margin-right: 8px; }
+  .topbar-toolbar { min-height: 60px; padding: 0 12px; }
+  .page-title { font-size: 18px; }
+  .topbar-actions { gap: 6px; }
+  .topbar-search { display: none; }
+  .dashboard-content { padding: 16px; }
+}
