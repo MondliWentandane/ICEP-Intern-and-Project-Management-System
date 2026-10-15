@@ -13,7 +13,7 @@ const icons: Record<string, typeof LayoutDashboard> = {
   Notifications: Bell, 'My Profile': Users,
 }
 const sectionLabels: Record<NavigationItem['section'], string> = {
-  MAIN: 'Main', PROJECTS: 'Projects', ADMIN: 'Administration',
+  MAIN: 'Main', PROJECTS: 'Projects', ADMIN: 'Admin',
 }
 const roleLabels: Record<string, string> = { admin: 'Administrator', wil_handler: 'WIL Handler', mentor: 'Mentor', intern: 'Intern' }
 

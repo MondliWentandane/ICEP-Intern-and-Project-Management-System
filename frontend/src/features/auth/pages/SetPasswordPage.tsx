@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, IconButton, InputAdornment, Link, Stack, TextField, Typography } from '@mui/material'
-import { Visibility, VisibilityOff } from 'lucide-react'
-import { Link as RouterLink, useParams } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -15,6 +15,7 @@ const passwordSchema = z.object({
 type PasswordValues = z.infer<typeof passwordSchema>
 
 export function SetPasswordPage() {
+  const navigate = useNavigate()
   const { token } = useParams<{ token: string }>()
   const [complete, setComplete] = useState(false)
   const [requestError, setRequestError] = useState('')
@@ -29,14 +30,14 @@ export function SetPasswordPage() {
     catch { setRequestError('We could not set your password. The link may have expired; ask for a new one and try again.') }
   })
 
-  const visibilityAdornment = (visible: boolean, toggle: () => void, label: string) => <InputAdornment position="end"><IconButton aria-label={visible ? `Hide ${label}` : `Show ${label}`} onClick={toggle} edge="end" size="small"><span className="password-visibility-icon">{visible ? <VisibilityOff size={18} /> : <Visibility size={18} />}</span></IconButton></InputAdornment>
+  const visibilityAdornment = (visible: boolean, toggle: () => void, label: string) => <InputAdornment position="end"><IconButton aria-label={visible ? `Hide ${label}` : `Show ${label}`} onClick={toggle} edge="end" size="small"><span className="password-visibility-icon">{visible ? <EyeOff size={18} /> : <Eye size={18} />}</span></IconButton></InputAdornment>
 
   return (
     <Stack className="auth-form auth-create-password-form" component="form" spacing={0} onSubmit={onSubmit} noValidate>
       {complete ? <>
         <Typography className="auth-heading" component="h1">Password set!</Typography>
         <Typography color="text.secondary" sx={{ textAlign: 'center', mb: 4 }}>Your ICEP account is ready. You can now sign in with your new password.</Typography>
-        <Button className="auth-submit" component={RouterLink} to="/login" fullWidth>Continue to Login</Button>
+        <Button className="auth-submit" type="button" onClick={() => navigate('/login')} fullWidth>Continue to Login</Button>
       </> : <>
         <Typography className="auth-heading" component="h1">Create your password</Typography>
         <Typography className="auth-subtitle">Welcome to ICEP! Set a password to<br className="desktop-break" /> activate your account.</Typography>

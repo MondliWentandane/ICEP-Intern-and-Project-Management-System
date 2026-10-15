@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Alert, IconButton, InputAdornment, Link, Stack, TextField, Typography } from '@mui/material'
-import { Visibility, VisibilityOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -52,7 +52,7 @@ export function LoginPage() {
           slotProps={{
             htmlInput: { 'aria-label': 'Password' },
             input: { endAdornment: <InputAdornment position="end">
-              <IconButton aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((visible) => !visible)} edge="end" size="small"><span className="password-visibility-icon">{showPassword ? <VisibilityOff size={18} /> : <Visibility size={18} />}</span></IconButton>
+              <IconButton aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((visible) => !visible)} edge="end" size="small"><span className="password-visibility-icon">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</span></IconButton>
               <Link className="auth-forgot-link" component={RouterLink} to="/forgot-password">Forgot password?</Link>
             </InputAdornment> },
           }}
