@@ -1,3 +1,11 @@
 import { useForm } from 'react-hook-form'
-import type { ApplicationForm } from '@/types'
-export function useApplicationForm() { return useForm<ApplicationForm>() }
+import { zodResolver } from '@hookform/resolvers/zod'
+import { applicationSchema, type ApplicationInput, type ApplicationValues } from '../data/applicationSchema'
+
+export function useApplicationForm(positionId = '') {
+  return useForm<ApplicationInput, unknown, ApplicationValues>({
+    resolver: zodResolver(applicationSchema),
+    mode: 'onTouched',
+    defaultValues: { positionId, firstName: '', surname: '', email: '', phone: '', idNumber: '', studentNumber: '', qualification: '', skills: [], consent: false },
+  })
+}

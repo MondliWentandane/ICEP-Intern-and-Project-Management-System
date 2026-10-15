@@ -1,6 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { PublicLayout } from '@/layouts/PublicLayout/PublicLayout'
-import { ApplyLayout } from '@/layouts/ApplyLayout/ApplyLayout'
 import { AuthLayout } from '@/layouts/AuthLayout/AuthLayout'
 import { DashboardLayout } from '@/layouts/DashboardLayout/DashboardLayout'
 import { ProtectedRoute } from './ProtectedRoute'
@@ -13,7 +12,8 @@ import { CareersPage } from '@/features/public-site/pages/CareersPage.tsx'
 import { PositionDetailPage } from '@/features/public-site/pages/PositionDetailPage.tsx'
 import { ContactPage } from '@/features/public-site/pages/ContactPage.tsx'
 import { ApplyPage } from '@/features/application/pages/ApplyPage.tsx'
-import { ApplicationSubmittedPage } from '@/features/application/pages/ApplicationSubmittedPage.tsx'
+import { TrackLoginPage } from '@/features/application/pages/TrackLoginPage.tsx'
+import { TrackApplicationPage } from '@/features/application/pages/TrackApplicationPage.tsx'
 import { HandlerDashboardPage } from '@/features/dashboard/pages/HandlerDashboardPage.tsx'
 import { AdminDashboardPage } from '@/features/dashboard/pages/AdminDashboardPage.tsx'
 import { MentorDashboardPage } from '@/features/dashboard/pages/MentorDashboardPage.tsx'
@@ -44,10 +44,10 @@ export const router = createBrowserRouter([
   { path: '/', element: <PublicLayout />, children: [
     { index: true, element: <HomePage /> }, { path: 'about', element: <AboutPage /> }, { path: 'careers', element: <CareersPage /> },
     { path: 'careers/:positionId', element: <PositionDetailPage /> }, { path: 'contact', element: <ContactPage /> },
+    { path: 'track', element: <TrackLoginPage /> }, { path: 'track/:reference', element: <TrackApplicationPage /> },
   ] },
-  { path: '/careers/:positionId/apply', element: <ApplyLayout />, children: [
-    { index: true, element: <ApplyPage /> }, { path: 'submitted', element: <ApplicationSubmittedPage /> },
-  ] },
+  // The application form is a pop-up (?apply=…) mounted in PublicLayout; these paths redirect to it.
+  { path: '/careers/:positionId/apply/*', element: <ApplyPage /> }, { path: '/apply/*', element: <ApplyPage /> },
   { element: <AuthLayout />, children: [
     { path: '/login', element: <LoginPage /> }, { path: '/forgot-password', element: <ForgotPasswordPage /> },
     { path: '/create-password/:token', element: <SetPasswordPage /> }, { path: '/set-password/:token', element: <SetPasswordPage /> },
