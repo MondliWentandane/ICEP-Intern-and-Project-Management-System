@@ -1,14 +1,28 @@
 :root {
   --icep-primary: #1B3A5C;
   --icep-sidebar: #12283F;
+  --icep-sidebar-active: #1B3A5C;
   --icep-page: #F5F6F8;
+  --icep-card: #FFFFFF;
+  --icep-border: #D1D9E2;
   --icep-heading: #1A202C;
   --icep-secondary: #718096;
   --icep-active: #16A34A;
+  --icep-active-tint: #DCFCE7;
   --icep-pending: #F59E0B;
+  --icep-pending-tint: #FEF3C7;
   --icep-completed: #3B82F6;
+  --icep-completed-tint: #DBEAFE;
   --icep-rejected: #DC2626;
+  --icep-rejected-tint: #FEE2E2;
   --icep-radius-sm: 4px;
   --icep-radius-md: 8px;
   --icep-radius-lg: 12px;
+  --icep-space-1: 4px;
+  --icep-space-2: 8px;
+  --icep-space-3: 12px;
+  --icep-space-4: 16px;
+  --icep-space-6: 24px;
+  --icep-space-8: 32px;
+  --icep-sidebar-width: 260px;
 }
