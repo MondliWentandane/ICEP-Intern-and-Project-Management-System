@@ -1,3 +1,5 @@
 export function isMockAuthEnabled() {
-  return import.meta.env.DEV && import.meta.env.VITE_AUTH_MODE === 'mock'
+  // Local development uses mock credentials unless a developer explicitly opts into the API.
+  // Vite production builds always use backend authentication.
+  return import.meta.env.DEV && import.meta.env.VITE_AUTH_MODE !== 'api'
 }
