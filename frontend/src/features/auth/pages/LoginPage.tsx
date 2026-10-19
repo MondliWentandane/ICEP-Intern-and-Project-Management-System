@@ -6,8 +6,10 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Auth } from '@/api/services/auth.service'
+import { mockDemoAccounts } from '@/api/services/mockAuth'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/hooks/useAuth'
+import { isMockAuthEnabled } from '@/utils/authMode'
 
 const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -21,12 +23,13 @@ export function LoginPage() {
   const { setSession } = useAuth()
   const [requestError, setRequestError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const mockAuthEnabled = isMockAuthEnabled()
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({ resolver: zodResolver(loginSchema) })
 
   const onSubmit = handleSubmit(async (values) => {
     setRequestError('')
     try {
-      const { data } = await Auth.login(values)
+      const data = await Auth.login(values)
       setSession(data.token, data.user)
       navigate(dashboardPaths[data.user.role], { replace: true })
     } catch {
@@ -38,6 +41,7 @@ export function LoginPage() {
     <Stack className="auth-form auth-login-form" component="form" spacing={0} onSubmit={onSubmit} noValidate>
       <Stack className="auth-login-main" spacing={0}>
         <Typography className="auth-heading" component="h1">Login</Typography>
+        {mockAuthEnabled && <Alert severity="info" role="status"><strong>Development mock login</strong><br />Password: <code>ICEPdemo1!</code><br />Accounts: {mockDemoAccounts.map((account) => account.email).join(', ')}</Alert>}
         {requestError && <Alert severity="error" role="alert">{requestError}</Alert>}
         <TextField className="auth-field" variant="outlined" placeholder="Email" type="email" autoComplete="email" {...register('email')} error={Boolean(errors.email)} helperText={errors.email?.message} slotProps={{ htmlInput: { 'aria-label': 'Email' } }} />
         <TextField
