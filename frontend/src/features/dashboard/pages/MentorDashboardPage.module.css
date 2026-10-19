@@ -1,0 +1,537 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: var(--icep-heading, #1A202C);
+  width: 100%;
+}
+
+/* Top Action Bar */
+.topBar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.dateButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1A202C;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.dateButton:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.newProjectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1B3A5C;
+  color: #FFFFFF;
+  border: 1px solid #1B3A5C;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(18, 40, 63, 0.15);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.newProjectButton:hover {
+  background: #12283F;
+  border-color: #12283F;
+}
+
+/* Metric / Stat Cards Grid */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.statCard {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 20px 24px;
+  border: 1px solid #EDF2F7;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(18, 40, 63, 0.06);
+}
+
+.statIconBox {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.iconBlue {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.iconGreen {
+  background: #ECFDF5;
+  color: #10B981;
+}
+
+.iconAmber {
+  background: #FFFBEB;
+  color: #D97706;
+}
+
+.iconRed {
+  background: #FEF2F2;
+  color: #EF4444;
+}
+
+.statContent {
+  display: flex;
+  flex-direction: column;
+}
+
+.statValue {
+  font-size: 30px;
+  font-weight: 750;
+  line-height: 1.1;
+  color: #1A202C;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.statLabel {
+  font-size: 13.5px;
+  color: #718096;
+  margin: 4px 0 0;
+  font-weight: 500;
+}
+
+/* Main Dashboard Two-Column Grid */
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* Card base */
+.card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #EDF2F7;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.cardTitle {
+  font-size: 18px;
+  font-weight: 750;
+  color: #1A202C;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.viewAllLink {
+  color: #2563EB;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.viewAllLink:hover {
+  text-decoration: underline;
+  color: #1D4ED8;
+}
+
+/* Table in Active Projects Overview */
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.projectsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.projectsTable th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #718096;
+  padding: 0 12px 14px 0;
+  border-bottom: 1px solid transparent;
+  letter-spacing: 0.01em;
+}
+
+.projectsTable td {
+  padding: 16px 12px 16px 0;
+  border-top: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+
+.projectsTable tr:hover td {
+  background-color: #FAFCFE;
+}
+
+.projectInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.projectName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A202C;
+  margin: 0;
+}
+
+.projectDepartment {
+  font-size: 12px;
+  color: #718096;
+  margin: 3px 0 0;
+}
+
+/* Avatar Group */
+.teamAvatars {
+  display: flex;
+  align-items: center;
+}
+
+.teamAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  margin-left: -7px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.teamAvatar:first-child {
+  margin-left: 0;
+}
+
+.avatarMS {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+.avatarTM {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.avatarJS {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.avatarRJ {
+  background: #EDE9FE;
+  color: #6D28D9;
+}
+
+.avatarTN {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.avatarAB {
+  background: #F3E8FF;
+  color: #7E22CE;
+}
+
+/* Status Pills */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statusOnTrack {
+  background: #DCFCE7;
+  color: #15803D;
+}
+
+.statusAtRisk {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+
+.statusPendingReview {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+/* Progress column */
+.progressColumn {
+  min-width: 130px;
+  max-width: 170px;
+}
+
+.progressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.progressValue {
+  font-weight: 600;
+  color: #64748B;
+}
+
+.progressDate {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  background: #EDF2F7;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.barBlue {
+  background: #2563EB;
+}
+
+.barOrange {
+  background: #EA580C;
+}
+
+.barGreen {
+  background: #10B981;
+}
+
+/* Upcoming Deadlines */
+.moreButton {
+  background: transparent;
+  border: none;
+  color: #718096;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  transition: background-color 0.15s ease;
+}
+
+.moreButton:hover {
+  background: #F1F5F9;
+  color: #1A202C;
+}
+
+.deadlinesList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deadlinesItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  transition: all 0.15s ease;
+}
+
+.deadlinesItem:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.deadlineDateBox {
+  width: 48px;
+  height: 50px;
+  flex: 0 0 48px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.dateRed {
+  border: 1.5px solid #F87171;
+  background: #FFF5F5;
+  color: #DC2626;
+}
+
+.dateAmber {
+  border: 1.5px solid #FBBF24;
+  background: #FFFBEB;
+  color: #D97706;
+}
+
+.dateBlue {
+  border: 1.5px solid #60A5FA;
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.dateMonth {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.dateDay {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.deadlineDetails {
+  flex: 1;
+  min-width: 0;
+}
+
+.deadlineTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A202C;
+  margin: 0;
+}
+
+.deadlineSub {
+  font-size: 12px;
+  color: #718096;
+  margin: 3px 0 0;
+}
+
+.viewAllDeadlinesButton {
+  width: 100%;
+  margin-top: 16px;
+  padding: 11px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  color: #1B3A5C;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  display: block;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.viewAllDeadlinesButton:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+/* Modal form controls */
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A202C;
+}
+
+.formInput, .formSelect {
+  padding: 9px 12px;
+  border: 1px solid #D1D9E2;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1A202C;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.formInput:focus, .formSelect:focus {
+  border-color: #1B3A5C;
+}
+
+/* Responsive queries */
+@media (max-width: 1120px) {
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .metricsGrid {
+    grid-template-columns: 1fr;
+  }
+  .topBar {
+    justify-content: space-between;
+  }
+}
