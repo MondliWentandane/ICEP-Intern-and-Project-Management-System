@@ -1,0 +1,486 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--icep-heading, #1A202C);
+  width: 100%;
+}
+
+/* Top control section */
+.topSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.actionRow {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.exportButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1A202C;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.exportButton:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.addEventButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1B3A5C;
+  color: #FFFFFF;
+  border: 1px solid #1B3A5C;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(18, 40, 63, 0.15);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.addEventButton:hover {
+  background: #12283F;
+  border-color: #12283F;
+}
+
+/* Filters row */
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.filterSelectWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.filterSelect {
+  appearance: none;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 8px 36px 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1A202C;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.filterSelect:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.filterSelect:focus {
+  border-color: #1B3A5C;
+  box-shadow: 0 0 0 2px rgba(27, 58, 92, 0.1);
+}
+
+.filterSelectChevron {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: #718096;
+}
+
+/* Calendar Main Card */
+.calendarCard {
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #EDF2F7;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+}
+
+/* Calendar Toolbar */
+.calendarToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #EDF2F7;
+}
+
+.navigationControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navButtonGroup {
+  display: flex;
+  align-items: center;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.navArrowBtn {
+  background: #FFFFFF;
+  border: none;
+  padding: 7px 10px;
+  color: #475569;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease;
+}
+
+.navArrowBtn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.navArrowBtn:first-child {
+  border-right: 1px solid #E2E8F0;
+}
+
+.monthHeading {
+  font-size: 18px;
+  font-weight: 750;
+  color: #1A202C;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.todayButton {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.todayButton:hover {
+  background: #F8FAFC;
+  color: #0F172A;
+  border-color: #CBD5E1;
+}
+
+/* View switcher segmented tabs */
+.viewSwitcher {
+  display: inline-flex;
+  background: #F1F5F9;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.viewButton {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.viewButton:hover {
+  color: #1A202C;
+}
+
+.viewButtonActive {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Days of the week header */
+.daysHeader {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid #EDF2F7;
+  background: #FFFFFF;
+}
+
+.dayLabel {
+  padding: 12px 10px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #718096;
+}
+
+/* Month Grid */
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid #EDF2F7;
+}
+
+.cell {
+  min-height: 110px;
+  padding: 8px;
+  border-right: 1px solid #EDF2F7;
+  border-top: 1px solid #EDF2F7;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #FFFFFF;
+  transition: background-color 0.15s ease;
+}
+
+.cell:nth-child(7n) {
+  border-right: none;
+}
+
+.cell:hover {
+  background-color: #FAFCFE;
+}
+
+.cellHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.cellDayNumber {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.cellDayFaded {
+  font-size: 13px;
+  font-weight: 500;
+  color: #94A3B8;
+}
+
+.todayBadge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0F172A;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Event Badges */
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eventPill {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.eventPill:hover {
+  opacity: 0.88;
+  transform: translateY(-0.5px);
+}
+
+.eventBlue {
+  background: #EFF6FF;
+  color: #1E40AF;
+  border-left: 3px solid #2563EB;
+}
+
+.eventBlueMeeting {
+  background: #EFF6FF;
+  color: #1E40AF;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meetingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2563EB;
+  flex-shrink: 0;
+}
+
+.eventGreen {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.eventAmber {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.eventRed {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+
+/* Week / Day fallback views */
+.weekContainer {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.weekHeader {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+}
+
+.weekDayCol {
+  background: #F8FAFC;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 280px;
+}
+
+.weekDayTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A202C;
+  text-align: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+/* Modal form controls */
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A202C;
+}
+
+.formInput,
+.modalSelect {
+  padding: 9px 12px;
+  border: 1px solid #D1D9E2;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1A202C;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.formInput:focus,
+.modalSelect:focus {
+  border-color: #1B3A5C;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .topSection {
+    gap: 12px;
+  }
+
+  .actionRow {
+    justify-content: space-between;
+  }
+
+  .cell {
+    min-height: 80px;
+    padding: 4px;
+  }
+
+  .eventPill {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+
+  .calendarToolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .filtersRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filterSelectWrapper {
+    width: 100%;
+  }
+
+  .filterSelect {
+    width: 100%;
+  }
+
+  .dayLabel {
+    font-size: 11px;
+    padding: 8px 2px;
+  }
+
+  .cell {
+    min-height: 60px;
+    padding: 2px;
+  }
+}

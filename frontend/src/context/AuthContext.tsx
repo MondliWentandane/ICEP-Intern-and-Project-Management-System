@@ -1,13 +1,24 @@
 import { createContext, useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { User } from '@/types'
+import { getMockUserFromToken } from '@/api/services/mockAuth'
+import { isMockAuthEnabled } from '@/utils/authMode'
 import { tokenStorage } from '@/utils/tokenStorage'
 
-interface AuthContextValue { user: User | null; isAuthenticated: boolean; setSession: (token: string, user: User) => void; logout: () => void }
+interface AuthContextValue { user: User | null; isAuthenticated: boolean; setSession: (token: string, user: User, remember?: boolean) => void; logout: () => void }
 export const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const previewRole = import.meta.env.DEV ? import.meta.env.VITE_DEV_AUTH_ROLE : undefined
-  const [user, setUser] = useState<User | null>(previewRole ? { id: 'local-preview', name: 'Local preview', email: 'preview@example.com', role: previewRole } : null)
-  const setSession = useCallback((token: string, nextUser: User) => { tokenStorage.set(token); setUser(nextUser) }, [])
+  const [user, setUser] = useState<User | null>(() => {
+    if (previewRole) {
+      return { id: 'local-preview', name: previewRole === 'mentor' ? 'Pat Naidoo' : 'Local preview', email: previewRole === 'mentor' ? 'pat.naidoo@icep.co.za' : 'preview@example.com', role: previewRole }
+    }
+    if (isMockAuthEnabled()) {
+      const stored = tokenStorage.get()
+      if (stored) return getMockUserFromToken(stored)
+    }
+    return null
+  })
+  const setSession = useCallback((token: string, nextUser: User, remember = true) => { tokenStorage.set(token, remember); setUser(nextUser) }, [])
   const logout = useCallback(() => { tokenStorage.clear(); setUser(null) }, [])
   const value = useMemo(() => ({ user, isAuthenticated: Boolean(user), setSession, logout }), [user, setSession, logout])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

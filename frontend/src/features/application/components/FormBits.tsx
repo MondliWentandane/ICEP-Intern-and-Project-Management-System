@@ -1,0 +1,49 @@
+import type { ReactNode } from 'react'
+import { Box, Link, TextField, Typography, type TextFieldProps } from '@mui/material'
+import { CircleHelp } from 'lucide-react'
+import type { UseFormRegisterReturn } from 'react-hook-form'
+
+type FormFieldProps = Omit<TextFieldProps, 'label' | 'name' | 'onChange' | 'onBlur'> & {
+  id: string
+  label: string
+  registration?: UseFormRegisterReturn
+  errorText?: string
+  hint?: string
+}
+
+/** Text field with the label above the input, as in the ICEP Figma forms. */
+export function FormField({ id, label, registration, errorText, hint, slotProps, ...props }: FormFieldProps) {
+  const { ref, ...field } = registration ?? {}
+  return (
+    <Box>
+      <Typography component="label" htmlFor={id} sx={{ display: 'block', fontSize: 14, fontWeight: 500, mb: 0.75 }}>{label}</Typography>
+      <TextField
+        id={id}
+        fullWidth
+        {...field}
+        {...props}
+        inputRef={ref}
+        error={Boolean(errorText)}
+        helperText={errorText ?? hint}
+        slotProps={{ ...slotProps, formHelperText: { sx: { mx: 0 } } }}
+      />
+    </Box>
+  )
+}
+
+export function HelpLine() {
+  return (
+    <Typography sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, color: 'text.secondary', fontSize: 14, mt: 3 }}>
+      <CircleHelp size={16} aria-hidden="true" /> Need help with your application? Contact <Link href="mailto:icep@tut.ac.za" underline="hover">icep@tut.ac.za</Link>
+    </Typography>
+  )
+}
+
+export function InfoNote({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', p: 2, borderRadius: 2, bgcolor: 'var(--icep-page)', color: 'text.secondary', fontSize: 14 }}>
+      <Box sx={{ display: 'grid', color: 'text.secondary' }}>{icon}</Box>
+      <span>{children}</span>
+    </Box>
+  )
+}
