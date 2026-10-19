@@ -1,5 +1,7 @@
 import { createContext, useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { User } from '@/types'
+import { getMockUserFromToken } from '@/api/services/mockAuth'
+import { isMockAuthEnabled } from '@/utils/authMode'
 import { tokenStorage } from '@/utils/tokenStorage'
 
 interface AuthContextValue { user: User | null; isAuthenticated: boolean; setSession: (token: string, user: User, remember?: boolean) => void; logout: () => void }
