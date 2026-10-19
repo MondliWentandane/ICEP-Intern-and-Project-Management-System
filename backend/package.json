@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+      "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
@@ -23,7 +24,7 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
-    "@prisma/client": "^6.19.0",
+    "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.117.3",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
