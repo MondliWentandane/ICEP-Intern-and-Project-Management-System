@@ -14,10 +14,10 @@ const CSS = `
 .ap-in{width:270px}.ap-in input{border:0;outline:0;width:100%;background:none;color:var(--tx)}
 .ap-sel{width:148px;position:relative}.ap-sel select{appearance:none;border:0;outline:0;background:none;width:100%;height:100%;cursor:pointer;color:var(--tx);padding-right:18px}
 .ap-sel svg{position:absolute;right:10px;pointer-events:none}
-.ap-clr{background:none;border:0;color:var(--mu);font-weight:600;cursor:pointer;padding:0 6px}
+.ap-clr{height:37px;padding:0 14px;background:#fff;border:1px solid var(--ln);border-radius:9px;color:var(--mu);font-weight:600;cursor:pointer}.ap-clr.on{color:var(--pr);border-color:var(--pr)}.ap-clr:hover{background:var(--bg)}
 .ap-add{margin-left:auto;height:37px;padding:0 16px;border:0;border-radius:9px;background:var(--pr);color:#fff;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer}
 .ap-card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(16,24,40,.06);overflow:hidden}
-.ap table{width:100%;min-width:960px;border-collapse:collapse;table-layout:fixed}
+.ap table{width:100%;min-width:1120px;border-collapse:collapse;table-layout:fixed}
 .ap-tw{overflow-x:auto}
 .ap th{height:40px;text-align:left;font-size:11.5px;font-weight:600;color:var(--mu);letter-spacing:.02em;padding:0 0 0 0;text-transform:uppercase;border-bottom:1px solid var(--ln)}
 .ap td{height:54px;border-bottom:1px solid var(--ln);padding:0;vertical-align:middle}
@@ -71,10 +71,16 @@ const CSS = `
 .ap-msg p{margin:0 0 7px}.ap-msg b{font-weight:700}
 .ap-msg .btn{display:inline-block;background:var(--pr);color:#fff;font-weight:700;padding:8px 13px;border-radius:7px;margin:3px 0 14px}
 .ap-msg.big{font-size:15px;line-height:1.25;min-height:257px;padding:18px 20px}.ap-msg.big p{margin:0 0 12px}
+.ap-b.sl{border-color:#2563eb;color:#1d4ed8;font-weight:600}
 `
 
 type Status = 'Pending' | 'Interview' | 'Accepted' | 'Rejected'
-export interface Applicant { id: number; name: string; studentNo: string; campus: string; course: string; level: string; date: string; status: Status; note?: string }
+export interface Applicant {
+  id: number; name: string; studentNo: string; campus: string; course: string; level: string; date: string; status: Status
+  note?: string
+  /** true once the interview invitation email has been sent */
+  interviewEmailSent?: boolean
+}
 
 const BASE: Applicant[] = [
   { id: 1, name: 'Thabo Molefe', studentNo: '210000000', campus: 'Soshanguve South', course: 'Computer Science', level: 'Diploma', date: '30 Sep 2026', status: 'Pending' },
@@ -115,11 +121,12 @@ const Ic = ({ d, s = 20 }: { d: string; s?: number }) => (
 )
 
 const HEAD = ['Name', 'Student no.', 'Campus', 'Course', 'Date applied', 'Status', 'Actions']
-const WIDTH = ['19%', '10%', '13%', '17%', '10%', '9%', '22%']
+// Actions column is wide enough for View + Shortlist + Accept + Reject.
+const WIDTH = ['17%', '10%', '11%', '15%', '9%', '8%', '30%']
 const initials = (n: string) => n.split(' ').map((w) => w[0]).join('')
 
 const today = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-type Dlg = null | { kind: 'add' } | { kind: 'view' | 'accept' | 'reject' | 'mailA' | 'mailR'; a: Applicant }
+type Dlg = null | { kind: 'add' } | { kind: 'view' | 'accept' | 'reject' | 'mailA' | 'mailR' | 'mailI'; a: Applicant }
 const prog = (a: Applicant) => `${a.level} in ${a.course}`
 type NewApplicant = Pick<Applicant, 'name' | 'studentNo' | 'campus' | 'course' | 'level'>
 
@@ -224,6 +231,29 @@ function RejectMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void;
   )
 }
 
+function InterviewMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void; onSend: (to: string) => void }) {
+  const [to, setTo] = useState(a.name)
+  const [subject, setSubject] = useState('Interview invitation – ICEP Internship Programme')
+  return (
+    <Modal title="Send interview email" width={470} bodyStyle={{ padding: '14px 27px 18px' }} onClose={onClose} footer={<>
+      <span className="ap-note">Template: Interview invitation</span>
+      <button className="ap-b ap-bt" onClick={onClose}>Cancel</button>
+      <button className="ap-b ap-bp" onClick={() => onSend(to.trim() || a.name)}>Send email</button>
+    </>}>
+      <div className="ap-ar"><span className="l">From</span><span className="v">Alex Williamson (Admin)</span><span className="ap-vp">Outlook connected</span></div>
+      <div className="ap-ar"><label className="l" htmlFor="mail-to">To</label><input id="mail-to" className="ap-fi ap-i2" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+      <div className="ap-ar"><label className="l" htmlFor="mail-subject">Subject</label><input id="mail-subject" className="ap-fi ap-i2" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
+      <div className="ap-msg">
+        <p>Dear {first(a)},</p>
+        <p>Thank you for applying for the {prog(a)} ({a.campus}).</p>
+        <p>We are pleased to let you know that you have been shortlisted. We would like to invite you to an interview.</p>
+        <p>Please reply to this email to confirm your availability.</p>
+        <p>Regards,<br /><b>ICEP WIL Office</b></p>
+      </div>
+    </Modal>
+  )
+}
+
 export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant[] }) {
   const [rows, setRows] = useState(applicants)
   const [q, setQ] = useState('')
@@ -251,11 +281,20 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
   const nums = Array.from({ length: Math.min(3, pages) }, (_, i) => from + i)
   const filter = (fn: (v: string) => void) => (v: string) => { fn(v); setPage(1) }
 
+  const clearFilters = () => { setQ(''); setCampus(''); setStatus(''); setPage(1) }
+
   const close = () => setDlg(null)
   const setStatusOf = (a: Applicant, s: Status, n?: string) =>
     setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: s, ...(n ? { note: n } : {}) } : x)))
   // Accept: confirm -> review email -> Send email marks the applicant Accepted.
   const sendAccept = (a: Applicant, to: string) => { setStatusOf(a, 'Accepted'); setToast(`Email sent to ${to}.`); close() }
+  // Shortlist: click Shortlist -> review the interview email -> Send email moves the applicant to Interview.
+  // Cancelling the email leaves the status as Pending.
+  const sendInterview = (a: Applicant, to: string) => {
+    setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: 'Interview', interviewEmailSent: true } : x)))
+    setToast(`Interview email sent to ${to}.`)
+    close()
+  }
   // Reject: confirm marks the applicant Rejected, then the rejection email can be reviewed and sent (or skipped with Cancel).
   const confirmReject = (a: Applicant, n: string) => { setStatusOf(a, 'Rejected', n); setDlg({ kind: 'mailR', a }) }
   const add = (v: NewApplicant) => {
@@ -279,7 +318,7 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
               <option value="">All statuses</option>
               {['Pending', 'Interview', 'Accepted', 'Rejected'].map((s) => <option key={s}>{s}</option>)}
             </Select>
-            <button className="ap-clr" onClick={() => { setQ(''); setCampus(''); setStatus(''); setPage(1) }}>Clear filters</button>
+            <button type="button" className={`ap-clr${q || campus || status ? ' on' : ''}`} onClick={clearFilters}>Clear filters</button>
             <button className="ap-add" onClick={() => setDlg({ kind: 'add' })}><Ic d={P.plus} />Add applicant</button>
           </div>
 
@@ -299,12 +338,14 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
                     <td>
                       <div className="ap-act">
                         <button className="ap-b" onClick={() => setDlg({ kind: 'view', a })}>View</button>
+                        {a.status === 'Pending' && <button className="ap-b sl" onClick={() => setDlg({ kind: 'mailI', a })}>Shortlist</button>}
                         {open(a.status) && (
                           <>
                             <button className="ap-b a" onClick={() => setDlg({ kind: 'accept', a })}>Accept</button>
                             <button className="ap-b r" onClick={() => { setNote(''); setDlg({ kind: 'reject', a }) }}>Reject</button>
                           </>
                         )}
+                        {a.status === 'Interview' && a.interviewEmailSent && <span className="ap-ok"><Ic d={P.check} s={16} />Interview email sent</span>}
                         {a.status === 'Accepted' && <span className="ap-ok"><Ic d={P.check} s={16} />Email sent</span>}
                       </div>
                     </td>
@@ -374,6 +415,8 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
       )}
       {dlg?.kind === 'mailA' && <AcceptMail a={dlg.a} onClose={close} onSend={(to) => sendAccept(dlg.a, to)} />}
       {dlg?.kind === 'mailR' && <RejectMail a={dlg.a} onClose={close} onSend={() => { setToast(`Rejection email sent to ${dlg.a.name}.`); close() }} />}
+
+      {dlg?.kind === 'mailI' && <InterviewMail a={dlg.a} onClose={close} onSend={(to) => sendInterview(dlg.a, to)} />}
 
       {toast && <div className="ap-toast" role="status">{toast}</div>}
     </div>
