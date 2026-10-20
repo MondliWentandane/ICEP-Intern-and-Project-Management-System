@@ -1,11 +1,24 @@
 import { prisma } from "../config/prisma";
 
+export type ApplicationStatusValue = "PENDING" | "INTERVIEWEE" | "ACCEPTED" | "REJECTED";
+
 export const applicationInclude = {
   position: { include: { campus: true, department: true, intake: true } },
   skills: { include: { skill: true } },
   documents: true,
   reviewedBy: { select: { id: true, fullName: true, email: true } },
 } as const;
+
+export type ApplicationProfileUpdate = {
+  fullName?: string;
+  email?: string;
+  phone?: string | null;
+  studentNumber?: string;
+  institution?: string;
+  qualification?: string;
+  yearOfStudy?: number | null;
+  skillIds?: string[];
+};
 
 export class ApplicationRepository {
   list(filters: { status?: string; positionId?: string } = {}) {
@@ -18,6 +31,14 @@ export class ApplicationRepository {
       orderBy: { createdAt: "desc" },
     });
   }
+
+  findByStatus(status: ApplicationStatusValue) {
+    return prisma.application.findMany({
+      where: { status }, include: applicationInclude, orderBy: { createdAt: "desc" },
+    });
+  }
+
+  findPending() { return this.findByStatus("PENDING"); }
 
   findById(id: string) {
     return prisma.application.findUnique({ where: { id }, include: applicationInclude });
@@ -48,17 +69,60 @@ export class ApplicationRepository {
     });
   }
 
-  update(id: string, data: {
-    status?: "PENDING" | "INTERVIEWEE" | "ACCEPTED" | "REJECTED";
-    interviewAt?: Date | null; rejectionReason?: string | null; reviewedById?: string;
-  }) {
+  updateProfile(id: string, data: ApplicationProfileUpdate) {
+    const { skillIds, ...profile } = data;
     return prisma.application.update({
       where: { id },
       data: {
-        ...data,
-        ...(data.status ? { reviewedAt: new Date() } : {}),
+        ...profile,
+        ...(profile.email ? { email: profile.email.trim().toLowerCase() } : {}),
+        ...(skillIds ? {
+          skills: {
+            deleteMany: {},
+            create: skillIds.map((skillId) => ({ skill: { connect: { id: skillId } } })),
+          },
+        } : {}),
       },
       include: applicationInclude,
     });
   }
+
+  updateStatus(id: string, data: {
+    status: ApplicationStatusValue;
+    interviewAt?: Date | null;
+    rejectionReason?: string | null;
+    reviewedById?: string;
+  }) {
+    return prisma.application.update({
+      where: { id },
+      data: { ...data, reviewedAt: new Date() },
+      include: applicationInclude,
+    });
+  }
+
+  async setPasswordFromToken(tokenHash: string, passwordHash: string): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const token = await tx.passwordToken.findFirst({
+        where: {
+          tokenHash, purpose: "SET_PASSWORD", usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true, userId: true },
+      });
+      if (!token) return false;
+
+      const claimed = await tx.passwordToken.updateMany({
+        where: { id: token.id, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) return false;
+
+      await tx.user.update({
+        where: { id: token.userId },
+        data: { passwordHash },
+      });
+      return true;
+    });
+  }
 }
+
