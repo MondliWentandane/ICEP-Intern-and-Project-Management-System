@@ -5,6 +5,7 @@ import { Check, CircleCheck, FileText, Mail } from 'lucide-react'
 import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { TableError, TableLoading } from '@/components/data/TableStates'
 import { LinkButton } from '@/features/public-site/components/LinkButton'
+import { PlacementLetterCard } from '@/features/placement-letter/PlacementLetterCard'
 import { HelpLine } from '../components/FormBits'
 import { endTrackSession, findApplication, readTrackSession, stageOrder, type ApplicationStage, type TrackedApplication } from '../data/applications'
 
@@ -19,6 +20,12 @@ const stageLabels: Record<ApplicationStage, string> = {
 }
 
 function stageText(stage: ApplicationStage, application: TrackedApplication) {
+  const placement = application.outcome === 'accepted' ? application.placement : undefined
+  if (placement && stage === 'outcome') return `You were accepted for a WIL placement on ${longDate(placement.acceptedAt)}.`
+  if (placement && stage === 'placement') {
+    const period = placement.startDate && placement.endDate ? ` from ${longDate(placement.startDate)} to ${longDate(placement.endDate)}` : ''
+    return `Your WIL placement letter has been issued. You'll be placed at the ${application.campus} campus${period}; your mentor will be introduced when you start.`
+  }
   switch (stage) {
     case 'submitted': return `We received your application on ${longDate(application.submittedAt)}.`
     case 'under_review': return 'The ICEP placement team is assessing your details, skills and supporting documents.'
@@ -28,7 +35,8 @@ function stageText(stage: ApplicationStage, application: TrackedApplication) {
 }
 
 function Timeline({ application }: { application: TrackedApplication }) {
-  const current = stageOrder.indexOf(application.stage)
+  // Once accepted, every step is complete (the placement letter has been issued).
+  const current = application.outcome === 'accepted' ? stageOrder.length : stageOrder.indexOf(application.stage)
   return (
     <Box component="ol" aria-label="Application progress" sx={{ listStyle: 'none', p: 0, m: 0 }}>
       {stageOrder.map((stage, index) => {
@@ -91,6 +99,7 @@ export function TrackApplicationPage() {
   if (!application) return <Navigate to={`/track?reference=${encodeURIComponent(reference)}`} replace />
 
   const signOut = () => { endTrackSession(); navigate('/track', { replace: true }) }
+  const accepted = application.outcome === 'accepted' && application.placement
 
   return (
     <Box sx={{ maxWidth: 880, mx: 'auto', display: 'grid', gap: 2.5 }}>
@@ -113,8 +122,10 @@ export function TrackApplicationPage() {
         <Box>
           <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Current status</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mt: 0.5 }}>
-            <Typography id="status-title" component="h2" sx={{ fontSize: 24, fontWeight: 750 }}>{stageLabels[application.stage]}</Typography>
-            <Chip size="small" label="In progress" sx={{ bgcolor: 'var(--icep-pending-tint)', color: '#92400E', fontWeight: 600 }} />
+            <Typography id="status-title" component="h2" sx={{ fontSize: 24, fontWeight: 750 }}>{accepted ? 'Accepted' : stageLabels[application.stage]}</Typography>
+            {accepted
+              ? <Chip size="small" label="Placement confirmed" sx={{ bgcolor: 'var(--icep-active-tint)', color: '#166534', fontWeight: 600 }} />
+              : <Chip size="small" label="In progress" sx={{ bgcolor: 'var(--icep-pending-tint)', color: '#92400E', fontWeight: 600 }} />}
           </Box>
           <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>Last updated {longDate(application.updatedAt)}</Typography>
         </Box>
@@ -124,6 +135,17 @@ export function TrackApplicationPage() {
           <Typography sx={{ fontSize: 13 }}>ICEP · {application.campus} Campus · Submitted {longDate(application.submittedAt)}</Typography>
         </Box>
       </Paper>
+
+      {accepted && application.placement && (
+        <PlacementLetterCard sx={{ ...cardSx, border: '1px solid', borderColor: 'var(--icep-active)' }} details={{
+          ...application.placement,
+          fullName: `${application.firstName} ${application.surname}`,
+          reference: application.reference,
+          positionTitle: application.positionTitle,
+          campus: application.campus,
+          issuedAt: application.placement.acceptedAt,
+        }} />
+      )}
 
       <Paper component="section" aria-labelledby="progress-title" sx={cardSx}>
         <Typography id="progress-title" component="h2" sx={{ fontSize: 19, fontWeight: 700, mb: 2.5 }}>Progress</Typography>

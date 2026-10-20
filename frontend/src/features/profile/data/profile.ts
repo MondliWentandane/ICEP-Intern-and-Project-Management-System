@@ -15,6 +15,16 @@ export interface Profile {
   intake?: string
   skills: string[]
   cv?: ProfileCv
+  /** Interns only: the accepted placement, used for the WIL placement letter. */
+  placement?: {
+    reference: string
+    acceptedAt: string
+    institution: string
+    positionTitle: string
+    department: string
+    startDate: string
+    endDate: string
+  }
 }
 
 export const qualifications = ['Diploma in Informatics', 'Diploma in Computer Science', 'Diploma in Information Technology', 'Advanced Diploma in ICT', 'Bachelor of Information Technology']
@@ -34,6 +44,10 @@ function seed(user: User): Profile {
     campus: 'Polokwane', studentNumber: '241189694', qualification: 'Diploma in Informatics', intake: 'July 2026',
     skills: ['React', 'JavaScript', 'SQL', 'UI design'],
     cv: { name: `${user.name.replace(/\s+/g, '_')}_CV.pdf`, size: 248 * 1024, updatedAt: '2026-07-02' },
+    placement: {
+      reference: 'ICEP-2026-00412', acceptedAt: '2026-06-18', institution: 'Tshwane University of Technology',
+      positionTitle: 'Web Developer Intern', department: 'Software Development', startDate: '2026-07-13', endDate: '2026-12-11',
+    },
   }
 }
 

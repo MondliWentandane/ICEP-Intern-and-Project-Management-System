@@ -129,11 +129,12 @@ export class EmailService {
             throw new Error("PASSWORD_RESET template not found.");
         }
 
+        const finalHtmlBody = template.body.replace('{{resetLink}}', actualResetLink);
+
         await this.outlookService.sendTemplateEmail(
             email,
             template.subject,
-            template.body,
-            { resetLink: actualResetLink }
+            finalHtmlBody
         );
     }
 }

@@ -1,11 +1,11 @@
 // Group A — applicant approval & onboarding (owner: Tshephang), plus Group A emails & notifications (owner: Siphesihle).
 // Flow: Apply (PENDING) -> optional interview -> Accept (intern created + password-link email) or Reject.
 import { Router } from "express";
-import { ApplicationController } from "../controllers/ApplicationController";
+import { ApplicationController, reviewApplication } from "../controllers/ApplicationController";
 import multer, { type FileFilterCallback } from "multer";
-import type { Request } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { EmailController } from "../controllers/EmailController";
-import { AuthMiddleware } from "../middlewares/AuthMiddleware";
+import { AuthMiddleware, notImplemented } from "./guards";
 
 // Access guards (roles match the Prisma Role enum): verifyToken first, then the role check.
 const authenticated = [AuthMiddleware.verifyToken];
@@ -31,12 +31,18 @@ const applicationUploads = multer({
   { name: "academicRecord", maxCount: 1 },
 ]);
 
+// "Schedule interview" = status change to INTERVIEWEE; reuses the controller's reviewApplication.
+const asInterview = (req: Request, _res: Response, next: NextFunction) => {
+  req.body = { ...(req.body ?? {}), status: "INTERVIEWEE" };
+  next();
+};
+
 const router = Router();
 
 // ---- Public: careers page + application form --------------------------------
-router.get("/positions", ApplicationController.getPositions); // only OPEN positions
-router.get("/positions/manage", adminOrHandler, ApplicationController.getAllPositions); // incl. DRAFT / CLOSED
-router.get("/positions/:id", ApplicationController.getPosition);
+router.get("/positions", notImplemented("GET /positions")); // only OPEN positions
+router.get("/positions/manage", adminOrHandler, notImplemented("GET /positions/manage")); // incl. DRAFT / CLOSED
+router.get("/positions/:id", notImplemented("GET /positions/:id"));
 
 // Multipart form (fields + cv, idDocument, academicRecord). Creates the application as PENDING.
 // /applications is what the frontend calls; /register is the path in the sequence diagram.
@@ -44,13 +50,13 @@ router.post("/applications", applicationUploads, ApplicationController.registerA
 router.post("/register", applicationUploads, ApplicationController.registerApplicant);
 
 // "View Application Status": applicant looks up with email + reference (no account needed).
-router.post("/applications/track", ApplicationController.trackApplication);
-router.post("/applications/track/link", ApplicationController.sendTrackingLink);
+router.post("/applications/track", notImplemented("POST /applications/track"));
+router.post("/applications/track/link", notImplemented("POST /applications/track/link"));
 
 // ---- Careers management (Admin / WIL Handler) ---------------------------------
-router.post("/positions", adminOrHandler, ApplicationController.createPosition);
-router.put("/positions/:id", adminOrHandler, ApplicationController.updatePosition);
-router.put("/positions/:id/status", adminOrHandler, ApplicationController.setPositionStatus); // DRAFT / OPEN / CLOSED
+router.post("/positions", adminOrHandler, notImplemented("POST /positions"));
+router.put("/positions/:id", adminOrHandler, notImplemented("PUT /positions/:id"));
+router.put("/positions/:id/status", adminOrHandler, notImplemented("PUT /positions/:id/status")); // DRAFT / OPEN / CLOSED
 
 // ---- Applicants queue (Admin / WIL Handler) -----------------------------------
 // Query: ?status=PENDING|INTERVIEWEE|ACCEPTED|REJECTED &campusId= &positionId= &search= &page= &limit=
@@ -58,8 +64,8 @@ router.get("/applicants", adminOrHandler, ApplicationController.getApplicants);
 router.get("/applicants/pending", adminOrHandler, ApplicationController.getPendingApplicants);
 router.post("/applicants", adminOrHandler, applicationUploads, ApplicationController.registerApplicant); // "Add applicant"
 router.get("/applicants/:id", adminOrHandler, ApplicationController.getApplicant);
-router.get("/applicants/:id/documents", adminOrHandler, ApplicationController.getApplicantDocuments);
-router.put("/applicants/:id/interview", adminOrHandler, ApplicationController.scheduleInterview);
+router.get("/applicants/:id/documents", adminOrHandler, notImplemented("GET /applicants/:id/documents"));
+router.put("/applicants/:id/interview", adminOrHandler, asInterview, reviewApplication);
 router.put("/applicants/:id/accept", adminOrHandler, ApplicationController.acceptApplicant);
 router.put("/applicants/:id/reject", adminOrHandler, ApplicationController.rejectApplicant);
 
