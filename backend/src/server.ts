@@ -3,6 +3,8 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { disconnectPrisma } from "./config/prisma";
+import { EmailController } from "./controllers/EmailController";
+
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -22,6 +24,8 @@ app.get("/health", (_req, res) => {
     message: "Backend is healthy",
   });
 });
+
+app.post("/api/email/setup-password", (req, res) => EmailController.sendPasswordLink(req, res));
 
 const server = app.listen(PORT, () => {
   console.log(`ICEP backend running at http://localhost:${PORT}`);
