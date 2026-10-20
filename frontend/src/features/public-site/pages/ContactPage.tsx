@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Paper, Typography } from '@mui/material'
+import { CursorFollower } from '../story/CursorFollower'
 
 /** frontend/src/features/public-site/pages/ContactPage.tsx (route /contact already exists). Styles are included below. */
 
@@ -217,6 +218,7 @@ export function ContactPage({ onSendMessage }: { onSendMessage?: (m: ContactMess
   return (
     <section className="cp">
       <style>{CSS}</style>
+      <CursorFollower />
       <div className="cp-w">
         <Paper
           component="section"

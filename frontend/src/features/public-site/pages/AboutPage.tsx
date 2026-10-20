@@ -1,6 +1,7 @@
 import { Box, Link, Paper, Typography, type SxProps, type Theme } from '@mui/material'
 import { Building2, Code, UsersRound } from 'lucide-react'
 import { LinkButton } from '../components/LinkButton'
+import { CursorFollower } from '../story/CursorFollower'
 import { riseSx, useReveal } from '../story/useScrollProgress'
 
 const VIDEO_URL = 'https://www.youtube.com/watch?v=_91tr1Rgg0A'
@@ -189,6 +190,7 @@ function MissionAndVideoSection() {
 export function AboutPage() {
   return (
     <Box sx={{ display: 'grid', gap: 4 }}>
+      <CursorFollower />
       {/* Header section with zero extra gap and clean subheading */}
       <Paper
         component="section"

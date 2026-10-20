@@ -7,6 +7,7 @@ import { TableEmpty, TableError, TableLoading } from '@/components/data/TableSta
 import { useSearchParams } from 'react-router-dom'
 import { LinkButton } from '../components/LinkButton'
 import { CategoryIcon, PositionStatusPill } from '../components/PositionBits'
+import { CursorFollower } from '../story/CursorFollower'
 import { campuses, fetchPositions, positionCategories, type CareerPosition, type PositionCategory } from '../data/positions'
 import { riseSx, useReveal } from '../story/useScrollProgress'
 
@@ -99,6 +100,7 @@ export function CareersPage() {
 
   return (
     <Box sx={{ display: 'grid', gap: 4 }}>
+      <CursorFollower />
       <Paper component="section" sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider', bgcolor: '#fff' }}>
         <Typography sx={{ color: 'primary.main', fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>ICEP · Work-integrated learning</Typography>
         <Typography component="h1" sx={{ fontSize: { xs: 28, md: 32 }, fontWeight: 750, mt: 0.5 }}>Find your WIL placement</Typography>
