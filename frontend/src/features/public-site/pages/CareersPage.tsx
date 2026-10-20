@@ -99,7 +99,7 @@ export function CareersPage() {
 
   return (
     <Box sx={{ display: 'grid', gap: 4 }}>
-      <Paper component="section" sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, boxShadow: 'none' }}>
+      <Paper component="section" sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider', bgcolor: '#fff' }}>
         <Typography sx={{ color: 'primary.main', fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>ICEP · Work-integrated learning</Typography>
         <Typography component="h1" sx={{ fontSize: { xs: 28, md: 32 }, fontWeight: 750, mt: 0.5 }}>Find your WIL placement</Typography>
         <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>Put your skills into practice. Explore WIL opportunities at TUT.</Typography>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Paper, Typography } from '@mui/material'
 
 /** frontend/src/features/public-site/pages/ContactPage.tsx (route /contact already exists). Styles are included below. */
 
@@ -13,11 +14,7 @@ const CAMPUS = {
 
 const CSS = `
 .cp{--p:var(--mui-palette-primary-main,#1f3a68);--t:var(--mui-palette-text-primary,#0f1a2b);--m:var(--mui-palette-text-secondary,#5b6678);--b:var(--mui-palette-background-paper,#fff);--l:var(--mui-palette-divider,#d9dee7);--e:cubic-bezier(.65,0,.35,1);color:var(--t)}
-.cp *{box-sizing:border-box}
-.cp-w{max-width:1200px;margin:0 auto;padding:40px 24px}
-.cp-h{text-align:center;margin-bottom:48px}
-.cp-h h1{font-size:clamp(32px,4.5vw,44px);margin:0 0 12px}
-.cp-h p{margin:0;color:var(--m);font-size:clamp(16px,2vw,20px)}
+.cp-w{max-width:1200px;margin:0 auto;display:grid;gap:32px}
 .cp-st{display:grid;gap:32px}
 .cp-on .cp-st{gap:0;overflow:hidden}
 .cp-on .cp-ly{grid-area:1/1;will-change:opacity,transform}
@@ -59,7 +56,7 @@ textarea.cp-in{min-height:170px;resize:vertical}
 .cp-pp h3{margin:0 0 8px;font-size:18px;line-height:1.3}
 .cp-pp p{margin:0 0 12px;color:var(--m);font-size:15px}
 @media(min-width:600px){.cp-2{grid-template-columns:1fr 1fr}}
-@media(min-width:900px){.cp-w{padding:64px 24px}.cp-cols{gap:32px;grid-template-columns:1fr 1.15fr}.cp-i{padding:32px}.cp-f{padding:24px 24px 0 0}.cp-mp{min-height:450px}.cp-pp{max-width:400px}}
+@media(min-width:900px){.cp-cols{gap:32px;grid-template-columns:1fr 1.15fr}.cp-i{padding:32px}.cp-f{padding:24px 24px 0 0}.cp-mp{min-height:450px}.cp-pp{max-width:400px}}
 `
 
 const Ic = ({ children, s = 20 }: { children: ReactNode; s?: number }) => (
@@ -221,10 +218,35 @@ export function ContactPage({ onSendMessage }: { onSendMessage?: (m: ContactMess
     <section className="cp">
       <style>{CSS}</style>
       <div className="cp-w">
-        <div className="cp-h">
-          <h1>Get in touch</h1>
-          <p>Have a question about WIL placements? Send us a message and the ICEP team will get back to you.</p>
-        </div>
+        <Paper
+          component="section"
+          sx={{
+            p: { xs: 3, md: 5 },
+            borderRadius: 3,
+            boxShadow: 'none',
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: '#fff',
+          }}
+        >
+          <Typography
+            sx={{
+              color: 'primary.main',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            ICEP · Work-integrated learning
+          </Typography>
+          <Typography component="h1" sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 750, mt: 0.5 }}>
+            Get in touch
+          </Typography>
+          <Typography sx={{ color: 'text.secondary', mt: 0.5, fontSize: { xs: 15, md: 17 }, lineHeight: 1.6, maxWidth: 800 }}>
+            Have a question about WIL placements? Send us a message and the ICEP team will get back to you.
+          </Typography>
+        </Paper>
         <ScrollSwap
           first={
             <div className="cp-c">
