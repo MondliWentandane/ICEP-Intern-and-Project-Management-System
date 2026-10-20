@@ -4,8 +4,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const outlookTransporter = nodemailer.createTransport({
-    host: "smtp-relay.bravo.com",
-    port: 587,
+    host: 'smtp-relay.brevo.com',
+    port: 2525,
     secure: false,
     auth: {
         user: process.env.OUTLOOK_SMTP_LOGIN,
