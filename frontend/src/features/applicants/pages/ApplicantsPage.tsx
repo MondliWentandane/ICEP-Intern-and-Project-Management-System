@@ -1,4 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { PlacementLetterPreview } from '@/features/placement-letter/PlacementLetterCard'
+import { placementLetterFileName, printPlacementLetter, type PlacementLetterDetails } from '@/features/placement-letter/placementLetter'
 
 /** frontend/src/features/applicants/pages/ApplicantsPage.tsx — page content only (no sidebar / top bar); styles are included below. */
 
@@ -72,6 +75,12 @@ const CSS = `
 .ap-msg .btn{display:inline-block;background:var(--pr);color:#fff;font-weight:700;padding:8px 13px;border-radius:7px;margin:3px 0 14px}
 .ap-msg.big{font-size:15px;line-height:1.25;min-height:257px;padding:18px 20px}.ap-msg.big p{margin:0 0 12px}
 .ap-b.sl{border-color:#2563eb;color:#1d4ed8;font-weight:600}
+.ap-b.pl{border-color:#15803d;color:#15803d;font-weight:600}
+.ap-att{display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 12px;border:1px solid var(--ln);border-radius:10px;background:#fff}
+.ap-att .ic{width:34px;height:34px;border-radius:8px;background:#fde2e2;color:#b42318;display:grid;place-items:center;font-size:10px;font-weight:800;flex:none}
+.ap-att .nm{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ap-att .nm span{display:block;font-weight:400;color:var(--mu);font-size:12px}
+.ap-att .ap-b{height:29px}
+.ap-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 `
 
 type Status = 'Pending' | 'Interview' | 'Accepted' | 'Rejected'
@@ -80,7 +89,13 @@ export interface Applicant {
   note?: string
   /** true once the interview invitation email has been sent */
   interviewEmailSent?: boolean
+  /** Set on acceptance: the details on the WIL placement letter attached to the acceptance email. */
+  placement?: Placement
 }
+
+/** Placement details captured when accepting, used for the WIL placement letter. */
+interface Placement { department: string; startDate: string; endDate: string; acceptedAt: string; signatory: string }
+const DEPARTMENTS = ['Software Development', 'Cybersecurity & Informatics', 'Systems Engineering', 'Multimedia & Design']
 
 const BASE: Applicant[] = [
   { id: 1, name: 'Thabo Molefe', studentNo: '210000000', campus: 'Soshanguve South', course: 'Computer Science', level: 'Diploma', date: '30 Sep 2026', status: 'Pending' },
@@ -126,8 +141,25 @@ const WIDTH = ['17%', '10%', '11%', '15%', '9%', '8%', '30%']
 const initials = (n: string) => n.split(' ').map((w) => w[0]).join('')
 
 const today = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-type Dlg = null | { kind: 'add' } | { kind: 'view' | 'accept' | 'reject' | 'mailA' | 'mailR' | 'mailI'; a: Applicant }
+type Dlg = null | { kind: 'add' } | { kind: 'view' | 'accept' | 'reject' | 'mailR' | 'mailI'; a: Applicant } | { kind: 'mailA'; a: Applicant; placement: Placement }
 const prog = (a: Applicant) => `${a.level} in ${a.course}`
+const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+// Demo letter details. TODO: take reference, institution and position from the application once the API is connected.
+const letterDetails = (a: Applicant, p: Placement): PlacementLetterDetails => ({
+  fullName: a.name,
+  reference: `ICEP-${p.acceptedAt.slice(0, 4)}-${String(a.id).slice(-5).padStart(5, '0')}`,
+  studentNumber: a.studentNo,
+  institution: 'Tshwane University of Technology',
+  qualification: prog(a),
+  positionTitle: `${a.course} Intern`,
+  department: p.department,
+  campus: a.campus,
+  startDate: p.startDate,
+  endDate: p.endDate,
+  issuedAt: p.acceptedAt,
+  signatory: p.signatory,
+})
 type NewApplicant = Pick<Applicant, 'name' | 'studentNo' | 'campus' | 'course' | 'level'>
 
 function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: ReactNode }) {
@@ -189,7 +221,51 @@ function AddForm({ onAdd }: { onAdd: (v: NewApplicant) => void }) {
 
 const first = (a: Applicant) => a.name.split(' ')[0]
 
-function AcceptMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void; onSend: (to: string) => void }) {
+/** Accept step: the placement details that go on the WIL placement letter. */
+function AcceptForm({ signatory, onAccept }: { signatory: string; onAccept: (p: Placement) => void }) {
+  // Defaults: a six-month placement starting on the 1st of next month.
+  const [v, setV] = useState(() => {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const end = new Date(start.getFullYear(), start.getMonth() + 6, 0)
+    return { department: DEPARTMENTS[0], startDate: isoDate(start), endDate: isoDate(end) }
+  })
+  const [err, setErr] = useState('')
+  const on = (k: keyof typeof v) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV((o) => ({ ...o, [k]: e.target.value }))
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!v.startDate || !v.endDate) return setErr('Enter the placement start and end dates')
+    if (v.endDate <= v.startDate) return setErr('The end date must be after the start date')
+    setErr('')
+    onAccept({ ...v, acceptedAt: new Date().toISOString(), signatory })
+  }
+  return (
+    <form id="accept-form" className="ap-fm" onSubmit={submit} noValidate style={{ marginTop: 14 }}>
+      <label>Department
+        <span className="ap-fsel"><select className="ap-fi" value={v.department} onChange={on('department')}>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select><Ic d={P.down} s={16} /></span>
+      </label>
+      <div className="ap-two">
+        <label>Placement start<input type="date" className="ap-fi" value={v.startDate} onChange={on('startDate')} /></label>
+        <label>Placement end<input type="date" className="ap-fi" value={v.endDate} onChange={on('endDate')} /></label>
+      </div>
+      <small>{err}</small>
+    </form>
+  )
+}
+
+function LetterAttachment({ details }: { details: PlacementLetterDetails }) {
+  const [preview, setPreview] = useState(false)
+  return (
+    <div className="ap-att">
+      <span className="ic">PDF</span>
+      <span className="nm">{placementLetterFileName(details.fullName)}.pdf<span>WIL placement letter · attached</span></span>
+      <button type="button" className="ap-b" onClick={() => setPreview(true)}>Preview</button>
+      <PlacementLetterPreview details={details} open={preview} onClose={() => setPreview(false)} />
+    </div>
+  )
+}
+
+function AcceptMail({ a, placement, onClose, onSend }: { a: Applicant; placement: Placement; onClose: () => void; onSend: (to: string) => void }) {
   const [to, setTo] = useState(a.name)
   const [subject, setSubject] = useState('Application accepted – ICEP Internship Programme')
   return (
@@ -204,8 +280,10 @@ function AcceptMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void;
       <div className="ap-msg">
         <p>Dear {first(a)},</p>
         <p>Congratulations! Your application for the {prog(a)} ({a.campus}) has been accepted.</p>
+        <p>Please find your <b>WIL placement letter</b> attached. Submit it to your institution's WIL / experiential learning office.</p>
         <p>Regards,<br /><b>ICEP WIL Office</b></p>
       </div>
+      <LetterAttachment details={letterDetails(a, placement)} />
     </Modal>
   )
 }
@@ -255,6 +333,8 @@ function InterviewMail({ a, onClose, onSend }: { a: Applicant; onClose: () => vo
 }
 
 export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant[] }) {
+  const { user } = useAuth()
+  const signatory = user?.name ?? 'WIL Coordinator'
   const [rows, setRows] = useState(applicants)
   const [q, setQ] = useState('')
   const [campus, setCampus] = useState('')
@@ -286,8 +366,12 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
   const close = () => setDlg(null)
   const setStatusOf = (a: Applicant, s: Status, n?: string) =>
     setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: s, ...(n ? { note: n } : {}) } : x)))
-  // Accept: confirm -> review email -> Send email marks the applicant Accepted.
-  const sendAccept = (a: Applicant, to: string) => { setStatusOf(a, 'Accepted'); setToast(`Email sent to ${to}.`); close() }
+  // Accept: confirm + placement details -> review email (WIL placement letter attached) -> Send email marks the applicant Accepted.
+  const sendAccept = (a: Applicant, placement: Placement, to: string) => {
+    setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: 'Accepted', placement } : x)))
+    setToast(`Email with WIL placement letter sent to ${to}.`)
+    close()
+  }
   // Shortlist: click Shortlist -> review the interview email -> Send email moves the applicant to Interview.
   // Cancelling the email leaves the status as Pending.
   const sendInterview = (a: Applicant, to: string) => {
@@ -346,6 +430,7 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
                           </>
                         )}
                         {a.status === 'Interview' && a.interviewEmailSent && <span className="ap-ok"><Ic d={P.check} s={16} />Interview email sent</span>}
+                        {a.status === 'Accepted' && a.placement && <button className="ap-b pl" onClick={() => printPlacementLetter(letterDetails(a, a.placement!))}>Placement letter</button>}
                         {a.status === 'Accepted' && <span className="ap-ok"><Ic d={P.check} s={16} />Email sent</span>}
                       </div>
                     </td>
@@ -393,10 +478,11 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
       {dlg?.kind === 'accept' && (
         <Modal title="Accept applicant" onClose={close} footer={<>
           <button className="ap-b ap-bl" onClick={close}>Cancel</button>
-          <button className="ap-b ap-bp" onClick={() => setDlg({ kind: 'mailA', a: dlg.a })}>Accept and send email</button>
+          <button type="submit" form="accept-form" className="ap-b ap-bp">Accept and send email</button>
         </>}>
           <p className="ap-q">Accept <b>{dlg.a.name}</b> for {prog(dlg.a)}?</p>
-          <div className="ap-mail"><Ic d={P.mail} s={22} /><span>An acceptance email will be sent to the applicant through Outlook.</span></div>
+          <div className="ap-mail"><Ic d={P.mail} s={22} /><span>An acceptance email will be sent to the applicant through Outlook, with their WIL placement letter attached.</span></div>
+          <AcceptForm signatory={signatory} onAccept={(placement) => setDlg({ kind: 'mailA', a: dlg.a, placement })} />
         </Modal>
       )}
 
@@ -413,7 +499,7 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
           </label>
         </Modal>
       )}
-      {dlg?.kind === 'mailA' && <AcceptMail a={dlg.a} onClose={close} onSend={(to) => sendAccept(dlg.a, to)} />}
+      {dlg?.kind === 'mailA' && <AcceptMail a={dlg.a} placement={dlg.placement} onClose={close} onSend={(to) => sendAccept(dlg.a, dlg.placement, to)} />}
       {dlg?.kind === 'mailR' && <RejectMail a={dlg.a} onClose={close} onSend={() => { setToast(`Rejection email sent to ${dlg.a.name}.`); close() }} />}
 
       {dlg?.kind === 'mailI' && <InterviewMail a={dlg.a} onClose={close} onSend={(to) => sendInterview(dlg.a, to)} />}
