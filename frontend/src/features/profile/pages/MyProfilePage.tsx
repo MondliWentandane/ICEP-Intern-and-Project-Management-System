@@ -7,6 +7,7 @@ import { TableError, TableLoading } from '@/components/data/TableStates'
 import { FileRow } from '@/features/application/components/FileUploads'
 import { formatBytes } from '@/features/application/data/applicationSchema'
 import { downloadBlob } from '@/utils/format'
+import { PlacementLetterCard } from '@/features/placement-letter/PlacementLetterCard'
 import { DetailValue, PageHeading, ProfileFootnote, ProfileHeader, SecurityCard, SkillChips } from '../components/ProfileParts'
 import { cardSx } from '../components/styles'
 import { useProfile } from '../hooks/useProfile'
@@ -35,6 +36,17 @@ export function MyProfilePage() {
       <PageHeading current="My profile" title="My profile" subtitle="Manage your personal information and account security." />
       <Alert severity="info">This page uses demo data until the profile API is available. Changes last until you refresh.</Alert>
       <ProfileHeader profile={profile} role={user.role} />
+      {isIntern && profile.placement && (
+        <PlacementLetterCard sx={cardSx} details={{
+          ...profile.placement,
+          fullName: profile.fullName,
+          studentNumber: profile.studentNumber,
+          qualification: profile.qualification,
+          campus: profile.campus ?? '',
+          intake: profile.intake,
+          issuedAt: profile.placement.acceptedAt,
+        }} />
+      )}
 
       <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 360px' }, alignItems: 'start' }}>
         <Paper component="section" aria-labelledby="details-title" sx={cardSx}>

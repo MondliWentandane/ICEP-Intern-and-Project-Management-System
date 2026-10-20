@@ -17,6 +17,20 @@ export interface TrackedApplication {
   /** The stage currently in progress. Earlier stages are complete. */
   stage: ApplicationStage
   documents: string[]
+  /** Set once the placement team has decided. Accepted applicants receive a WIL placement letter. */
+  outcome?: 'accepted' | 'rejected'
+  /** Placement details shown on the WIL placement letter (filled in on acceptance). */
+  placement?: {
+    acceptedAt: string
+    studentNumber?: string
+    institution?: string
+    qualification?: string
+    department?: string
+    intake?: string
+    startDate?: string
+    endDate?: string
+    signatory?: string
+  }
 }
 
 const STORE_KEY = 'icep.demo.applications'
@@ -27,6 +41,18 @@ const demoApplication: TrackedApplication = {
   reference: 'ICEP-2026-01428', email: 'applicant@example.com', firstName: 'Demo', surname: 'Applicant',
   positionTitle: 'Web Developer Intern', campus: 'Polokwane', submittedAt: '2026-10-05T09:30:00', updatedAt: '2026-10-07T14:00:00',
   stage: 'under_review', documents: ['Curriculum vitae', 'ID document', 'Academic record'],
+}
+
+// An accepted example, to try the WIL placement letter: accepted@example.com + ICEP-2026-00977.
+const demoAcceptedApplication: TrackedApplication = {
+  reference: 'ICEP-2026-00977', email: 'accepted@example.com', firstName: 'Thabo', surname: 'Mokoena',
+  positionTitle: 'Web Developer Intern', campus: 'Polokwane', submittedAt: '2026-09-02T10:15:00', updatedAt: '2026-10-12T11:00:00',
+  stage: 'placement', documents: ['Curriculum vitae', 'ID document', 'Academic record'], outcome: 'accepted',
+  placement: {
+    acceptedAt: '2026-10-12T11:00:00', studentNumber: '221045873', institution: 'Tshwane University of Technology',
+    qualification: 'Diploma in Informatics', department: 'Software Development', intake: 'January 2027',
+    startDate: '2027-01-11', endDate: '2027-06-30', signatory: 'WIL Coordinator',
+  },
 }
 
 function readStore(): TrackedApplication[] {
@@ -46,7 +72,7 @@ function writeStore(applications: TrackedApplication[]) {
 const memory: TrackedApplication[] = []
 function allApplications() {
   const stored = readStore()
-  return [demoApplication, ...stored, ...memory.filter((item) => !stored.some((saved) => saved.reference === item.reference))]
+  return [demoApplication, demoAcceptedApplication, ...stored, ...memory.filter((item) => !stored.some((saved) => saved.reference === item.reference))]
 }
 const normalise = (value: string) => value.trim().toLowerCase()
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
