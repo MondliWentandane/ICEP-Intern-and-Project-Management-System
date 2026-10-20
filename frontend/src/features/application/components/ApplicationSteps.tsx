@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import type { CareerPosition } from '@/features/public-site/data/positions'
 import { studyCategories, yearsOfStudy, type ApplicationInput, type ApplicationValues } from '../data/applicationSchema'
 import { FileDropzone, FileRow } from './FileUploads'
-import { FormField, InfoNote } from './FormBits'
+import { FieldRow, FormField, InfoNote } from './FormBits'
 import { TagInput } from './TagInput'
 
 const useApplicationContext = () => useFormContext<ApplicationInput, unknown, ApplicationValues>()
@@ -17,15 +17,14 @@ function LabeledSelect({ name, id, label, options, placeholder }: { name: 'categ
   const { control, trigger } = useApplicationContext()
   return (
     <Controller name={name} control={control} render={({ field, fieldState }) => (
-      <Box>
-        <Typography component="label" htmlFor={id} sx={{ display: 'block', fontSize: 14, fontWeight: 500, mb: 0.75 }}>{label}</Typography>
+      <FieldRow label={label} htmlFor={id}>
         <TextField select fullWidth id={id} value={field.value ?? ''} onChange={(event) => { field.onChange(event); if (fieldState.error) void trigger(name) }} onBlur={field.onBlur} inputRef={field.ref}
           error={Boolean(fieldState.error)} helperText={fieldState.error?.message}
           slotProps={{ select: { displayEmpty: true }, formHelperText: { sx: { mx: 0 } } }}>
           <MenuItem value="" disabled>{placeholder}</MenuItem>
           {options.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
         </TextField>
-      </Box>
+      </FieldRow>
     )} />
   )
 }
@@ -42,18 +41,34 @@ function PdfField({ name, id, dropTitle }: { name: 'cv' | 'idDocument' | 'academ
   )
 }
 
+/** One part of a step; the section tabs above the form scroll to its id. */
+function FormSection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <Box component="section" id={id} aria-labelledby={`${id}-title`} sx={{ display: 'grid', gap: 2.5, scrollMarginTop: 56 }}>
+      <Typography id={`${id}-title`} component="h4" sx={{ fontSize: 15, fontWeight: 700, color: 'primary.main' }}>{title}</Typography>
+      {children}
+    </Box>
+  )
+}
+
+const sectionStack = { display: 'grid', gap: 4 } as const
+
 export function PersonalStep() {
   const { register, formState: { errors } } = useApplicationContext()
   return (
-    <Box sx={{ display: 'grid', gap: 2.5 }}>
-      <Box sx={twoColumns}>
+    <Box sx={sectionStack}>
+      <FormSection id="section-name" title="Name">
         <FormField id="firstName" label="Name" autoComplete="given-name" registration={register('firstName')} errorText={errors.firstName?.message} />
         <FormField id="surname" label="Surname" autoComplete="family-name" registration={register('surname')} errorText={errors.surname?.message} />
+      </FormSection>
+      <FormSection id="section-contact" title="Contact">
         <FormField id="email" label="Email address" type="email" autoComplete="email" registration={register('email')} errorText={errors.email?.message} hint="We'll send application updates to this address." />
         <FormField id="phone" label="Phone number" type="tel" autoComplete="tel" registration={register('phone')} errorText={errors.phone?.message} hint="Use a South African mobile number." />
-      </Box>
-      <FormField id="idNumber" label="South African ID number" inputMode="numeric" registration={register('idNumber')} errorText={errors.idNumber?.message} hint="Enter your 13-digit ID number as it appears on your ID." />
-      <InfoNote icon={<ShieldCheck size={18} />}>Your information is used only to assess your WIL application and manage your placement.</InfoNote>
+      </FormSection>
+      <FormSection id="section-identity" title="Identity">
+        <FormField id="idNumber" label="South African ID number" inputMode="numeric" registration={register('idNumber')} errorText={errors.idNumber?.message} hint="Enter your 13-digit ID number as it appears on your ID." />
+        <InfoNote icon={<ShieldCheck size={18} />}>Your information is used only to assess your WIL application and manage your placement.</InfoNote>
+      </FormSection>
     </Box>
   )
 }
@@ -61,23 +76,25 @@ export function PersonalStep() {
 export function StudiesStep() {
   const { register, control, formState: { errors } } = useApplicationContext()
   return (
-    <Box sx={{ display: 'grid', gap: 2.5 }}>
-      <Box sx={twoColumns}>
+    <Box sx={sectionStack}>
+      <FormSection id="section-studies" title="Studies">
         <FormField id="studentNumber" label="Student number" inputMode="numeric" registration={register('studentNumber')} errorText={errors.studentNumber?.message} />
         <LabeledSelect name="category" id="category" label="Category" options={studyCategories} placeholder="Select category" />
         <FormField id="qualification" label="Qualification" placeholder="e.g. Diploma in Computer Science" registration={register('qualification')} errorText={errors.qualification?.message} />
         <LabeledSelect name="yearOfStudy" id="yearOfStudy" label="Year of study" options={yearsOfStudy} placeholder="Select year" />
-      </Box>
-      <Box>
-        <Typography component="label" htmlFor="skills" sx={{ display: 'block', fontSize: 14, fontWeight: 500, mb: 0.75 }}>Skills <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>(optional)</Box></Typography>
-        <Controller name="skills" control={control} render={({ field, fieldState }) => (
-          <TagInput id="skills" value={field.value ?? []} onChange={field.onChange} onBlur={field.onBlur} errorText={fieldState.error?.message} hint="Type a skill and press Enter to add it. Skills from coursework, projects or hobbies count too. No skills yet? You can leave this empty." />
-        )} />
-      </Box>
-      <Box>
-        <Typography component="label" htmlFor="cv" sx={{ display: 'block', fontSize: 14, fontWeight: 500, mb: 0.75 }}>Curriculum vitae (CV)</Typography>
-        <PdfField name="cv" id="cv" dropTitle="Choose a CV to upload or replace" />
-      </Box>
+      </FormSection>
+      <FormSection id="section-skills" title="Skills">
+        <FieldRow htmlFor="skills" label={<>Skills <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>(optional)</Box></>}>
+          <Controller name="skills" control={control} render={({ field, fieldState }) => (
+            <TagInput id="skills" value={field.value ?? []} onChange={field.onChange} onBlur={field.onBlur} errorText={fieldState.error?.message} hint="Type a skill and press Enter to add it. Skills from coursework, projects or hobbies count too. No skills yet? You can leave this empty." />
+          )} />
+        </FieldRow>
+      </FormSection>
+      <FormSection id="section-cv" title="CV">
+        <FieldRow htmlFor="cv" label="Curriculum vitae (CV)">
+          <PdfField name="cv" id="cv" dropTitle="Choose a CV to upload or replace" />
+        </FieldRow>
+      </FormSection>
     </Box>
   )
 }
@@ -86,25 +103,25 @@ export function DocumentsStep() {
   const { watch } = useApplicationContext()
   const cv = watch('cv')
   return (
-    <Box sx={{ display: 'grid', gap: 3 }}>
+    <Box sx={sectionStack}>
       {cv instanceof File && (
         <Box>
           <Typography sx={{ fontSize: 15 }}>Your CV is already attached from Your studies.</Typography>
           <FileRow muted caption="Curriculum vitae" name={cv.name} size={cv.size} status="Uploaded" action={<CircleCheck size={20} color="#16A34A" aria-label="Attached" />} />
         </Box>
       )}
-      <Box sx={twoColumns}>
-        <Box>
-          <Typography component="label" htmlFor="idDocument" sx={{ display: 'block', fontWeight: 700 }}>ID document</Typography>
+      <FormSection id="section-id-document" title="ID document">
+        <FieldRow htmlFor="idDocument" label="ID document">
           <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.25 }}>A certified copy of your South African ID.</Typography>
           <PdfField name="idDocument" id="idDocument" />
-        </Box>
-        <Box>
-          <Typography component="label" htmlFor="academicRecord" sx={{ display: 'block', fontWeight: 700 }}>Academic record</Typography>
+        </FieldRow>
+      </FormSection>
+      <FormSection id="section-academic-record" title="Academic record">
+        <FieldRow htmlFor="academicRecord" label="Academic record">
           <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.25 }}>Your latest official academic transcript.</Typography>
           <PdfField name="academicRecord" id="academicRecord" />
-        </Box>
-      </Box>
+        </FieldRow>
+      </FormSection>
       <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 13, color: 'text.secondary' }}>
         <Lock size={15} aria-hidden="true" /> Your documents are stored securely and shared only with the ICEP placement team.
       </Typography>

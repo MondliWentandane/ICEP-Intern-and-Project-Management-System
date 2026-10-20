@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Alert, Box, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, IconButton, Typography, useMediaQuery } from '@mui/material'
+import { Alert, Box, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, LinearProgress, Typography, useMediaQuery } from '@mui/material'
+import { keyframes } from '@emotion/react'
 import { useTheme } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
 import { Check, ClipboardCheck, LogIn, Mail, X } from 'lucide-react'
@@ -13,10 +14,11 @@ import { stepFields } from '../data/applicationSchema'
 import { startTrackSession } from '../data/applications'
 import { submitApplication, type SubmittedApplication } from '../data/submitApplication'
 import { useApplicationForm } from '../hooks/useApplicationForm'
+import { ApplicationRail, SectionTabs } from './ApplicationRail'
 import { ApplicationStepper } from './ApplicationStepper'
 import { DocumentsStep, PersonalStep, PositionPicker, ReviewStep, StudiesStep } from './ApplicationSteps'
-import { HelpLine } from './FormBits'
-import { applicationStepNames } from './steps'
+import { HelpLine, InlineLabels } from './FormBits'
+import { applicationStepNames, stepSections } from './steps'
 
 /** URL search param that opens the application pop-up: ?apply=<positionId>, or ?apply=choose to pick a position in the form. */
 export const APPLY_PARAM = 'apply'
@@ -29,6 +31,11 @@ const stepCopy = [
   { title: 'Review your application', subtitle: 'Check your details before submitting. Use Edit to make any changes.' },
 ]
 const lastStep = stepCopy.length - 1
+const railStepsDone = applicationStepNames.length
+
+// Each step's content slides in from the side it came from.
+const slideFromRight = keyframes`from { opacity: 0; transform: translateX(24px) } to { opacity: 1; transform: none }`
+const slideFromLeft = keyframes`from { opacity: 0; transform: translateX(-24px) } to { opacity: 1; transform: none }`
 
 /** Mounted once in the public layout; renders the pop-up whenever the URL has ?apply=… */
 export function ApplicationDialog() {
@@ -49,6 +56,7 @@ function ApplicationDialogBody({ target }: { target: string }) {
   const form = useApplicationForm(fixedPositionId)
   const selectedId = useWatch({ control: form.control, name: 'positionId' })
   const [step, setStep] = useState(0)
+  const [direction, setDirection] = useState<1 | -1>(1)
   const [submitError, setSubmitError] = useState('')
   const [submitted, setSubmitted] = useState<SubmittedApplication | null>(null)
   const unsaved = form.formState.isDirty && !submitted
@@ -71,7 +79,7 @@ function ApplicationDialogBody({ target }: { target: string }) {
   }
 
   const scrollTop = () => document.getElementById('application-dialog-content')?.scrollTo({ top: 0 })
-  const goTo = (next: number) => { setStep(next); scrollTop() }
+  const goTo = (next: number) => { setDirection(next < step ? -1 : 1); setStep(next); scrollTop() }
   const continueToNext = async () => {
     if (await form.trigger(stepFields[step], { shouldFocus: true })) goTo(step + 1)
   }
@@ -131,44 +139,60 @@ function ApplicationDialogBody({ target }: { target: string }) {
         {fixedPosition || step > 0
           ? position && <Typography sx={{ color: 'text.secondary' }}>Applying for · <Box component="strong" sx={{ color: 'text.primary' }}>{position.title} · {position.campus}</Box></Typography>
           : <PositionPicker positions={positions} />}
-        <Box sx={{ my: 3 }}><ApplicationStepper activeStep={step} /></Box>
-        <Divider sx={{ mb: 3 }} />
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: '.03em' }}>Step {step + 1} of 4</Typography>
-        <Typography id="step-title" component="h3" sx={{ fontSize: 20, fontWeight: 700, mt: 0.5 }}>{stepCopy[step].title}</Typography>
-        <Typography sx={{ color: 'text.secondary', mt: 0.5, mb: 3 }}>{stepCopy[step].subtitle}</Typography>
-        {submitError && <Alert severity="error" sx={{ mb: 2.5 }}>{submitError}</Alert>}
-        {step === 0 && <PersonalStep />}
-        {step === 1 && <StudiesStep />}
-        {step === 2 && <DocumentsStep />}
-        {step === 3 && position && <ReviewStep position={position} onEdit={goTo} />}
+        <Box sx={{ my: 3, display: { md: 'none' } }}><ApplicationStepper activeStep={step} /></Box>
+        <Box key={step} sx={{ mt: { md: 2.5 }, animation: `${direction > 0 ? slideFromRight : slideFromLeft} .28s cubic-bezier(.2,.8,.2,1)`, '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }}>
+          <SectionTabs sections={stepSections[step]} scrollContainerId="application-dialog-content" />
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: '.03em', mt: 3 }}>Step {step + 1} of 4</Typography>
+          <Typography id="step-title" component="h3" sx={{ fontSize: 20, fontWeight: 700, mt: 0.5 }}>{stepCopy[step].title}</Typography>
+          <Typography sx={{ color: 'text.secondary', mt: 0.5, mb: 3 }}>{stepCopy[step].subtitle}</Typography>
+          {submitError && <Alert severity="error" sx={{ mb: 2.5 }}>{submitError}</Alert>}
+          <InlineLabels value>
+            {step === 0 && <PersonalStep />}
+            {step === 1 && <StudiesStep />}
+            {step === 2 && <DocumentsStep />}
+          </InlineLabels>
+          {step === 3 && position && <ReviewStep position={position} onEdit={goTo} />}
+        </Box>
         <HelpLine />
       </>
     )
+    const percent = Math.round((step / stepCopy.length) * 100)
     actions = <>
-      {step === 0
-        ? <Button type="button" appearance="secondary" onClick={close}>Cancel</Button>
-        : <Button type="button" appearance="secondary" onClick={() => goTo(step - 1)} disabled={isSubmitting}>Back</Button>}
-      {step < lastStep
-        ? <Button type="button" onClick={() => void continueToNext()}>Continue</Button>
-        : <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting…' : 'Submit application'}</Button>}
+      <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1.5, flex: '0 1 220px' }}>
+        <LinearProgress variant="determinate" value={percent} aria-label="Application progress" sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: 'var(--icep-page)', '& .MuiLinearProgress-bar': { borderRadius: 3 } }} />
+        <Typography sx={{ fontSize: 13, color: 'text.secondary', whiteSpace: 'nowrap' }}>{percent}% complete</Typography>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1.5, ml: 'auto', flex: { xs: 1, sm: '0 0 auto' }, justifyContent: 'space-between' }}>
+        {step === 0
+          ? <Button type="button" appearance="secondary" onClick={close}>Cancel</Button>
+          : <Button type="button" appearance="secondary" onClick={() => goTo(step - 1)} disabled={isSubmitting}>Back</Button>}
+        {step < lastStep
+          ? <Button type="button" onClick={() => void continueToNext()}>Continue</Button>
+          : <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting…' : 'Submit application'}</Button>}
+      </Box>
     </>
   }
+
+  const showRail = Boolean(submitted) || (!isLoading && !isError && !unavailable)
 
   return (
     <>
       <Dialog open onClose={close} fullScreen={fullScreen} fullWidth maxWidth="md" scroll="paper" aria-labelledby="application-dialog-title"
-        slotProps={{ paper: { sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: 'var(--icep-page)' } } }}>
-        <DialogTitle id="application-dialog-title" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#fff', borderBottom: '1px solid', borderColor: 'divider', py: 1.5 }}>
+        slotProps={{ paper: { sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: 'var(--icep-page)', maxWidth: { md: 1040 }, flexDirection: { md: 'row' }, height: { md: 'min(780px, calc(100% - 64px))' } } } }}>
+        {showRail && <ApplicationRail activeStep={submitted ? railStepsDone : step} onSelect={submitted || isSubmitting ? undefined : goTo} />}
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
+        <DialogTitle id="application-dialog-title" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#fff', borderBottom: '1px solid', borderColor: 'divider', py: 1.5, pl: { md: 5 } }}>
           <img src={icepLogo} alt="" aria-hidden="true" style={{ height: 38, width: 'auto' }} />
           <Typography component="h2" sx={{ flex: 1, fontSize: { xs: 18, sm: 21 }, fontWeight: 750 }}>{submitted ? 'Application submitted' : 'Apply for a WIL placement'}</Typography>
           <IconButton aria-label="Close application" onClick={close} edge="end"><X size={22} /></IconButton>
         </DialogTitle>
         <FormProvider {...form}>
           <Box component="form" noValidate onSubmit={onSubmit} sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-            <DialogContent id="application-dialog-content" sx={{ px: { xs: 2, sm: 4 }, py: 3 }}>{body}</DialogContent>
-            {actions && <DialogActions sx={{ justifyContent: 'space-between', gap: 1.5, px: { xs: 2, sm: 4 }, py: 2, bgcolor: '#fff', borderTop: '1px solid', borderColor: 'divider' }}>{actions}</DialogActions>}
+            <DialogContent id="application-dialog-content" sx={{ px: { xs: 2, sm: 4 }, pl: { md: 5 }, py: 3 }}>{body}</DialogContent>
+            {actions && <DialogActions sx={{ justifyContent: 'space-between', gap: 1.5, px: { xs: 2, sm: 4 }, pl: { md: 5 }, py: 2, bgcolor: '#fff', borderTop: '1px solid', borderColor: 'divider' }}>{actions}</DialogActions>}
           </Box>
         </FormProvider>
+        </Box>
       </Dialog>
 
       <Dialog open={blocker.state === 'blocked'} onClose={() => blocker.reset?.()} aria-labelledby="discard-title" maxWidth="xs">
@@ -197,7 +221,8 @@ function SubmittedView({ application }: { application: SubmittedApplication }) {
   return (
     <Box>
       <Typography sx={{ color: 'text.secondary' }}>Applying for · <Box component="strong" sx={{ color: 'text.primary' }}>{application.positionTitle} · {application.campus}</Box></Typography>
-      <Box sx={{ my: 3 }}><ApplicationStepper activeStep={applicationStepNames.length} /></Box>
+      <Box sx={{ my: 3, display: { md: 'none' } }}><ApplicationStepper activeStep={railStepsDone} /></Box>
+      <Box sx={{ height: { md: 24 } }} />
       <Box sx={{ textAlign: 'center', display: 'grid', justifyItems: 'center', gap: 1 }} role="status">
         <Box sx={{ width: 56, height: 56, borderRadius: '50%', display: 'grid', placeItems: 'center', bgcolor: 'var(--icep-active-tint)', color: 'success.main' }}><Check size={28} aria-hidden="true" /></Box>
         <Typography component="h3" sx={{ fontSize: 22, fontWeight: 700, mt: 1 }}>Thank you, {application.firstName}</Typography>

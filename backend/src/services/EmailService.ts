@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { OutlookService } from './OutlookService';
 import { prisma } from '../config/prisma';
+import crypto from 'crypto';
 
 export class EmailService {
     private outlookService: OutlookService;
@@ -98,40 +99,41 @@ export class EmailService {
 
     public async sendPasswordSetupLink(email: string): Promise<void> {
         const user = await prisma.user.findUnique({ where: { email } });
-        const fullName = user ? user.fullName : "User";
+        if (!user) {
+            throw new Error("User not found in the system.");
+        }
+
+        const rawToken = crypto.randomBytes(32).toString('hex');
+
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        await prisma.passwordToken.create({
+            data: {
+                userId: user.id,
+                tokenHash: tokenHash,
+                purpose: 'SET_PASSWORD',
+                expiresAt: expiresAt
+            }
+        });
+
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const actualResetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
 
         const template = await prisma.emailTemplate.findUnique({
             where: { key: 'PASSWORD_RESET' }
         });
-        if (!template) throw new Error("Template 'PASSWORD_RESET' not found.");
 
-        const token = jwt.sign(
-            { email },
-            process.env.JWT_SECRET || 'fallback_secret',
-            { expiresIn: '24h' }
+        if (!template) {
+            throw new Error("PASSWORD_RESET template not found.");
+        }
+
+        await this.outlookService.sendTemplateEmail(
+            email,
+            template.subject,
+            template.body,
+            { resetLink: actualResetLink }
         );
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const setupLink = `${frontendUrl}/set-password?token=${token}`;
-
-        const subject = template.subject.split('{{fullName}}').join(fullName);
-        const content = template.body
-            .split('{{fullName}}').join(fullName)
-            .split('{{passwordLink}}').join(setupLink);
-        const htmlContent = content.split('\n').join('<br>');
-
-        const sent = await this.outlookService.sendTemplateEmail(
-            email, subject, `Set Up Your Password`, htmlContent, setupLink, 'Set Password'
-        );
-
-        if (!sent) throw new Error(`Failed to send link to ${email}`);
-
-        await prisma.emailLog.create({
-            data: {
-                templateId: template.id,
-                toEmail: email,
-                subject: subject,
-                status: 'SENT'
-            }
-        });
     }
 }
