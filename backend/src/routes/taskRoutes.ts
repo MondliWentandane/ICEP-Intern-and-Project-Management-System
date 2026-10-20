@@ -1,43 +1,144 @@
-// Group B — tasks: Kanban board, Gantt, Calendar and approval (owner: Mash).
-// Interns are read-only; mentors (and admins) create, assign, update and approve.
+
 import { Router } from "express";
 import { TaskController } from "../controllers/TaskController";
-import { AuthMiddleware } from "../middlewares/AuthMiddleware";
+import {
+    authenticateToken,
+    authorizeRoles
+} from "../middlewares/AuthMiddleware";
 
-// Access guards (roles match the Prisma Role enum): verifyToken first, then the role check.
-const adminOrMentor = [AuthMiddleware.verifyToken, AuthMiddleware.authorizeRole("ADMIN", "MENTOR")];
-const anyRole = [AuthMiddleware.verifyToken, AuthMiddleware.authorizeRole("ADMIN", "WIL_HANDLER", "MENTOR", "INTERN")];
-// Resource-level check: interns only reach their own data, mentors only their own projects / interns / tasks.
-const ownershipCheck = AuthMiddleware.authorizationCheck;
+// Only administrators and mentors can manage tasks
+const adminOrMentor = [
+    authenticateToken,
+    authorizeRoles("ADMIN", "MENTOR")
+];
+
+// All authenticated roles can access permitted task information
+const anyRole = [
+    authenticateToken,
+    authorizeRoles("ADMIN", "WIL_HANDLER", "MENTOR", "INTERN")
+];
 
 const router = Router();
 
-// ---- Project views (Kanban / Gantt) -----------------------------------------------------
-router.get("/projects/:id/tasks", anyRole, ownershipCheck, TaskController.getProjectTasks); // Kanban + subtasks
-router.get("/projects/:id/gantt", anyRole, ownershipCheck, TaskController.getGanttData); // start/end per task
+// ================= PROJECT VIEWS =================
 
-// ---- Calendar: saved tasks with start/due date + time ---------------------------------------
-router.get("/calendar", anyRole, TaskController.getCalendarEvents); // ?projectId= &from= &to=
+// Kanban board
+router.get(
+    "/projects/:id/tasks",
+    anyRole,
+    TaskController.getProjectTasks
+);
 
-// ---- Tasks ----------------------------------------------------------------------------------
-// Query: ?projectId= &status=TODO|IN_PROGRESS|COMPLETED &assignedTo= &category=
-router.get("/tasks", anyRole, TaskController.getTasks);
-router.post("/tasks", adminOrMentor, ownershipCheck, TaskController.createTask);
-router.get("/tasks/review", adminOrMentor, TaskController.getReviewQueue); // completed, awaiting approval
-router.get("/tasks/:id", anyRole, ownershipCheck, TaskController.getTask);
-router.put("/tasks/:id", adminOrMentor, ownershipCheck, TaskController.updateTask);
-router.delete("/tasks/:id", adminOrMentor, ownershipCheck, TaskController.deleteTask);
+// Gantt chart
+router.get(
+    "/projects/:id/gantt",
+    anyRole,
+    TaskController.getGanttData
+);
 
-router.put("/tasks/:id/status", adminOrMentor, ownershipCheck, TaskController.updateTaskStatus); // TODO / IN_PROGRESS / COMPLETED
-router.put("/tasks/:id/assign", adminOrMentor, ownershipCheck, TaskController.assignTo);
-router.put("/tasks/:id/approve", adminOrMentor, ownershipCheck, TaskController.approveTask); // sends task-approval notification
+// ================= CALENDAR =================
 
-// ---- Subtasks (e.g. Task: Front-end development -> Subtask: UI/UX design) ----------------------
-router.get("/tasks/:id/subtasks", anyRole, ownershipCheck, TaskController.getSubtasks);
-router.post("/tasks/:id/subtasks", adminOrMentor, ownershipCheck, TaskController.createSubtask);
+router.get(
+    "/calendar",
+    anyRole,
+    TaskController.getCalendarEvents
+);
 
-// ---- Progress updates and feedback ------------------------------------------------------------------
-router.get("/tasks/:id/comments", anyRole, ownershipCheck, TaskController.getComments);
-router.post("/tasks/:id/comments", anyRole, ownershipCheck, TaskController.addComment);
+// ================= TASKS =================
+
+// Get tasks
+router.get(
+    "/tasks",
+    anyRole,
+    TaskController.getTasks
+);
+
+// Create task
+router.post(
+    "/tasks",
+    adminOrMentor,
+    TaskController.createTask
+);
+
+// Completed tasks waiting for approval
+router.get(
+    "/tasks/review",
+    adminOrMentor,
+    TaskController.getReviewQueue
+);
+
+// Get a specific task
+router.get(
+    "/tasks/:id",
+    anyRole,
+    TaskController.getTask
+);
+
+// Update task
+router.put(
+    "/tasks/:id",
+    adminOrMentor,
+    TaskController.updateTask
+);
+
+// Delete task
+router.delete(
+    "/tasks/:id",
+    adminOrMentor,
+    TaskController.deleteTask
+);
+
+// Update task status
+router.put(
+    "/tasks/:id/status",
+    adminOrMentor,
+    TaskController.updateTaskStatus
+);
+
+// Assign task to an intern
+router.put(
+    "/tasks/:id/assign",
+    adminOrMentor,
+    TaskController.assignTo
+);
+
+// Approve completed task
+router.put(
+    "/tasks/:id/approve",
+    adminOrMentor,
+    TaskController.approveTask
+);
+
+// ================= SUBTASKS =================
+
+// Get subtasks
+router.get(
+    "/tasks/:id/subtasks",
+    anyRole,
+    TaskController.getSubtasks
+);
+
+// Create subtask
+router.post(
+    "/tasks/:id/subtasks",
+    adminOrMentor,
+    TaskController.createSubtask
+);
+
+// ================= COMMENTS =================
+
+// Get comments
+router.get(
+    "/tasks/:id/comments",
+    anyRole,
+    TaskController.getComments
+);
+
+// Add comment
+router.post(
+    "/tasks/:id/comments",
+    anyRole,
+    TaskController.addComment
+);
 
 export default router;
