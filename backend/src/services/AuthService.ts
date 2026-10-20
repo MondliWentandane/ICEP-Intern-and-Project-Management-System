@@ -2,7 +2,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { authRepository } from "../repositories/AuthRepository";
-
+import crypto from "crypto";
 export class AuthService {
   async login(email: string, password: string) {
     if (!email?.trim() || !password) {
@@ -57,6 +57,29 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  async confirmPasswordSetup(rawToken: string, newPassword: string): Promise<void> {
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const passwordToken = await authRepository.findTokenByHash(tokenHash);
+
+    if (!passwordToken) {
+      throw new Error("Invalid or fake token.");
+    }
+    if (passwordToken.usedAt !== null) {
+      throw new Error("This link has already been used.");
+    }
+    if (passwordToken.expiresAt < new Date()) {
+      throw new Error("This link has expired. Please request a new one.");
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await authRepository.updatePasswordAndConsumeToken(
+      passwordToken.userId,
+      passwordToken.id,
+      hashedPassword
+    );
   }
 }
 
