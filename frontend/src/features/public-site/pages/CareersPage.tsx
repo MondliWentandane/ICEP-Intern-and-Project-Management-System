@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Box, Chip, Divider, InputAdornment, MenuItem, Paper, TextField, Typography } from '@mui/material'
+import { Box, Chip, Divider, InputAdornment, MenuItem, Paper, TextField, Typography, type SxProps, type Theme } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Clock, MapPin, Search } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -8,10 +8,25 @@ import { useSearchParams } from 'react-router-dom'
 import { LinkButton } from '../components/LinkButton'
 import { CategoryIcon, PositionStatusPill } from '../components/PositionBits'
 import { campuses, fetchPositions, positionCategories, type CareerPosition, type PositionCategory } from '../data/positions'
+import { riseSx, useReveal } from '../story/useScrollProgress'
 
-function PositionCard({ position }: { position: CareerPosition }) {
+function PositionCard({ position, sx }: { position: CareerPosition; sx?: SxProps<Theme> }) {
   return (
-    <Paper component="article" sx={{ p: 2.5, borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 'none', display: 'flex', flexDirection: 'column' }}>
+    <Paper
+      component="article"
+      sx={[
+        {
+          p: 2.5,
+          borderRadius: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
+    >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
         <CategoryIcon category={position.category} />
         <PositionStatusPill position={position} />
@@ -25,6 +40,38 @@ function PositionCard({ position }: { position: CareerPosition }) {
       </Box>
       <LinkButton to={`/careers/${position.id}`} appearance="secondary" fullWidth endIcon={<ArrowRight size={18} />} aria-label={`View ${position.title}`}>View</LinkButton>
     </Paper>
+  )
+}
+
+function PositionsGrid({ positions }: { positions: CareerPosition[] }) {
+  const { ref, p } = useReveal<HTMLDivElement>()
+  const step = positions.length > 1 ? Math.min(0.12, 0.5 / (positions.length - 1)) : 0.12
+
+  return (
+    <Box
+      ref={ref}
+      sx={{
+        display: 'grid',
+        gap: 2.5,
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+      }}
+    >
+      {positions.map((position, index) => (
+        <PositionCard
+          key={position.id}
+          position={position}
+          sx={{
+            ...riseSx(p, index, { step, length: 0.45, distance: 32 }),
+            transition: 'opacity 0.25s ease-out, transform 0.25s ease-out',
+            '@media (prefers-reduced-motion: reduce)': {
+              transition: 'none',
+              transform: 'none',
+              opacity: 1,
+            },
+          }}
+        />
+      ))}
+    </Box>
   )
 }
 
@@ -101,9 +148,7 @@ export function CareersPage() {
           <TableEmpty message={filtered ? 'No positions match your search' : 'No open positions right now'} />
         ) : (
           <>
-            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' } }}>
-              {visible.map((position) => <PositionCard key={position.id} position={position} />)}
-            </Box>
+            <PositionsGrid positions={visible} />
             <Typography sx={{ textAlign: 'center', color: 'text.secondary', fontSize: 13, mt: 3 }}>
               {filtered ? `Showing ${visible.length} of ${positions.length} positions.` : `Showing all ${visible.length} positions. Your next chapter starts here.`}
             </Typography>
