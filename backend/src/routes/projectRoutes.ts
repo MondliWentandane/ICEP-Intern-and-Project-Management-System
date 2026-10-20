@@ -1,8 +1,16 @@
 // Group B — projects, teams, dashboards and reports (owner: Tshepiso).
 // Task-related project paths (/projects/:id/tasks, /projects/:id/gantt) live in taskRoutes.ts.
 import { Router } from "express";
-import { ProjectController } from "../controllers/ProjectController";
-import { AuthMiddleware } from "../middlewares/AuthMiddleware";
+import {
+  listProjects,
+  getProject,
+  createProject,
+  updateProject,
+  deleteProject,
+  assignProjectMember,
+  removeProjectMember,
+} from "../controllers/ProjectController";
+import { AuthMiddleware, notImplemented } from "./guards";
 
 // Access guards (roles match the Prisma Role enum): verifyToken first, then the role check.
 const authenticated = [AuthMiddleware.verifyToken];
@@ -18,31 +26,31 @@ const router = Router();
 // ---- Projects ---------------------------------------------------------------------
 // Query: ?department= &status=PLANNED|IN_PROGRESS|COMPLETED|ON_HOLD &search=
 // Admin sees all; mentors see theirs; interns see the project they are assigned to.
-router.get("/projects", anyRole, ProjectController.getProjects);
-router.post("/projects", adminOrMentor, ProjectController.createProject);
-router.get("/projects/me", authenticated, ProjectController.getMyProject); // intern "My Project" page
+router.get("/projects", anyRole, listProjects);
+router.post("/projects", adminOrMentor, createProject);
+router.get("/projects/me", authenticated, notImplemented("GET /projects/me")); // intern "My Project" page
 // Team builder: filter interns (GET /interns/filter), then group them and assign to the project.
-router.post("/projects/assign", adminOrMentor, ProjectController.assignInterns); // body: { projectId, internIds[] }
-router.get("/projects/:id", anyRole, ownershipCheck, ProjectController.getProject);
-router.put("/projects/:id", adminOrMentor, ownershipCheck, ProjectController.updateProject);
-router.put("/projects/:id/status", adminOrMentor, ownershipCheck, ProjectController.updateProjectStatus);
-router.delete("/projects/:id", adminOnly, ProjectController.deleteProject);
+router.post("/projects/assign", adminOrMentor, notImplemented("POST /projects/assign")); // body: { projectId, internIds[] }
+router.get("/projects/:id", anyRole, ownershipCheck, getProject);
+router.put("/projects/:id", adminOrMentor, ownershipCheck, updateProject);
+router.put("/projects/:id/status", adminOrMentor, ownershipCheck, updateProject);
+router.delete("/projects/:id", adminOnly, deleteProject);
 
 // ---- Project team (members + their roles) ---------------------------------------------
-router.get("/projects/:id/members", anyRole, ownershipCheck, ProjectController.getMembers);
-router.post("/projects/:id/members", adminOrMentor, ownershipCheck, ProjectController.assignInterns);
-router.put("/projects/:id/members/:internId", adminOrMentor, ownershipCheck, ProjectController.updateMemberRole);
-router.delete("/projects/:id/members/:internId", adminOrMentor, ownershipCheck, ProjectController.removeIntern);
+router.get("/projects/:id/members", anyRole, ownershipCheck, notImplemented("GET /projects/:id/members"));
+router.post("/projects/:id/members", adminOrMentor, ownershipCheck, assignProjectMember);
+router.put("/projects/:id/members/:internId", adminOrMentor, ownershipCheck, notImplemented("PUT /projects/:id/members/:internId"));
+router.delete("/projects/:id/members/:internId", adminOrMentor, ownershipCheck, removeProjectMember);
 
 // ---- Mentors (supervisor dropdown) -------------------------------------------------------
-router.get("/mentors", staff, ProjectController.getMentors);
+router.get("/mentors", staff, notImplemented("GET /mentors"));
 
 // ---- Dashboards & reports --------------------------------------------------------------------
 // The summary returned depends on the caller's role (admin / handler / mentor); :id is an optional role key.
-router.get("/dashboards", staff, ProjectController.getDashboard);
-router.get("/dashboards/:id", staff, ProjectController.getDashboard);
+router.get("/dashboards", staff, notImplemented("GET /dashboards"));
+router.get("/dashboards/:id", staff, notImplemented("GET /dashboards/:id"));
 // Interns, intakes, projects, assignments, progress. Query: ?from= &to= &campusId=
-router.get("/reports", adminOnly, ProjectController.getReports);
-router.get("/reports/export", adminOnly, ProjectController.exportReport); // ?format=pdf|xlsx|csv
+router.get("/reports", adminOnly, notImplemented("GET /reports"));
+router.get("/reports/export", adminOnly, notImplemented("GET /reports/export")); // ?format=pdf|xlsx|csv
 
 export default router;
