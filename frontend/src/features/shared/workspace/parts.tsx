@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Chip, Stack, Typography } from '@mui/material'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import { Link as RouterLink } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { statusMeta, toneColor } from './status'
@@ -91,7 +92,7 @@ export function EmptyNote({ message }: { message: string }) {
 }
 
 export function LoadingBlock() {
-  return <Stack sx={{ alignItems: 'center', py: 6 }}><CircularProgress aria-label="Loading" /></Stack>
+  return <Stack sx={{ alignItems: 'center', py: 6 }}><BikeLoader /></Stack>
 }
 
 export function SampleNotice() {

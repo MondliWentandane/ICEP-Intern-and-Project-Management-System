@@ -1,10 +1,10 @@
 import { Search, TriangleAlert } from 'lucide-react'
-import { CircularProgress } from '@mui/material'
+import { BikeLoader } from './BikeLoader'
 
 const cardStyle = { minHeight: 180, padding: 24, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 } as const
 
 export function KanbanLoading() {
-  return <div role="status" style={cardStyle}><CircularProgress size={22} /><strong>Loading tasks...</strong></div>
+  return <div style={cardStyle}><BikeLoader label="Loading tasks" /></div>
 }
 
 export function KanbanEmpty({ message = 'No tasks yet' }: { message?: string }) {
