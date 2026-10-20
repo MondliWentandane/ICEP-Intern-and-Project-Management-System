@@ -34,7 +34,6 @@ export class OutlookService {
         let subject = 'ICEP Notification';
         let body = '';
 
-        // Intelligently maps your EmailService variables without throwing TS errors
         if (typeof args[1] === 'string') {
             subject = args[1];
             body = typeof args[2] === 'string' ? args[2] : '';
