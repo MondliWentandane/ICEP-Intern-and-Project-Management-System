@@ -89,9 +89,14 @@ export interface Applicant {
   note?: string
   /** true once the interview invitation email has been sent */
   interviewEmailSent?: boolean
+  /** Date, time and venue chosen in the interview email. */
+  interview?: Interview
   /** Set on acceptance: the details on the WIL placement letter attached to the acceptance email. */
   placement?: Placement
 }
+
+/** Interview slot chosen when sending the interview invitation (date is YYYY-MM-DD, time is HH:mm). */
+interface Interview { date: string; time: string; venue: string }
 
 /** Placement details captured when accepting, used for the WIL placement letter. */
 interface Placement { department: string; startDate: string; endDate: string; acceptedAt: string; signatory: string }
@@ -136,7 +141,7 @@ const Ic = ({ d, s = 20 }: { d: string; s?: number }) => (
 )
 
 const HEAD = ['Name', 'Student no.', 'Campus', 'Course', 'Date applied', 'Status', 'Actions']
-// Actions column is wide enough for View + Shortlist + Accept + Reject.
+// Actions column is wide enough for View + Interview + Accept + Reject.
 const WIDTH = ['17%', '10%', '11%', '15%', '9%', '8%', '30%']
 const initials = (n: string) => n.split(' ').map((w) => w[0]).join('')
 
@@ -160,6 +165,16 @@ const letterDetails = (a: Applicant, p: Placement): PlacementLetterDetails => ({
   issuedAt: p.acceptedAt,
   signatory: p.signatory,
 })
+const TIMES = Array.from({ length: 19 }, (_, i) => `${String(8 + (i >> 1)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`) // 08:00 – 17:00
+const ONLINE = 'Online (Microsoft Teams)'
+const OTHER_VENUE = '__other'
+const fmtDate = (d: string) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—')
+const nextWorkday = () => {
+  const d = new Date()
+  do d.setDate(d.getDate() + 1)
+  while (d.getDay() === 0 || d.getDay() === 6)
+  return isoDate(d)
+}
 type NewApplicant = Pick<Applicant, 'name' | 'studentNo' | 'campus' | 'course' | 'level'>
 
 function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: ReactNode }) {
@@ -309,22 +324,61 @@ function RejectMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void;
   )
 }
 
-function InterviewMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void; onSend: (to: string) => void }) {
+function InterviewMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void; onSend: (to: string, iv: Interview) => void }) {
+  const campusVenue = `${a.campus} Campus – WIL Office`
   const [to, setTo] = useState(a.name)
   const [subject, setSubject] = useState('Interview invitation – ICEP Internship Programme')
+  const [date, setDate] = useState(nextWorkday)
+  const [time, setTime] = useState('10:00')
+  const [venueSel, setVenueSel] = useState(campusVenue)
+  const [other, setOther] = useState('')
+  const [err, setErr] = useState('')
+  const venue = venueSel === OTHER_VENUE ? other.trim() : venueSel
+
+  const send = () => {
+    if (!date) return setErr('Select the interview date')
+    if (date < isoDate(new Date())) return setErr('The interview date cannot be in the past')
+    if (!venue) return setErr('Enter the interview venue')
+    setErr('')
+    onSend(to.trim() || a.name, { date, time, venue })
+  }
+
   return (
     <Modal title="Send interview email" width={470} bodyStyle={{ padding: '14px 27px 18px' }} onClose={onClose} footer={<>
       <span className="ap-note">Template: Interview invitation</span>
       <button className="ap-b ap-bt" onClick={onClose}>Cancel</button>
-      <button className="ap-b ap-bp" onClick={() => onSend(to.trim() || a.name)}>Send email</button>
+      <button className="ap-b ap-bp" onClick={send}>Send email</button>
     </>}>
       <div className="ap-ar"><span className="l">From</span><span className="v">Alex Williamson (Admin)</span><span className="ap-vp">Outlook connected</span></div>
       <div className="ap-ar"><label className="l" htmlFor="mail-to">To</label><input id="mail-to" className="ap-fi ap-i2" value={to} onChange={(e) => setTo(e.target.value)} /></div>
       <div className="ap-ar"><label className="l" htmlFor="mail-subject">Subject</label><input id="mail-subject" className="ap-fi ap-i2" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
+
+      <div className="ap-fm" style={{ marginTop: 14 }}>
+        <div className="ap-two">
+          <label>Interview date<input type="date" className="ap-fi" value={date} min={isoDate(new Date())} onChange={(e) => setDate(e.target.value)} /></label>
+          <label>Time
+            <span className="ap-fsel"><select className="ap-fi" value={time} onChange={(e) => setTime(e.target.value)}>{TIMES.map((t) => <option key={t}>{t}</option>)}</select><Ic d={P.down} s={16} /></span>
+          </label>
+        </div>
+        <label>Venue
+          <span className="ap-fsel">
+            <select className="ap-fi" value={venueSel} onChange={(e) => setVenueSel(e.target.value)}>
+              <option value={campusVenue}>{campusVenue}</option>
+              <option value={ONLINE}>{ONLINE}</option>
+              <option value={OTHER_VENUE}>Other venue…</option>
+            </select>
+            <Ic d={P.down} s={16} />
+          </span>
+        </label>
+        {venueSel === OTHER_VENUE && <input className="ap-fi" placeholder="Type the venue" value={other} onChange={(e) => setOther(e.target.value)} aria-label="Other venue" />}
+        <small>{err}</small>
+      </div>
+
       <div className="ap-msg">
         <p>Dear {first(a)},</p>
         <p>Thank you for applying for the {prog(a)} ({a.campus}).</p>
-        <p>We are pleased to let you know that you have been shortlisted. We would like to invite you to an interview.</p>
+        <p>We are pleased to let you know that you have been shortlisted. We would like to invite you to an interview:</p>
+        <p><b>Date:</b> {fmtDate(date)}<br /><b>Time:</b> {time}<br /><b>Venue:</b> {venue || '—'}</p>
         <p>Please reply to this email to confirm your availability.</p>
         <p>Regards,<br /><b>ICEP WIL Office</b></p>
       </div>
@@ -372,10 +426,10 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
     setToast(`Email with WIL placement letter sent to ${to}.`)
     close()
   }
-  // Shortlist: click Shortlist -> review the interview email -> Send email moves the applicant to Interview.
-  // Cancelling the email leaves the status as Pending.
-  const sendInterview = (a: Applicant, to: string) => {
-    setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: 'Interview', interviewEmailSent: true } : x)))
+  // Interview: click Interview -> review the interview email -> Send email sets the status to Interview
+  // and the Interview button disappears. Cancelling the email leaves the status as Pending.
+  const sendInterview = (a: Applicant, to: string, interview: Interview) => {
+    setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: 'Interview', interviewEmailSent: true, interview } : x)))
     setToast(`Interview email sent to ${to}.`)
     close()
   }
@@ -422,14 +476,18 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
                     <td>
                       <div className="ap-act">
                         <button className="ap-b" onClick={() => setDlg({ kind: 'view', a })}>View</button>
-                        {a.status === 'Pending' && <button className="ap-b sl" onClick={() => setDlg({ kind: 'mailI', a })}>Shortlist</button>}
+                        {a.status === 'Pending' && !a.interviewEmailSent && (
+                          <button className="ap-b sl" onClick={() => setDlg({ kind: 'mailI', a })}>Interview</button>
+                        )}
                         {open(a.status) && (
                           <>
                             <button className="ap-b a" onClick={() => setDlg({ kind: 'accept', a })}>Accept</button>
                             <button className="ap-b r" onClick={() => { setNote(''); setDlg({ kind: 'reject', a }) }}>Reject</button>
                           </>
                         )}
-                        {a.status === 'Interview' && a.interviewEmailSent && <span className="ap-ok"><Ic d={P.check} s={16} />Interview email sent</span>}
+                        {a.status === 'Interview' && a.interviewEmailSent && (
+                          <span className="ap-ok" title={a.interview ? `${fmtDate(a.interview.date)} at ${a.interview.time} – ${a.interview.venue}` : undefined}><Ic d={P.check} s={16} />Interview email sent</span>
+                        )}
                         {a.status === 'Accepted' && a.placement && <button className="ap-b pl" onClick={() => printPlacementLetter(letterDetails(a, a.placement!))}>Placement letter</button>}
                         {a.status === 'Accepted' && <span className="ap-ok"><Ic d={P.check} s={16} />Email sent</span>}
                       </div>
@@ -471,6 +529,7 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
               ['Status', <span className={`ap-pill s-${dlg.a.status}`}>{dlg.a.status}</span>]] as [string, ReactNode][]).map(([k, v]) => (
               <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
             ))}
+            {dlg.a.interview && <div><dt>Interview</dt><dd>{fmtDate(dlg.a.interview.date)} at {dlg.a.interview.time}<br />{dlg.a.interview.venue}</dd></div>}
           </dl>
         </Modal>
       )}
@@ -502,7 +561,7 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
       {dlg?.kind === 'mailA' && <AcceptMail a={dlg.a} placement={dlg.placement} onClose={close} onSend={(to) => sendAccept(dlg.a, dlg.placement, to)} />}
       {dlg?.kind === 'mailR' && <RejectMail a={dlg.a} onClose={close} onSend={() => { setToast(`Rejection email sent to ${dlg.a.name}.`); close() }} />}
 
-      {dlg?.kind === 'mailI' && <InterviewMail a={dlg.a} onClose={close} onSend={(to) => sendInterview(dlg.a, to)} />}
+      {dlg?.kind === 'mailI' && <InterviewMail a={dlg.a} onClose={close} onSend={(to, iv) => sendInterview(dlg.a, to, iv)} />}
 
       {toast && <div className="ap-toast" role="status">{toast}</div>}
     </div>
