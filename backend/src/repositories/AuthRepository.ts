@@ -2,18 +2,46 @@
 import { prisma } from "../config/prisma";
 
 export class AuthRepository {
-  async findByEmail(email: string) {
+  // Find a user by email address.
+  async findUserByEmail(email: string) {
     return prisma.user.findUnique({
       where: { email: email.trim().toLowerCase() },
     });
   }
 
+  // Find a user by their unique ID.
   async findById(id: string) {
     return prisma.user.findUnique({
       where: { id },
     });
   }
 
+  // Save a new user.
+  async saveUser(data: {
+    fullName: string;
+    email: string;
+    passwordHash?: string | null;
+    phone?: string | null;
+    role: "ADMIN" | "WIL_HANDLER" | "MENTOR" | "INTERN";
+    isActive?: boolean;
+  }) {
+    return prisma.user.create({
+      data: {
+        ...data,
+        email: data.email.trim().toLowerCase(),
+      },
+    });
+  }
+
+  // Update a user's password hash.
+  async updatePassword(userId: string, passwordHash: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+  }
+
+  // Record a successful login.
   async updateLastLogin(id: string) {
     return prisma.user.update({
       where: { id },
@@ -21,17 +49,23 @@ export class AuthRepository {
     });
   }
 
+  // Find a password token using its SHA-256 hash.
   async findTokenByHash(tokenHash: string) {
     return prisma.passwordToken.findUnique({
-      where: { tokenHash: tokenHash },
+      where: { tokenHash },
     });
   }
 
-  async updatePasswordAndConsumeToken(userId: string, tokenId: string, passwordHash: string) {
+  // Update a password and mark its token as used atomically.
+  async updatePasswordAndConsumeToken(
+    userId: string,
+    tokenId: string,
+    passwordHash: string,
+  ) {
     return prisma.$transaction([
       prisma.user.update({
         where: { id: userId },
-        data: { passwordHash: passwordHash },
+        data: { passwordHash },
       }),
       prisma.passwordToken.update({
         where: { id: tokenId },

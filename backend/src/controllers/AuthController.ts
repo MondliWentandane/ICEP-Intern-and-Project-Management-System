@@ -1,8 +1,12 @@
 
 import type { Request, Response } from "express";
 import { authService } from "../services/AuthService";
+import type { AuthenticatedRequest } from "../middlewares/AuthMiddleware";
 
 export class AuthController {
+  /**
+   * Logs in a user and returns an authentication token.
+   */
   async login(req: Request, res: Response): Promise<void> {
     try {
       const { email, password } = req.body ?? {};
@@ -19,7 +23,7 @@ export class AuthController {
         return;
       }
 
-      const result = await authService.login(email, password);
+      const result = await authService.loginUser(email, password);
 
       res.status(200).json({
         message: "Login successful.",
@@ -47,7 +51,9 @@ export class AuthController {
       }
 
       if (
-        message.startsWith("Authentication is not configured correctly.")
+        message.startsWith(
+          "Authentication is not configured correctly.",
+        )
       ) {
         res.status(500).json({
           message: "Authentication is temporarily unavailable.",
@@ -61,6 +67,39 @@ export class AuthController {
         message: "An unexpected error occurred during login.",
       });
     }
+  }
+
+  /**
+   * Logs out the user on the client side.
+   */
+  async logout(_req: Request, res: Response): Promise<void> {
+    res.status(200).json({
+      message: "Logout successful. Please discard your authentication token.",
+    });
+  }
+
+  /**
+   * Returns the authenticated user's information.
+   * Requires authenticateToken middleware to run first.
+   */
+  async verifyToken(
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> {
+    if (!req.user) {
+      res.status(401).json({
+        message: "Authentication is required.",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      message: "Token verified successfully.",
+      user: {
+        id: req.user.id,
+        role: req.user.role,
+      },
+    });
   }
 }
 

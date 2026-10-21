@@ -1,5 +1,6 @@
 
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Response } from "express";
+import type { Request } from "express";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { authRepository } from "../repositories/AuthRepository";
 
@@ -15,7 +16,11 @@ const getJwtSecret = (): string | null => {
   return secret && secret.length >= 32 ? secret : null;
 };
 
-export const authenticateToken = async (
+/**
+ * Verifies the JWT and confirms that the account is active.
+ * UML method: verifyToken()
+ */
+export const verifyToken = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
@@ -23,14 +28,18 @@ export const authenticateToken = async (
   const authorization = req.headers.authorization;
 
   if (!authorization?.startsWith("Bearer ")) {
-    res.status(401).json({ message: "Authentication token is required." });
+    res.status(401).json({
+      message: "Authentication token is required.",
+    });
     return;
   }
 
   const token = authorization.slice("Bearer ".length).trim();
 
   if (!token) {
-    res.status(401).json({ message: "Authentication token is required." });
+    res.status(401).json({
+      message: "Authentication token is required.",
+    });
     return;
   }
 
@@ -51,7 +60,9 @@ export const authenticateToken = async (
       typeof decoded.sub !== "string" ||
       typeof (decoded as JwtPayload).role !== "string"
     ) {
-      res.status(401).json({ message: "Invalid authentication token." });
+      res.status(401).json({
+        message: "Invalid authentication token.",
+      });
       return;
     }
 
@@ -86,14 +97,20 @@ export const authenticateToken = async (
   }
 };
 
-export const authorizeRoles = (...allowedRoles: string[]) => {
+/**
+ * Allows access only to specified roles.
+ * UML method: authorizeRole()
+ */
+export const authorizeRole = (...allowedRoles: string[]) => {
   return (
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction,
   ): void => {
     if (!req.user) {
-      res.status(401).json({ message: "Authentication is required." });
+      res.status(401).json({
+        message: "Authentication is required.",
+      });
       return;
     }
 
@@ -108,4 +125,26 @@ export const authorizeRoles = (...allowedRoles: string[]) => {
   };
 };
 
-export default authenticateToken;
+/**
+ * Checks authentication and then checks the allowed roles.
+ * UML method: authorizationCheck()
+ */
+export const authorizationCheck = (...allowedRoles: string[]) => {
+  const checkRole = authorizeRole(...allowedRoles);
+
+  return (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): void => {
+    checkRole(req, res, next);
+  };
+};
+
+/**
+ * Compatibility aliases for existing project routes.
+ */
+export const authenticateToken = verifyToken;
+export const authorizeRoles = authorizeRole;
+
+export default verifyToken;

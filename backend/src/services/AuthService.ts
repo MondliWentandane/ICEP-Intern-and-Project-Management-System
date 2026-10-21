@@ -1,16 +1,21 @@
 
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { authRepository } from "../repositories/AuthRepository";
 import crypto from "crypto";
+import { authRepository } from "../repositories/AuthRepository";
+
 export class AuthService {
-  async login(email: string, password: string) {
+  /**
+   * Validates the user's email, password, and account status.
+   */
+  async validateUser(email: string, password: string) {
     if (!email?.trim() || !password) {
       throw new Error("Email and password are required.");
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await authRepository.findByEmail(normalizedEmail);
+
+    const user = await authRepository.findUserByEmail(normalizedEmail);
 
     if (!user || !user.passwordHash) {
       throw new Error("Invalid email or password.");
@@ -28,6 +33,23 @@ export class AuthService {
     if (!passwordMatches) {
       throw new Error("Invalid email or password.");
     }
+
+    return user;
+  }
+
+  /**
+   * Authenticates a user and generates a JWT.
+   */
+  async loginUser(email: string, password: string) {
+    return this.login(email, password);
+  }
+
+  /**
+   * Logs in a user.
+   * Kept for compatibility with the existing AuthController.
+   */
+  async login(email: string, password: string) {
+    const user = await this.validateUser(email, password);
 
     const secret = process.env.JWT_SECRET;
 
@@ -59,18 +81,33 @@ export class AuthService {
     };
   }
 
-  async confirmPasswordSetup(rawToken: string, newPassword: string): Promise<void> {
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const passwordToken = await authRepository.findTokenByHash(tokenHash);
+  /**
+   * Confirms password setup using a valid, unused password token.
+   */
+  async confirmPasswordSetup(
+    rawToken: string,
+    newPassword: string,
+  ): Promise<void> {
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    const passwordToken =
+      await authRepository.findTokenByHash(tokenHash);
 
     if (!passwordToken) {
       throw new Error("Invalid or fake token.");
     }
+
     if (passwordToken.usedAt !== null) {
       throw new Error("This link has already been used.");
     }
+
     if (passwordToken.expiresAt < new Date()) {
-      throw new Error("This link has expired. Please request a new one.");
+      throw new Error(
+        "This link has expired. Please request a new one.",
+      );
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -78,7 +115,7 @@ export class AuthService {
     await authRepository.updatePasswordAndConsumeToken(
       passwordToken.userId,
       passwordToken.id,
-      hashedPassword
+      hashedPassword,
     );
   }
 }

@@ -1,5 +1,6 @@
 // Auth & user accounts — AuthController (owners: Karabo & Makgabo).
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { authController } from "../controllers/AuthController";
 import { ApplicationController } from "../controllers/ApplicationController";
 import { AuthMiddleware, notImplemented } from "./guards";
@@ -19,8 +20,12 @@ router.post("/auth/create-password", ApplicationController.setPassword);
 router.post("/auth/set-password", ApplicationController.setPassword);
 
 // ---- Any logged-in user ----------------------------------------------------
-router.get("/auth/me", authenticated, notImplemented("GET /auth/me")); // AuthController.verifyToken not written yet
-router.post("/auth/logout", authenticated, notImplemented("POST /auth/logout"));
+router.get("/auth/me", authenticated, (req:Request, res:Response) =>
+  authController.verifyToken(req, res),
+); // AuthController.verifyToken not written yet
+router.post("/auth/logout", authenticated, (req:Request, res:Response) =>
+  authController.logout(req, res),
+);
 router.put("/auth/profile", authenticated, notImplemented("PUT /auth/profile"));
 router.put("/auth/change-password", authenticated, notImplemented("PUT /auth/change-password"));
 
