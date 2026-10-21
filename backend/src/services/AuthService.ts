@@ -74,7 +74,7 @@ export class AuthService {
       token,
       user: {
         id: user.id,
-        fullName: user.fullName,
+        name: user.fullName,
         email: user.email,
         role: user.role,
       },

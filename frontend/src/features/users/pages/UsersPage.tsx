@@ -4,20 +4,23 @@ import { BriefcaseBusiness, Plus, Search, ShieldCheck, UserRoundCog, UsersRound 
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 
-type UserRole = 'admin' | 'wil_handler' | 'mentor' | 'intern'
+type UserRole = 'ADMIN' | 'WIL_HANDLER' | 'MENTOR' | 'INTERN'
 interface UserRecord { id: number; name: string; email: string; role: UserRole; campus: string }
-const roleNames: Record<UserRole, string> = { admin: 'Administrator', wil_handler: 'WIL Handler', mentor: 'Mentor', intern: 'Intern' }
+
+const roleNames: Record<UserRole, string> = { ADMIN: 'Administrator', WIL_HANDLER: 'WIL Handler', MENTOR: 'Mentor', INTERN: 'Intern' }
+
 const roleBadgeStyles: Record<UserRole, { bgcolor: string; color: string }> = {
-  admin: { bgcolor: 'var(--icep-completed-tint)', color: '#1E40AF' },
-  wil_handler: { bgcolor: 'var(--icep-active-tint)', color: '#166534' },
-  mentor: { bgcolor: 'var(--icep-pending-tint)', color: '#92400E' },
-  intern: { bgcolor: '#E5E7EB', color: '#374151' },
+  ADMIN: { bgcolor: 'var(--icep-completed-tint)', color: '#1E40AF' },
+  WIL_HANDLER: { bgcolor: 'var(--icep-active-tint)', color: '#166534' },
+  MENTOR: { bgcolor: 'var(--icep-pending-tint)', color: '#92400E' },
+  INTERN: { bgcolor: '#E5E7EB', color: '#374151' },
 }
+
 const demoUsers: UserRecord[] = [
-  { id: 1, name: 'Demo Administrator', email: 'admin@example.com', role: 'admin', campus: 'All campuses' },
-  { id: 2, name: 'Demo WIL Handler', email: 'handler@example.com', role: 'wil_handler', campus: 'Pretoria' },
-  { id: 3, name: 'Demo Mentor', email: 'mentor@example.com', role: 'mentor', campus: 'Pretoria' },
-  { id: 4, name: 'Demo Intern', email: 'intern1@example.com', role: 'intern', campus: 'Soshanguve South' },
+  { id: 1, name: 'Demo Administrator', email: 'admin@example.com', role: 'ADMIN', campus: 'All campuses' },
+  { id: 2, name: 'Demo WIL Handler', email: 'handler@example.com', role: 'WIL_HANDLER', campus: 'Pretoria' },
+  { id: 3, name: 'Demo Mentor', email: 'mentor@example.com', role: 'MENTOR', campus: 'Pretoria' },
+  { id: 4, name: 'Demo Intern', email: 'intern1@example.com', role: 'INTERN', campus: 'Soshanguve South' },
 ]
 const headerCellSx = { py: 1.5, fontSize: 12, fontWeight: 700, color: 'var(--icep-secondary)', textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' } as const
 
@@ -30,9 +33,9 @@ export function UsersPage() {
   const filteredUsers = useMemo(() => users.filter((user) => `${user.name} ${user.email} ${user.campus}`.toLowerCase().includes(query.trim().toLowerCase()) && (!roleFilter || user.role === roleFilter)), [users, query, roleFilter])
   const counts = useMemo(() => ({
     total: users.length,
-    admins: users.filter((user) => user.role === 'admin').length,
-    handlers: users.filter((user) => user.role === 'wil_handler').length,
-    mentorsInterns: users.filter((user) => user.role === 'mentor' || user.role === 'intern').length,
+    admins: users.filter((user) => user.role === 'ADMIN').length,
+    handlers: users.filter((user) => user.role === 'WIL_HANDLER').length,
+    mentorsInterns: users.filter((user) => user.role === 'MENTOR' || user.role === 'INTERN').length,
   }), [users])
 
   const addUser = (event: FormEvent<HTMLFormElement>) => {
@@ -115,7 +118,12 @@ export function UsersPage() {
           {error && <Alert severity="error">{error}</Alert>}
           <TextField name="name" label="Full name" required fullWidth />
           <TextField name="email" label="Email address" type="email" required fullWidth />
-          <TextField name="role" label="Role" select required defaultValue=""><MenuItem value="admin">Administrator</MenuItem><MenuItem value="wil_handler">WIL Handler</MenuItem><MenuItem value="mentor">Mentor</MenuItem><MenuItem value="intern">Intern</MenuItem></TextField>
+          <TextField name="role" label="Role" select required defaultValue="">
+            <MenuItem value="ADMIN">Administrator</MenuItem>
+            <MenuItem value="WIL_HANDLER">WIL Handler</MenuItem>
+            <MenuItem value="MENTOR">Mentor</MenuItem>
+            <MenuItem value="INTERN">Intern</MenuItem>
+          </TextField>
           <TextField name="campus" label="Campus (optional)" fullWidth />
         </Box></DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}><Button appearance="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save user</Button></DialogActions>

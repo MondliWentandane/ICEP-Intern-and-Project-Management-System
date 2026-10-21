@@ -1,4 +1,4 @@
 import type { UserRole } from '@/types'
-export const rolePrefix: Record<UserRole, string> = { admin: '/admin', wil_handler: '/handler', mentor: '/mentor', intern: '/intern' }
-export const homeByRole: Record<UserRole, string> = { admin: '/admin/dashboard', wil_handler: '/handler/dashboard', mentor: '/mentor/dashboard', intern: '/intern/project' }
-export const profileByRole: Record<UserRole, string> = { admin: '/admin/profile', wil_handler: '/handler/profile', mentor: '/mentor/profile', intern: '/intern/profile' }
+export const rolePrefix: Record<UserRole, string> = { ADMIN: '/admin', WIL_HANDLER: '/handler', MENTOR: '/mentor', INTERN: '/intern' }
+export const homeByRole: Record<UserRole, string> = { ADMIN: '/admin/dashboard', WIL_HANDLER: '/handler/dashboard', MENTOR: '/mentor/dashboard', INTERN: '/intern/project' }
+export const profileByRole: Record<UserRole, string> = { ADMIN: '/admin/profile', WIL_HANDLER: '/handler/profile', MENTOR: '/mentor/profile', INTERN: '/intern/profile' }
