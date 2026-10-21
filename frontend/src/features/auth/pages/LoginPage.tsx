@@ -15,7 +15,13 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Enter your password.'),
 })
 type LoginValues = z.infer<typeof loginSchema>
-const dashboardPaths = { admin: '/admin/dashboard', wil_handler: '/handler/dashboard', mentor: '/mentor/dashboard', intern: '/intern/project' } as const
+
+const dashboardPaths = {
+  ADMIN: '/admin/dashboard',
+  WIL_HANDLER: '/handler/dashboard',
+  MENTOR: '/mentor/dashboard',
+  INTERN: '/intern/project'
+} as const
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -29,7 +35,7 @@ export function LoginPage() {
     try {
       const data = await Auth.login(values)
       setSession(data.token, data.user)
-      navigate(dashboardPaths[data.user.role], { replace: true })
+      navigate(dashboardPaths[data.user.role.toUpperCase() as keyof typeof dashboardPaths], { replace: true })
     } catch {
       setRequestError('Incorrect email or password. Please try again.')
     }
