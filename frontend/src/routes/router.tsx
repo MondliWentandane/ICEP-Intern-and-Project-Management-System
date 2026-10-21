@@ -50,6 +50,8 @@ export const router = createBrowserRouter([
   { path: '/careers/:positionId/apply/*', element: <ApplyPage /> }, { path: '/apply/*', element: <ApplyPage /> },
   { element: <AuthLayout />, children: [
     { path: '/login', element: <LoginPage /> }, { path: '/forgot-password', element: <ForgotPasswordPage /> },
+    // The account email links to /reset-password?token=…; the path-token forms are kept for older links.
+    { path: '/reset-password', element: <SetPasswordPage /> },
     { path: '/create-password/:token', element: <SetPasswordPage /> }, { path: '/set-password/:token', element: <SetPasswordPage /> },
   ] },
   { path: '/handler', element: guarded(['wil_handler'], <DashboardLayout />), children: [

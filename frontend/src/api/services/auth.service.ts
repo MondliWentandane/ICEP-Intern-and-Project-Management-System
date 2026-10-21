@@ -11,5 +11,6 @@ export const Auth = {
   },
   me: () => apiClient.get<User>(endpoints.auth.me),
   forgotPassword: (email: string) => apiClient.post(endpoints.auth.forgotPassword, { email }),
-  createPassword: (token: string, password: string) => apiClient.post(endpoints.auth.createPassword, { token, password }),
+  // Backend: POST /api/auth/confirm-password { token, newPassword } -> 200, or 400 { error } (invalid / used / expired link).
+  createPassword: (token: string, newPassword: string) => apiClient.post(endpoints.auth.createPassword, { token, newPassword }),
 }
