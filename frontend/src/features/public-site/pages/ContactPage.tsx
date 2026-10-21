@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Paper, Typography } from '@mui/material'
 import { CursorFollower } from '../story/CursorFollower'
+import { RevealTitle } from '../story/Reveal'
+import { riseSx, useReveal } from '../story/useScrollProgress'
+import { introSx } from '../story/motion'
 
 /** frontend/src/features/public-site/pages/ContactPage.tsx (route /contact already exists). Styles are included below. */
+
+const navy = '#1E3A5F'
 
 const CAMPUS = {
   name: 'Tshwane University of Technology - Soshanguve South Campus - TUT',
@@ -214,41 +219,66 @@ function ScrollSwap({ first, second }: { first: ReactNode; second: ReactNode }) 
   )
 }
 
+function ContactHeader() {
+  const { ref, p } = useReveal<HTMLDivElement>()
+  
+  return (
+    <Paper
+      ref={ref}
+      component="section"
+      sx={{
+        p: { xs: 3, md: 5 },
+        borderRadius: 3,
+        boxShadow: 'none',
+        border: '1px solid',
+        borderColor: 'rgba(255,255,255,.14)',
+        bgcolor: navy,
+        color: '#fff',
+        ...riseSx(p, 0)
+      }}
+    >
+      <Typography
+        sx={{
+          color: '#D7DFE9',
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: '.04em',
+          textTransform: 'uppercase',
+          ...introSx(0)
+        }}
+      >
+        ICEP · Work-integrated learning
+      </Typography>
+      <RevealTitle 
+        id="contact-title" 
+        component="h1" 
+        text="Get in touch" 
+        delay={150} 
+        sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 750, mt: 0.5 }} 
+      />
+      <Typography 
+        sx={{ 
+          color: '#D7DFE9', 
+          mt: 0.5, 
+          fontSize: { xs: 15, md: 17 }, 
+          lineHeight: 1.6, 
+          maxWidth: 800,
+          ...introSx(550)
+        }}
+      >
+        Have a question about WIL placements? Send us a message and the ICEP team will get back to you.
+      </Typography>
+    </Paper>
+  )
+}
+
 export function ContactPage({ onSendMessage }: { onSendMessage?: (m: ContactMessage) => Promise<void> | void }) {
   return (
     <section className="cp">
       <style>{CSS}</style>
       <CursorFollower />
       <div className="cp-w">
-        <Paper
-          component="section"
-          sx={{
-            p: { xs: 3, md: 5 },
-            borderRadius: 3,
-            boxShadow: 'none',
-            border: '1px solid',
-            borderColor: 'divider',
-            bgcolor: '#fff',
-          }}
-        >
-          <Typography
-            sx={{
-              color: 'primary.main',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            ICEP · Work-integrated learning
-          </Typography>
-          <Typography component="h1" sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 750, mt: 0.5 }}>
-            Get in touch
-          </Typography>
-          <Typography sx={{ color: 'text.secondary', mt: 0.5, fontSize: { xs: 15, md: 17 }, lineHeight: 1.6, maxWidth: 800 }}>
-            Have a question about WIL placements? Send us a message and the ICEP team will get back to you.
-          </Typography>
-        </Paper>
+        <ContactHeader />
         <ScrollSwap
           first={
             <div className="cp-c">

@@ -2,9 +2,20 @@ import { Box, Link, Paper, Typography, type SxProps, type Theme } from '@mui/mat
 import { Building2, Code, UsersRound } from 'lucide-react'
 import { LinkButton } from '../components/LinkButton'
 import { CursorFollower } from '../story/CursorFollower'
-import { riseSx, useReveal } from '../story/useScrollProgress'
+import { RevealTitle } from '../story/Reveal'
+import { riseSx, seg, useReveal } from '../story/useScrollProgress'
+import { introSx } from '../story/motion'
 
 const VIDEO_URL = 'https://www.youtube.com/watch?v=_91tr1Rgg0A'
+
+const navy = '#1E3A5F'
+
+const heroButton = (filled: boolean) => ({
+  minHeight: 46, px: 3, fontWeight: 600, borderRadius: 2,
+  ...(filled
+    ? { bgcolor: '#fff', color: 'primary.main', border: '1px solid #fff', '&:hover': { bgcolor: '#EEF2F8' } }
+    : { bgcolor: 'transparent', color: '#fff', borderColor: 'rgba(255,255,255,.6)', '&:hover': { bgcolor: 'rgba(255,255,255,.08)', borderColor: '#fff' } }),
+})
 
 const INTRO =
   "ICEP is an Informatics Community Engagement Programme initiated by the Informatics Department of TUT. " +
@@ -187,77 +198,92 @@ function MissionAndVideoSection() {
   )
 }
 
+function AboutHeader() {
+  const { ref, p } = useReveal<HTMLDivElement>()
+  
+  return (
+    <Paper
+      ref={ref}
+      component="section"
+      sx={{
+        p: { xs: 3, md: 5 },
+        borderRadius: 3,
+        boxShadow: 'none',
+        border: '1px solid',
+        borderColor: 'rgba(255,255,255,.14)',
+        bgcolor: navy,
+        color: '#fff',
+        ...riseSx(p, 0)
+      }}
+    >
+      <Typography
+        sx={{
+          color: '#D7DFE9',
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: '.04em',
+          textTransform: 'uppercase',
+          ...introSx(0)
+        }}
+      >
+        TUT · Informatics Community Engagement Programme
+      </Typography>
+      <RevealTitle 
+        id="about-title" 
+        component="h1" 
+        text="About us" 
+        delay={150} 
+        sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 750, mt: 0.5 }} 
+      />
+      <Typography 
+        sx={{ 
+          color: '#D7DFE9', 
+          fontSize: { xs: 15, md: 17 }, 
+          lineHeight: 1.7, 
+          mt: 1.5, 
+          maxWidth: 960,
+          ...introSx(550)
+        }}
+      >
+        {INTRO}
+      </Typography>
+    </Paper>
+  )
+}
+
+/** Call-to-action band that grows from an inset card to full width as it scrolls in. */
+function CtaBand() {
+  const { ref, p } = useReveal<HTMLDivElement>(0.95, 0.75)
+  const s = seg(p, 0, 0.7)
+  return (
+    <Box ref={ref} sx={{
+      p: { xs: 3, md: 5 }, bgcolor: navy, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 3, flexWrap: 'wrap',
+      borderRadius: `${12 + (1 - s) * 28}px`, transform: `scale(${0.9 + 0.1 * s})`, opacity: 0.3 + 0.7 * s,
+    }}>
+      <Box>
+        <RevealTitle id="cta-title" text="Ready to start your WIL placement?" sx={{ fontSize: { xs: 22, md: 26 }, fontWeight: 750 }} />
+        <Typography sx={{ color: '#D7DFE9', mt: 0.5, ...riseSx(p, 2, { distance: 16 }) }}>Browse open positions and apply online in four simple steps.</Typography>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', ...riseSx(p, 3, { distance: 16 }) }}>
+        <LinkButton to="/?apply=choose" sx={heroButton(true)}>Apply now</LinkButton>
+        <LinkButton to="/contact" appearance="secondary" sx={heroButton(false)}>Contact us</LinkButton>
+      </Box>
+    </Box>
+  )
+}
+
 export function AboutPage() {
   return (
     <Box sx={{ display: 'grid', gap: 4 }}>
       <CursorFollower />
-      {/* Header section with zero extra gap and clean subheading */}
-      <Paper
-        component="section"
-        sx={{
-          p: { xs: 3, md: 5 },
-          borderRadius: 3,
-          boxShadow: 'none',
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: '#fff',
-        }}
-      >
-        <Typography
-          sx={{
-            color: 'primary.main',
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: '.04em',
-            textTransform: 'uppercase',
-          }}
-        >
-          TUT · Informatics Community Engagement Programme
-        </Typography>
-        <Typography component="h1" sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 750, mt: 0.5 }}>
-          About us
-        </Typography>
-        <Typography sx={{ color: 'text.secondary', fontSize: { xs: 15, md: 17 }, lineHeight: 1.7, mt: 1.5, maxWidth: 960 }}>
-          {INTRO}
-        </Typography>
-      </Paper>
+      {/* Header section with text pop-in and fade-up animations */}
+      <AboutHeader />
 
       {/* Mission cards and animated video frame */}
       <MissionAndVideoSection />
 
       {/* Bottom CTA block consistent with Home page */}
-      <Paper
-        component="aside"
-        aria-label="Explore ICEP careers"
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: 'none',
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: '#fff',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 2,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Box>
-          <Typography component="h2" sx={{ fontWeight: 700, fontSize: 18 }}>
-            Ready to start your WIL placement?
-          </Typography>
-          <Typography sx={{ fontSize: 14, color: 'text.secondary', mt: 0.5 }}>
-            Explore open opportunities across TUT campuses and apply online.
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-          <LinkButton to="/careers">Browse positions</LinkButton>
-          <LinkButton to="/contact" appearance="secondary">
-            Contact us
-          </LinkButton>
-        </Box>
-      </Paper>
+      <CtaBand />
     </Box>
   )
 }
