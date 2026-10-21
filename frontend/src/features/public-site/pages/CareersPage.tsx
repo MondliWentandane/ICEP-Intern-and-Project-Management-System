@@ -10,6 +10,10 @@ import { CategoryIcon, PositionStatusPill } from '../components/PositionBits'
 import { CursorFollower } from '../story/CursorFollower'
 import { campuses, fetchPositions, positionCategories, type CareerPosition, type PositionCategory } from '../data/positions'
 import { riseSx, useReveal } from '../story/useScrollProgress'
+import { RevealTitle } from '../story/Reveal'
+import { introSx } from '../story/motion'
+
+const navy = '#1E3A5F'
 
 function PositionCard({ position, sx }: { position: CareerPosition; sx?: SxProps<Theme> }) {
   return (
@@ -76,6 +80,105 @@ function PositionsGrid({ positions }: { positions: CareerPosition[] }) {
   )
 }
 
+function CareersHeader({ 
+  searchInput, 
+  setSearchInput, 
+  onSearch 
+}: { 
+  searchInput: string; 
+  setSearchInput: (v: string) => void; 
+  onSearch: (e: FormEvent) => void 
+}) {
+  const { ref, p } = useReveal<HTMLDivElement>()
+
+  return (
+    <Paper 
+      ref={ref}
+      component="section" 
+      sx={{ 
+        p: { xs: 3, md: 5 }, 
+        borderRadius: 3, 
+        boxShadow: 'none', 
+        border: '1px solid', 
+        borderColor: 'rgba(255,255,255,.14)', 
+        bgcolor: navy,
+        color: '#fff',
+        ...riseSx(p, 0)
+      }}
+    >
+      <Typography 
+        sx={{ 
+          color: '#D7DFE9', 
+          fontSize: 12, 
+          fontWeight: 700, 
+          letterSpacing: '.04em', 
+          textTransform: 'uppercase',
+          ...introSx(0)
+        }}
+      >
+        ICEP · Work-integrated learning
+      </Typography>
+      <RevealTitle 
+        id="careers-title" 
+        component="h1" 
+        text="Find your WIL placement" 
+        delay={150} 
+        sx={{ fontSize: { xs: 28, md: 32 }, fontWeight: 750, mt: 0.5 }} 
+      />
+      <Typography 
+        sx={{ 
+          color: '#D7DFE9', 
+          mt: 0.5,
+          ...introSx(550) 
+        }}
+      >
+        Put your skills into practice. Explore WIL opportunities at TUT.
+      </Typography>
+      <Box 
+        component="form" 
+        role="search" 
+        onSubmit={onSearch} 
+        sx={{ 
+          display: 'flex', 
+          gap: 1.5, 
+          mt: 3, 
+          maxWidth: 700, 
+          flexDirection: { xs: 'column', sm: 'row' },
+          ...introSx(700) 
+        }}
+      >
+        <TextField
+          fullWidth
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          placeholder="Search positions or keywords"
+          slotProps={{ 
+            input: { startAdornment: <InputAdornment position="start"><Search size={18} aria-hidden="true" /></InputAdornment> }, 
+            htmlInput: { 'aria-label': 'Search positions' } 
+          }}
+          sx={{
+            bgcolor: '#fff',
+            borderRadius: 1,
+            '& .MuiOutlinedInput-root': { borderRadius: 1 }
+          }}
+        />
+        <Button 
+          type="submit" 
+          sx={{ 
+            minWidth: 104, 
+            minHeight: 56, 
+            bgcolor: '#fff', 
+            color: 'primary.main', 
+            '&:hover': { bgcolor: '#EEF2F8' } 
+          }}
+        >
+          Search
+        </Button>
+      </Box>
+    </Paper>
+  )
+}
+
 export function CareersPage() {
   const { data: positions = [], isLoading, isError, refetch } = useQuery({ queryKey: ['public', 'positions'], queryFn: fetchPositions })
   const [searchInput, setSearchInput] = useState('')
@@ -101,21 +204,11 @@ export function CareersPage() {
   return (
     <Box sx={{ display: 'grid', gap: 4 }}>
       <CursorFollower />
-      <Paper component="section" sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider', bgcolor: '#fff' }}>
-        <Typography sx={{ color: 'primary.main', fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>ICEP · Work-integrated learning</Typography>
-        <Typography component="h1" sx={{ fontSize: { xs: 28, md: 32 }, fontWeight: 750, mt: 0.5 }}>Find your WIL placement</Typography>
-        <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>Put your skills into practice. Explore WIL opportunities at TUT.</Typography>
-        <Box component="form" role="search" onSubmit={onSearch} sx={{ display: 'flex', gap: 1.5, mt: 3, maxWidth: 700, flexDirection: { xs: 'column', sm: 'row' } }}>
-          <TextField
-            fullWidth
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search positions or keywords"
-            slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={18} aria-hidden="true" /></InputAdornment> }, htmlInput: { 'aria-label': 'Search positions' } }}
-          />
-          <Button type="submit" sx={{ minWidth: 104, minHeight: 56 }}>Search</Button>
-        </Box>
-      </Paper>
+      <CareersHeader 
+        searchInput={searchInput} 
+        setSearchInput={setSearchInput} 
+        onSearch={onSearch} 
+      />
 
       <Paper component="aside" aria-label="Track an application" sx={{ p: 2.5, borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
         <Box>
