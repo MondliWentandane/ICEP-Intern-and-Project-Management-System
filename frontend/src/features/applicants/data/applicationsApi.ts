@@ -13,6 +13,8 @@ export interface ApiApplication {
   fullName: string
   email: string
   phone: string | null
+  /** SA ID number (POPIA-sensitive): only shown masked. */
+  idNumber?: string | null
   studentNumber: string
   institution: string
   qualification: string
@@ -21,6 +23,7 @@ export interface ApiApplication {
   interviewVenue?: string | null
   rejectionReason: string | null
   reviewedAt: string | null
+  reviewedBy?: { id: string; fullName: string; email: string } | null
   createdAt: string
   updatedAt: string
   position: {
@@ -31,7 +34,7 @@ export interface ApiApplication {
     intake: { name: string; startDate: string; endDate: string }
   }
   skills: Array<{ skill: { name: string } }>
-  documents: Array<{ id: string; type: 'CV' | 'ID_COPY' | 'ACADEMIC_RECORD' | string; fileName: string }>
+  documents: Array<{ id: string; type: 'CV' | 'ID_COPY' | 'ACADEMIC_RECORD' | string; fileName: string; mimeType?: string | null; sizeBytes?: number | null; uploadedAt?: string }>
 }
 
 export const fetchApplications = async () => (await apiClient.get<ApiApplication[]>(endpoints.applicants)).data
@@ -45,6 +48,17 @@ export const acceptApplication = async (id: string) => (await apiClient.put<ApiA
 
 export const rejectApplication = async (id: string, rejectionReason: string) =>
   (await apiClient.put<ApiApplication>(url(id, 'reject'), { rejectionReason })).data
+
+/** Downloads one uploaded document by id and saves it in the browser. */
+export async function downloadDocumentById(applicationId: string, documentId: string, fileName: string) {
+  const { data } = await apiClient.get<Blob>(`${url(applicationId, 'documents')}/${encodeURIComponent(documentId)}/download`, { responseType: 'blob', timeout: 60000 })
+  const href = URL.createObjectURL(data)
+  const link = window.document.createElement('a')
+  link.href = href
+  link.download = fileName
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(href), 1000)
+}
 
 /** Downloads one of the applicant's uploaded PDFs (CV by default) and saves it in the browser. */
 export async function downloadApplicationDocument(application: Pick<ApiApplication, 'id' | 'documents' | 'fullName'>, type = 'CV') {

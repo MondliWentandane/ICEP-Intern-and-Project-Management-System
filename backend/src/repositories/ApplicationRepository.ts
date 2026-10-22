@@ -51,6 +51,26 @@ export class ApplicationRepository {
     });
   }
 
+  /** Everything the public "Track application" page may show. No ID number, phone or internal notes. */
+  findForTracking(referenceCode: string) {
+    return prisma.application.findUnique({
+      where: { referenceCode },
+      select: {
+        referenceCode: true, email: true, fullName: true, status: true,
+        studentNumber: true, institution: true, qualification: true,
+        interviewAt: true, interviewVenue: true, reviewedAt: true, createdAt: true, updatedAt: true,
+        position: { select: {
+          title: true,
+          campus: { select: { name: true } },
+          department: { select: { name: true } },
+          intake: { select: { name: true, startDate: true, endDate: true } },
+        } },
+        documents: { select: { type: true } },
+        reviewedBy: { select: { fullName: true } },
+      },
+    });
+  }
+
   create(data: {
     positionId: string; fullName: string; email: string; phone?: string;
     idNumber?: string; studentNumber: string; institution: string;
