@@ -5,6 +5,7 @@ import { ApplicationController, reviewApplication } from "../controllers/Applica
 import multer, { type FileFilterCallback } from "multer";
 import type { NextFunction, Request, Response } from "express";
 import { EmailController } from "../controllers/EmailController";
+import { getPosition, listOpenPositions } from "../controllers/PositionController";
 import { AuthMiddleware, notImplemented } from "./guards";
 
 // Access guards (roles match the Prisma Role enum): verifyToken first, then the role check.
@@ -21,7 +22,7 @@ const pdfOnly = (_req: Request, file: Express.Multer.File, cb: FileFilterCallbac
   if (isPdf) cb(null, true);
   else cb(new Error("Only PDF files are allowed."));
 };
-const applicationUploads = multer({
+const parseApplicationUploads = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 3 },
   fileFilter: pdfOnly,
@@ -30,6 +31,17 @@ const applicationUploads = multer({
   { name: "idDocument", maxCount: 1 },
   { name: "academicRecord", maxCount: 1 },
 ]);
+// Upload problems (not a PDF, bigger than 5 MB, unknown field) answer 400 JSON instead of an HTML 500 page.
+const applicationUploads = (req: Request, res: Response, next: NextFunction) => {
+  parseApplicationUploads(req, res, (error: unknown) => {
+    if (!error) return next();
+    const code = (error as { code?: string }).code;
+    const message = code === "LIMIT_FILE_SIZE" ? "Each file must be 5 MB or smaller."
+      : code === "LIMIT_UNEXPECTED_FILE" ? "Unexpected file field in the upload."
+      : (error as Error).message || "The upload could not be read.";
+    res.status(400).json({ error: message });
+  });
+};
 
 // "Schedule interview" = status change to INTERVIEWEE; reuses the controller's reviewApplication.
 const asInterview = (req: Request, _res: Response, next: NextFunction) => {
@@ -40,9 +52,9 @@ const asInterview = (req: Request, _res: Response, next: NextFunction) => {
 const router = Router();
 
 // ---- Public: careers page + application form --------------------------------
-router.get("/positions", notImplemented("GET /positions")); // only OPEN positions
+router.get("/positions", listOpenPositions); // only OPEN positions
 router.get("/positions/manage", adminOrHandler, notImplemented("GET /positions/manage")); // incl. DRAFT / CLOSED
-router.get("/positions/:id", notImplemented("GET /positions/:id"));
+router.get("/positions/:id", getPosition);
 
 // Multipart form (fields + cv, idDocument, academicRecord). Creates the application as PENDING.
 // /applications is what the frontend calls; /register is the path in the sequence diagram.
@@ -64,7 +76,8 @@ router.get("/applicants", adminOrHandler, ApplicationController.getApplicants);
 router.get("/applicants/pending", adminOrHandler, ApplicationController.getPendingApplicants);
 router.post("/applicants", adminOrHandler, applicationUploads, ApplicationController.registerApplicant); // "Add applicant"
 router.get("/applicants/:id", adminOrHandler, ApplicationController.getApplicant);
-router.get("/applicants/:id/documents", adminOrHandler, notImplemented("GET /applicants/:id/documents"));
+router.get("/applicants/:id/documents", adminOrHandler, ApplicationController.getDocuments);
+router.get("/applicants/:id/documents/:documentId/download", adminOrHandler, ApplicationController.downloadDocument);
 router.put("/applicants/:id/interview", adminOrHandler, asInterview, reviewApplication);
 router.put("/applicants/:id/accept", adminOrHandler, ApplicationController.acceptApplicant);
 router.put("/applicants/:id/reject", adminOrHandler, ApplicationController.rejectApplicant);

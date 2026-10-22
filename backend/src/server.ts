@@ -7,6 +7,7 @@ import { EmailController } from "./controllers/EmailController";
 import taskRoutes from "./routes/taskRoutes";
 import { authService } from "./services/AuthService";
 import authRoutes from "./routes/authRoutes";
+import applicationRoutes from "./routes/applicationRoutes";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -20,6 +21,8 @@ app.use((req, res, next) => {
 app.use("/api", taskRoutes);
 
 app.use("/api", authRoutes);
+// Group A - careers positions, intern applications and the Applicants queue
+app.use("/api", applicationRoutes);
 
 app.get("/", (_req, res) => {
   res.status(200).json({

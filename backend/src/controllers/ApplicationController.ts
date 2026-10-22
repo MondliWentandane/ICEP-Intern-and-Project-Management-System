@@ -46,9 +46,37 @@ export async function getApplicationStatus(req: Request, res: Response) {
   catch (error) { return sendError(res, error); }
 }
 
+// Careers "Apply" form: multipart fields + cv / idDocument / academicRecord PDFs (parsed by multer in the route).
 export async function createApplication(req: Request, res: Response) {
-  try { return res.status(201).json(await service.create(req.body)); }
+  try {
+    const files = req.files && !Array.isArray(req.files) ? req.files : undefined;
+    const created = await service.submit(req.body ?? {}, files);
+    // Only what the "Application submitted" screen needs; no ID number or storage paths go back to the browser.
+    return res.status(201).json({
+      id: created.id,
+      referenceCode: created.referenceCode,
+      status: created.status,
+      createdAt: created.createdAt,
+      fullName: created.fullName,
+      email: created.email,
+      position: { id: created.position.id, title: created.position.title, campus: created.position.campus.name },
+    });
+  }
   catch (error) { return sendError(res, error); }
+}
+
+export async function getApplicationDocuments(req: Request, res: Response) {
+  try { return res.json(await service.getDocuments(routeParam(req.params.id))); }
+  catch (error) { return sendError(res, error); }
+}
+
+export async function downloadApplicationDocument(req: Request, res: Response) {
+  try {
+    const { document, content } = await service.downloadDocument(routeParam(req.params.id), routeParam(req.params.documentId));
+    res.setHeader("Content-Type", document.mimeType || "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${document.fileName.replace(/"/g, "")}"`);
+    return res.send(content);
+  } catch (error) { return sendError(res, error); }
 }
 
 export async function updateApplicationProfile(req: Request, res: Response) {
@@ -81,12 +109,12 @@ export async function rejectApplicant(req: Request, res: Response) {
 
 export async function reviewApplication(req: Request, res: Response) {
   try {
-    const { status, interviewAt, rejectionReason } = req.body;
+    const { status, interviewAt, interviewVenue, rejectionReason } = req.body ?? {};
     if (!["PENDING", "INTERVIEWEE", "ACCEPTED", "REJECTED"].includes(status)) {
       return res.status(400).json({ error: "Invalid application status" });
     }
     return res.json(await service.updateStatus(routeParam(req.params.id), {
-      status, interviewAt, rejectionReason,
+      status, interviewAt, interviewVenue, rejectionReason,
       reviewedById: (req as Request & { user?: { id: string } }).user?.id,
     }));
   } catch (error) { return sendError(res, error); }
@@ -100,4 +128,6 @@ export class ApplicationController {
   static rejectApplicant = rejectApplicant;
   static updateProfile = updateApplicationProfile;
   static setPassword = setApplicantPassword;
+  static getDocuments = getApplicationDocuments;
+  static downloadDocument = downloadApplicationDocument;
 }
