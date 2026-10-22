@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Avatar, Box, Button as MuiButton, Chip, IconButton, InputAdornment, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
+import { keyframes } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Archive, CircleCheck, Clock, Download, FileX, Search } from 'lucide-react'
 import { Link as RouterLink } from 'react-router-dom'
@@ -33,6 +34,25 @@ function FilterSelect({ label, value, onChange, all, options }: { label: string;
 }
 
 const headCellSx = { fontSize: 12, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' } as const
+
+const rowRise = keyframes`
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+`
+/** Rows rise in one by one and pop out in ICEP navy on hover (same as Applicants and Interns). */
+const rowSx = (index: number) => ({
+  animation: `${rowRise} .4s cubic-bezier(.2,.8,.2,1) ${index * 45}ms backwards`,
+  transition: 'background-color .25s ease, transform .3s cubic-bezier(.2,.8,.2,1), filter .3s ease',
+  '&.MuiTableRow-hover:hover': {
+    position: 'relative', zIndex: 1, bgcolor: 'primary.main',
+    transform: 'scale(1.006, 1.04)', filter: 'drop-shadow(0 8px 14px rgba(27,58,92,.3))',
+  },
+  '&:hover .MuiTableCell-root, &:hover .MuiTypography-root': { color: '#fff', borderBottomColor: 'transparent' },
+  '&:hover .muted': { color: '#C8D5E6' },
+  '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,.16)', color: '#fff' },
+  '&:hover .MuiIconButton-root': { color: '#fff', borderColor: 'rgba(255,255,255,.6)' },
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none', '&.MuiTableRow-hover:hover': { transform: 'none' } },
+})
 
 export function PastInternsPage() {
   const { data: records = [], isLoading, isError, refetch } = useQuery({ queryKey: ['past-interns'], queryFn: fetchPastInterns })
@@ -97,12 +117,12 @@ export function PastInternsPage() {
                 <TableCell sx={headCellSx}><Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>Open</Box></TableCell>
               </TableRow></TableHead>
               <TableBody>
-                {pageRows.map((record) => (
-                  <TableRow key={record.id} hover>
+                {pageRows.map((record, index) => (
+                  <TableRow key={record.id} hover sx={rowSx(index)}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 700, bgcolor: '#E4E9F1', color: 'primary.main' }}>{initials(record.name)}</Avatar>
-                        <Box><Typography sx={{ fontSize: 14 }}>{record.name}</Typography><Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{record.email}</Typography></Box>
+                        <Box><Typography sx={{ fontSize: 14 }}>{record.name}</Typography><Typography className="muted" sx={{ fontSize: 12, color: 'text.secondary' }}>{record.email}</Typography></Box>
                       </Box>
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{record.campus}</TableCell>

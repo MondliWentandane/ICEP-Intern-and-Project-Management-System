@@ -678,7 +678,7 @@ const CSS = `
 .b:hover,.pb:not(:disabled):hover{filter:brightness(.95)}
 .card{background:#fff;border-radius:18px;box-shadow:0 1px 2px #14284b0d;overflow:hidden}
 .scroll{overflow-x:auto}
-.ap table{width:100%;border-collapse:collapse;font-size:16px;min-width:1040px}
+.ap table{width:100%;border-collapse:separate;border-spacing:0;font-size:16px;min-width:1040px}
 .ap th{text-align:left;padding:20px 12px;font-size:14px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#5d7499;border-bottom:1px solid var(--line);white-space:nowrap}
 .ap th:first-child,.ap td:first-child{padding-left:24px}
 .ap td{padding:14px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -686,13 +686,18 @@ const CSS = `
 .sortable{cursor:pointer;user-select:none;transition:color .15s}
 .sortable:hover{color:var(--navy)}
 .cb-col{width:48px;text-align:center}
-.ap tbody tr{cursor:pointer;transition:background .12s}
-.ap tbody tr:hover{background:#fafbfd}
+.ap tbody tr{cursor:pointer;transition:background-color .25s ease,color .25s ease,transform .3s cubic-bezier(.2,.8,.2,1),filter .3s ease}
 .ap tbody tr.sel{background:#eef2fb}
-.ap tbody tr.sel:hover{background:#e3e9f7}
+/* Hover: the row pops out in ICEP navy (same as the dashboard preview) */
+.ap tbody tr:hover,.ap tbody tr.sel:hover{position:relative;z-index:1;background:#1B3A5C;color:#fff;transform:scale(1.006,1.04);filter:drop-shadow(0 8px 14px rgba(27,58,92,.3))}
+.ap tbody tr:hover td{border-bottom-color:transparent;box-shadow:1px 0 0 #1B3A5C}
+.ap tbody tr:hover td small{color:#C8D5E6}
+.ap tbody tr:hover .cb span{border-color:#C8D5E6}
+.ap tbody tr:hover .sent{color:#86EFAC}
+@media (prefers-reduced-motion:reduce){.ap tbody tr:hover,.ap tbody tr.sel:hover{transform:none}}
 .nm{display:flex;align-items:center;gap:14px}
 .av{width:40px;height:40px;border-radius:50%;background:#e8edf5;color:var(--navy);font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:background .15s,color .15s}
-.ap tbody tr:hover .av{background:#d8e0ed}
+.ap tbody tr:hover .av{background:rgba(255,255,255,.16);color:#fff}
 .av.lg{width:52px;height:52px;font-size:16px}
 
 /* row entry animation */

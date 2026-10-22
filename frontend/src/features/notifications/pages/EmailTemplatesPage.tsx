@@ -3,14 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 /* ------------------------------ Styles ------------------------------ */
 
 const CSS = `
-.np{--bg:#f4f6f8;--card:#fff;--text:#12263f;--muted:#6b7a90;--border:#e5e9ef;--navy:#16345a;--navy-d:#12263f;--navy-soft:#e8edf4;--green:#17713a;--green-bg:#dcf7e6;--red:#c2300a;--red-bg:#fde4dc;--blue:#1d4fd8;--blue-bg:#dbe8fd;--amber:#8a4b08;--amber-bg:#fdf0c2;
- background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:15px;padding:24px;min-height:100%}
-@media (prefers-color-scheme: dark){.np{--bg:#0e1a2b;--card:#15253b;--text:#e9eef5;--muted:#93a3ba;--border:#24364f;--navy:#3b6aa8;--navy-d:#2f5a94;--navy-soft:#1f3350;--green-bg:#17402b;--green:#7ee0a3;--red-bg:#4a2018;--red:#ff9c80;--blue-bg:#1d3560;--blue:#9dbcff;--amber-bg:#4a3a12;--amber:#f2c66b}}
+/* ICEP style guide tokens (styles/tokens.css). Light only: no dark theme. */
+.np{--bg:var(--icep-page);--card:var(--icep-card);--text:var(--icep-heading);--muted:var(--icep-secondary);--border:var(--icep-border);--navy:var(--icep-primary);--navy-d:var(--icep-primary);--navy-soft:#E8EEF5;--green:#166534;--green-bg:var(--icep-active-tint);--red:#B91C1C;--red-bg:var(--icep-rejected-tint);--blue:#1E40AF;--blue-bg:var(--icep-completed-tint);--amber:#92400E;--amber-bg:var(--icep-pending-tint);
+ color:var(--text);font-family:Inter,Arial,sans-serif;font-size:14px;min-height:100%}
 .np,.np *{box-sizing:border-box}
 .np button{font-family:inherit}
 .np-head{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-bottom:28px}
 .np-head h1{margin:0 0 6px;font-size:26px}.np-head p{margin:0;color:var(--muted)}
-.np-card{background:var(--card);border:1px solid var(--border);border-radius:14px}
+.np-card{background:var(--card);border:1px solid var(--border);border-radius:var(--icep-radius-lg);box-shadow:0 2px 10px rgba(26,32,44,.05)}
 .np-outlook{display:flex;align-items:center;gap:28px;padding:18px 20px}
 .np-outlook b{display:block}.np-outlook small{color:var(--muted)}
 .np-btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap}

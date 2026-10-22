@@ -26,11 +26,16 @@ const CSS = `
 /* Table */
 .interns-page .card{background:var(--card);border:1px solid var(--border);border-radius:var(--icep-radius-lg);box-shadow:0 2px 10px rgba(26,32,44,.05);overflow:hidden}
 .interns-page .scroll{overflow-x:auto}
-.interns-page table{width:100%;border-collapse:collapse;min-width:820px}
+.interns-page table{width:100%;border-collapse:separate;border-spacing:0;min-width:820px}
 .interns-page th{text-align:left;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:14px 20px;background:#F8FAFC;border-bottom:1px solid var(--line);font-weight:700}
 .interns-page td{padding:14px 20px;border-bottom:1px solid var(--line);color:var(--text)}
-.interns-page tbody tr{transition:background-color .2s}
-.interns-page tbody tr:hover{background:#F8FAFC}
+/* Rows rise in one by one, and pop out in ICEP navy on hover (as on Applicants) */
+.interns-page tbody tr.trow{animation:intern-rise .4s var(--ease) backwards;transition:background-color .25s ease,color .25s ease,transform .3s var(--ease),filter .3s ease}
+.interns-page tbody tr.trow:hover{position:relative;z-index:1;background:var(--navy);transform:scale(1.006,1.04);filter:drop-shadow(0 8px 14px rgba(27,58,92,.3))}
+.interns-page tbody tr.trow:hover td{color:#fff;border-bottom-color:transparent;box-shadow:1px 0 0 var(--navy)}
+.interns-page tbody tr.trow:hover td.muted{color:#C8D5E6}
+.interns-page tbody tr.trow:hover .av{background:rgba(255,255,255,.16);color:#fff}
+.interns-page tbody tr.trow:hover .btn{border-color:#fff}
 .interns-page tr:last-child td{border-bottom:0}
 .interns-page .who{display:flex;align-items:center;gap:12px;font-weight:600}
 .interns-page .av{width:36px;height:36px;border-radius:50%;background:var(--navy-soft);color:var(--navy);font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
@@ -96,7 +101,7 @@ const CSS = `
 .interns-page .reveal{animation:intern-rise .45s var(--ease) both}
 @keyframes intern-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media(max-width:560px){.interns-page .kv{grid-template-columns:1fr}}
-@media(prefers-reduced-motion:reduce){.interns-page .reveal{animation:none}}
+@media(prefers-reduced-motion:reduce){.interns-page .reveal,.interns-page tbody tr.trow{animation:none}.interns-page tbody tr.trow:hover{transform:none}}
 `;
 
 type Status = "Intern" | "Interviewee" | "Applicant" | "Past Intern";
@@ -366,8 +371,8 @@ export function InternsPage() {
                         <td colSpan={6} style={{ color: "var(--muted)" }}>{loading ? "Loading interns…" : loadError || "No interns found."}</td>
                       </tr>
                     )}
-                    {rows.map((p) => (
-                      <tr key={p.id}>
+                    {rows.map((p, i) => (
+                      <tr key={p.id} className="trow" style={{ animationDelay: `${i * 45}ms` }}>
                         <td>
                           <div className="who">
                             <span className="av">{initials(p.name)}</span>
