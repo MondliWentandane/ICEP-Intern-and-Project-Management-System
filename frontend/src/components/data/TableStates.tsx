@@ -1,9 +1,10 @@
-import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/material'
+import { Alert, Box, Button, Paper, Typography } from '@mui/material'
 import { Search, TriangleAlert } from 'lucide-react'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 
-export const TableLoading = () => (
-  <Paper role="status" sx={{ minHeight: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, bgcolor: '#fff' }}>
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}><CircularProgress size={24} /><Typography sx={{ fontWeight: 600 }}>Loading...</Typography></Box>
+export const TableLoading = ({ label }: { label?: string }) => (
+  <Paper sx={{ minHeight: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, bgcolor: '#fff', py: 3 }}>
+    <BikeLoader label={label} />
   </Paper>
 )
 

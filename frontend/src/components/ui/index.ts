@@ -9,3 +9,4 @@ export * from './TagInput'
 export * from './PageScaffold'
 
 export * from './KanbanStates'
+export * from './BikeLoader'

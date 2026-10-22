@@ -1,0 +1,568 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--icep-heading, #1A202C);
+  width: 100%;
+}
+
+/* Metric / Summary Cards */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.statCard {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 20px 24px;
+  border: 1px solid #EDF2F7;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(18, 40, 63, 0.06);
+}
+
+.statIconBox {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.iconBlue {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.iconGreen {
+  background: #ECFDF5;
+  color: #10B981;
+}
+
+.iconAmber {
+  background: #FFFBEB;
+  color: #D97706;
+}
+
+.iconRed {
+  background: #FEF2F2;
+  color: #EF4444;
+}
+
+.statContent {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 750;
+  line-height: 1.1;
+  color: #1A202C;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.statLabel {
+  font-size: 13.5px;
+  color: #718096;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Toolbar & Filter Bar */
+.controlBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.searchInputWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 220px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  color: #718096;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 14px 8px 36px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #1A202C;
+  outline: none;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+}
+
+.searchInput:focus {
+  border-color: #1B3A5C;
+  box-shadow: 0 0 0 2px rgba(27, 58, 92, 0.1);
+}
+
+.selectWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.filterSelect {
+  appearance: none;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 8px 34px 8px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1A202C;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.filterSelect:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.filterSelect:focus {
+  border-color: #1B3A5C;
+}
+
+.selectChevron {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: #718096;
+}
+
+.datePickerButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.datePickerButton:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.actionsGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.exportButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1A202C;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.exportButton:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.addTaskButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1B3A5C;
+  color: #FFFFFF;
+  border: 1px solid #1B3A5C;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(18, 40, 63, 0.15);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.addTaskButton:hover {
+  background: #12283F;
+  border-color: #12283F;
+}
+
+/* Timeline Card */
+.timelineCard {
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #EDF2F7;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+}
+
+.timelineHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #EDF2F7;
+}
+
+.timelineTitle {
+  font-size: 18px;
+  font-weight: 750;
+  color: #1A202C;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* View switcher (Days, Weeks, Months) */
+.viewSwitcher {
+  display: inline-flex;
+  background: #F8FAFC;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid #E2E8F0;
+}
+
+.viewButton {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #718096;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.viewButton:hover {
+  color: #1A202C;
+}
+
+.viewButtonActive {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Gantt Table & Grid */
+.ganttScrollWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ganttTable {
+  width: 100%;
+  min-width: 950px;
+  border-collapse: collapse;
+}
+
+.tableHeaderRow th {
+  padding: 14px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #718096;
+  border-bottom: 1px solid #EDF2F7;
+  text-align: left;
+  background: #FFFFFF;
+}
+
+.dateColHeader {
+  text-align: center !important;
+  font-weight: 600;
+  color: #718096;
+  min-width: 90px;
+}
+
+.todayDateColHeader {
+  color: #2563EB !important;
+  font-weight: 750 !important;
+}
+
+.taskRow {
+  transition: background-color 0.15s ease;
+}
+
+.taskRow:hover {
+  background-color: #FAFCFE;
+}
+
+.taskRow td {
+  padding: 16px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+
+.taskMetaCell {
+  min-width: 180px;
+}
+
+.taskName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A202C;
+  margin: 0;
+}
+
+.taskPhase {
+  font-size: 12px;
+  color: #718096;
+  margin: 2px 0 0;
+}
+
+.assigneeCell {
+  min-width: 140px;
+}
+
+.assigneeWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assigneeAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: #1E293B;
+  flex-shrink: 0;
+}
+
+.avatarBlue {
+  background: #2563EB;
+}
+
+.avatarSlate {
+  background: #64748B;
+}
+
+.assigneeName {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1A202C;
+}
+
+.statusCell {
+  min-width: 110px;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statusCompleted {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+.statusActive {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.statusPending {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.statusRejected {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+
+/* Timeline cells with vertical grid borders */
+.timelineCell {
+  position: relative;
+  border-left: 1px dashed #EDF2F7;
+  padding: 8px 4px !important;
+  height: 54px;
+}
+
+.timelineCell:last-child {
+  border-right: 1px dashed #EDF2F7;
+}
+
+.timelineBar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  color: #FFFFFF;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.timelineBar:hover {
+  filter: brightness(1.08);
+}
+
+.barBlue {
+  background: #1D4ED8;
+}
+
+.barGreen {
+  background: #15803D;
+}
+
+.barTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barPercent {
+  font-size: 11px;
+  opacity: 0.95;
+  margin-left: 8px;
+}
+
+/* Modal form controls */
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A202C;
+}
+
+.formInput,
+.modalSelect {
+  padding: 9px 12px;
+  border: 1px solid #D1D9E2;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1A202C;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.formInput:focus,
+.modalSelect:focus {
+  border-color: #1B3A5C;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .controlBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actionsGroup {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 600px) {
+  .metricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .filterGroup {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchInputWrapper,
+  .selectWrapper,
+  .filterSelect,
+  .datePickerButton {
+    width: 100%;
+  }
+
+  .timelineHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}

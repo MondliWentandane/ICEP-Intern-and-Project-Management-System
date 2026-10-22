@@ -1,13 +1,13 @@
 import axios from 'axios'
 import { endpoints } from './endpoints'
 import { tokenStorage } from '@/utils/tokenStorage'
-import { isMockAuthEnabled } from '@/utils/authMode'
+
 
 export const apiClient = axios.create({ baseURL: import.meta.env.VITE_API_BASE_URL || '/api', timeout: 20000 })
 apiClient.interceptors.request.use((config) => {
   const token = tokenStorage.get()
   // A local mock-session token must never be sent to a backend service.
-  if (token && !isMockAuthEnabled()) config.headers.Authorization = `Bearer ${token}`
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 

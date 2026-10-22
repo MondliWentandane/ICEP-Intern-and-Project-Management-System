@@ -1,24 +1,150 @@
-import { Link } from 'react-router-dom'
-import styles from './DashboardPages.module.css'
+import { useMemo, useState } from 'react'
+import { Box, Button, LinearProgress, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
+import { Link as RouterLink } from 'react-router-dom'
+import { AlarmClock, FolderKanban, Users, UserCheck } from 'lucide-react'
+import { Applicants } from '@/api/services/applicants.service'
+import { Campuses } from '@/api/services/campuses.service'
+import { Interns } from '@/api/services/interns.service'
+import { Projects } from '@/api/services/projects.service'
+import { Tasks } from '@/api/services/tasks.service'
+import { useAuth } from '@/hooks/useAuth'
+import { formatDate } from '@/utils/format'
+import { BarList, EmptyNote, ErrorNotice, LoadingBlock, PageHeader, Panel, SampleNotice, StatTile, StatusBadge } from '@/features/shared/workspace/parts'
+import { cardGrid } from '@/features/shared/workspace/layout'
+import { sampleApplicants, sampleCampuses, sampleInterns, sampleProjects, sampleTasks } from '@/features/shared/workspace/sample'
+import { isActiveIntern, isPendingApplicant, statusKey } from '@/features/shared/workspace/status'
+import { useList } from '@/features/shared/workspace/useList'
+import type { CampusView, InternView, ProjectView } from '@/features/shared/workspace/types'
 
-const campuses = [
-  { name: 'Pretoria', applicants: 4, interviewees: 2, interns: 12 },
-  { name: 'Soshanguve South', applicants: 5, interviewees: 2, interns: 9 },
-  { name: 'Soshanguve North', applicants: 3, interviewees: 1, interns: 5 },
-  { name: 'Arcadia', applicants: 2, interviewees: 1, interns: 4 },
-  { name: 'Ga-Rankuwa', applicants: 2, interviewees: 1, interns: 3 },
-  { name: 'eMalahleni', applicants: 2, interviewees: 1, interns: 4 },
-  { name: 'Mbombela', applicants: 1, interviewees: 0, interns: 2 },
-  { name: 'Polokwane', applicants: 2, interviewees: 1, interns: 3 },
-]
-function SummaryCard({ label, value, detail, badge, badgeClass }: { label: string; value: string; detail: string; badge: string; badgeClass: string }) {
- return <section className={`${styles.card} ${styles.metric}`}><div className={styles.toolbar}><span className={styles.metricLabel}>{label}</span><span className={`${styles.pill} ${styles[badgeClass]}`}>{badge}</span></div><p className={styles.metricValue}>{value}</p><p className={styles.metricNote}>{detail}</p></section>
-}
+const BASE = '/admin'
+
 export function AdminDashboardPage() {
- return <main className={styles.page}>
-  <div className={styles.toolbar}><p className={styles.subheading}>Interns overview across all campuses.</p><label className={styles.inline}><span className={styles.muted}>Campus</span><select aria-label="Campus" className={styles.button}><option>All campuses</option>{campuses.map(({ name }) => <option key={name}>{name}</option>)}</select></label></div>
-  <div className={styles.metrics}><SummaryCard label="Applicants" value="21" detail="Awaiting approval" badge="+6 this week" badgeClass="blue" /><SummaryCard label="Interviewees" value="9" detail="Accepted, before placement" badge="3 interviews this week" badgeClass="yellow" /><SummaryCard label="Active interns" value="42" detail="Currently on placement" badge="92% completion rate" badgeClass="green" /></div>
-  <section className={`${styles.card} ${styles.tableCard}`}><header className={styles.cardHeader}><h2 className={styles.cardTitle}>By campus</h2><p className={styles.subheading}>Applicants, interviewees and active interns for each campus.</p></header><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Campus</th><th>Applicants</th><th>Interviewees</th><th>Active interns</th><th /></tr></thead><tbody>{campuses.map((campus) => <tr key={campus.name}><td><strong>{campus.name}</strong></td><td>{campus.applicants}</td><td>{campus.interviewees}</td><td><div className={styles.inline}><span>{campus.interns}</span><div className={styles.progress}><span style={{ width: `${campus.interns / 12 * 100}%` }} /></div></div></td><td><Link className={styles.link} to="/admin/campuses">View →</Link></td></tr>)}</tbody><tfoot><tr><td>Total</td><td>21</td><td>9</td><td>42</td><td /></tr></tfoot></table></div></section>
- </main>
+  const { user } = useAuth()
+  const applicants = useList(() => Applicants.list(), sampleApplicants)
+  const interns = useList<InternView>(() => Interns.list(), sampleInterns)
+  const campuses = useList<CampusView>(() => Campuses.list(), sampleCampuses)
+  const projects = useList<ProjectView>(() => Projects.list(), sampleProjects)
+  const tasks = useList(() => Tasks.list(), sampleTasks)
+
+  const all = [applicants, interns, campuses, projects, tasks]
+  const loading = all.some((r) => r.loading)
+  const failed = all.some((r) => r.failed)
+  const usingSample = all.some((r) => r.usingSample)
+
+  const [now] = useState(() => Date.now())
+  const openTasks = useMemo(() => tasks.items.filter((t) => t.status !== 'completed'), [tasks.items])
+  const overdue = useMemo(() => openTasks.filter((t) => t.dueAt && new Date(t.dueAt).getTime() < now), [openTasks, now])
+  const upcoming = useMemo(
+    () => openTasks.filter((t) => t.dueAt && new Date(t.dueAt).getTime() >= now).sort((a, b) => new Date(a.dueAt!).getTime() - new Date(b.dueAt!).getTime()).slice(0, 5),
+    [openTasks, now],
+  )
+
+  const activeProjects = projects.items.filter((p) => statusKey(p.status) === 'in_progress' || statusKey(p.status) === 'active')
+  const pendingApplicants = applicants.items.filter((a) => isPendingApplicant(a.status)).length
+  const activeInterns = interns.items.filter((i) => isActiveIntern(i.status))
+
+  const campusName = useMemo(() => new Map(campuses.items.map((c) => [c.id, c.name])), [campuses.items])
+  const projectName = useMemo(() => new Map(projects.items.map((p) => [p.id, p.name])), [projects.items])
+
+  const internsByCampus = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const intern of activeInterns) {
+      const name = (intern.campusId && campusName.get(intern.campusId)) || intern.campusName || 'Unassigned'
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+    return [...counts].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+  }, [activeInterns, campusName])
+
+  const taskBreakdown = [
+    { label: 'To do', value: tasks.items.filter((t) => t.status === 'todo').length, accent: 'pending' as const },
+    { label: 'In progress', value: tasks.items.filter((t) => t.status === 'in_progress').length, accent: 'completed' as const },
+    { label: 'Completed', value: tasks.items.filter((t) => t.status === 'completed').length, accent: 'active' as const },
+  ]
+
+  const firstName = user?.name?.split(' ')[0]
+
+  return (
+    <Box>
+      <PageHeader
+        title={firstName ? `Welcome back, ${firstName}` : 'Admin dashboard'}
+        subtitle="Programme overview across applicants, interns, projects and tasks."
+        actions={<>
+          <Button variant="outlined" component={RouterLink} to={`${BASE}/reports`}>Reports</Button>
+          <Button variant="contained" component={RouterLink} to={`${BASE}/projects`}>View projects</Button>
+        </>}
+      />
+
+      {usingSample && <SampleNotice />}
+      {failed && <ErrorNotice message="Some dashboard data could not be loaded. Check your connection and try again." />}
+      {loading ? <LoadingBlock /> : (
+        <Stack spacing={2}>
+          <Box sx={cardGrid({ lg: 4 })}>
+            <StatTile label="Applicants" value={applicants.items.length} hint={`${pendingApplicants} pending review`} icon={Users} accent="pending" />
+            <StatTile label="Active interns" value={activeInterns.length} hint={`${interns.items.length} interns on record`} icon={UserCheck} accent="active" />
+            <StatTile label="Active projects" value={activeProjects.length} hint={`${projects.items.length} projects in total`} icon={FolderKanban} accent="completed" />
+            <StatTile label="Overdue tasks" value={overdue.length} hint={`${openTasks.length} tasks still open`} icon={AlarmClock} accent={overdue.length ? 'rejected' : 'primary'} />
+          </Box>
+
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>
+            <Panel title="Projects" action={{ label: 'All projects', to: `${BASE}/projects` }}>
+              {projects.items.length === 0 ? <EmptyNote message="No projects yet." /> : (
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow><TableCell>Project</TableCell><TableCell>Status</TableCell><TableCell sx={{ minWidth: 140 }}>Progress</TableCell></TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {projects.items.slice(0, 6).map((project) => (
+                        <TableRow key={project.id} hover>
+                          <TableCell>
+                            <Typography variant="body2" component={RouterLink} to={`${BASE}/projects/${project.id}`} sx={{ fontWeight: 600, color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>{project.name}</Typography>
+                            {project.department && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{project.department}</Typography>}
+                          </TableCell>
+                          <TableCell><StatusBadge status={project.status} /></TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                              <LinearProgress variant="determinate" value={project.progress ?? 0} sx={{ flex: 1, height: 8, borderRadius: 4 }} aria-label={`${project.name} progress`} />
+                              <Typography variant="caption" sx={{ width: 34, textAlign: 'right' }}>{project.progress ?? 0}%</Typography>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
+              )}
+            </Panel>
+
+            <Panel title="Task status">
+              <BarList items={taskBreakdown} emptyMessage="No tasks yet." />
+            </Panel>
+          </Box>
+
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' } }}>
+            <Panel title="Upcoming deadlines" action={{ label: 'Calendar', to: `${BASE}/calendar` }}>
+              {upcoming.length === 0 ? <EmptyNote message="No upcoming deadlines." /> : (
+                <Stack spacing={1.5} divider={<Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />}>
+                  {upcoming.map((task) => (
+                    <Stack key={task.id} direction="row" sx={{ justifyContent: 'space-between', gap: 2 }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{task.title}</Typography>
+                        <Typography variant="caption" color="text.secondary">{(task.projectId && projectName.get(task.projectId)) || 'No project'}</Typography>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{formatDate(task.dueAt)}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Panel>
+
+            <Panel title="Active interns by campus" action={{ label: 'Campuses & intakes', to: `${BASE}/campuses` }}>
+              <BarList items={internsByCampus} emptyMessage="No active interns yet." />
+            </Panel>
+          </Box>
+        </Stack>
+      )}
+    </Box>
+  )
 }
+
 export default AdminDashboardPage

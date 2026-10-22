@@ -304,6 +304,7 @@ model Application {
 
   // Review (WIL Handler)
   interviewAt     DateTime?
+  interviewVenue  String?
   reviewedById    String?
   reviewedAt      DateTime?
   rejectionReason String?

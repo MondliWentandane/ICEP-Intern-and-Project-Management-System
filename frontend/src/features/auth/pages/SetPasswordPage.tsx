@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Alert, IconButton, InputAdornment, Link, Stack, TextField, Typography } from '@mui/material'
 import { Eye, EyeOff } from 'lucide-react'
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom'
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import axios from 'axios'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -16,7 +17,10 @@ type PasswordValues = z.infer<typeof passwordSchema>
 
 export function SetPasswordPage() {
   const navigate = useNavigate()
-  const { token } = useParams<{ token: string }>()
+  // The account email links to /reset-password?token=…; older links carry the token in the path.
+  const { token: pathToken } = useParams<{ token: string }>()
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token') ?? pathToken ?? ''
   const [complete, setComplete] = useState(false)
   const [requestError, setRequestError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -27,14 +31,22 @@ export function SetPasswordPage() {
     if (!token) { setRequestError('This password setup link is invalid. Ask your administrator for a new invitation.'); return }
     setRequestError('')
     try { await Auth.createPassword(token, password); setComplete(true) }
-    catch { setRequestError('We could not set your password. The link may have expired; ask for a new one and try again.') }
+    catch (error) {
+      // Show the backend's reason (e.g. "This link has expired. Please request a new one.") when there is one.
+      const reason = axios.isAxiosError<{ error?: string }>(error) ? error.response?.data?.error : undefined
+      setRequestError(reason ?? 'We could not set your password. The link may have expired; ask for a new one and try again.')
+    }
   })
 
   const visibilityAdornment = (visible: boolean, toggle: () => void, label: string) => <InputAdornment position="end"><IconButton aria-label={visible ? `Hide ${label}` : `Show ${label}`} onClick={toggle} edge="end" size="small"><span className="password-visibility-icon">{visible ? <EyeOff size={18} /> : <Eye size={18} />}</span></IconButton></InputAdornment>
 
   return (
     <Stack className="auth-form auth-create-password-form" component="form" spacing={0} onSubmit={onSubmit} noValidate>
-      {complete ? <>
+      {!token ? <>
+        <Typography className="auth-heading" component="h1">Link not valid</Typography>
+        <Typography color="text.secondary" sx={{ textAlign: 'center', mb: 4 }}>This password setup link is incomplete. Open the link from your ICEP email again, or ask your administrator for a new invitation.</Typography>
+        <Button className="auth-submit" type="button" onClick={() => navigate('/login')} fullWidth>Back to Login</Button>
+      </> : complete ? <>
         <Typography className="auth-heading" component="h1">Password set!</Typography>
         <Typography color="text.secondary" sx={{ textAlign: 'center', mb: 4 }}>Your ICEP account is ready. You can now sign in with your new password.</Typography>
         <Button className="auth-submit" type="button" onClick={() => navigate('/login')} fullWidth>Continue to Login</Button>

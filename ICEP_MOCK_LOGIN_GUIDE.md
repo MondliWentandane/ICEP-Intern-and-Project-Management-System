@@ -19,33 +19,29 @@ ICEPdemo1!
 
 Enter the email and password on the normal `/login` page. The login handler chooses the account role and navigates to its landing route.
 
-## Enable mock login locally
+## Run locally
 
-The repository includes `frontend/.env.example` with mock mode enabled for local development. Each developer should copy it to `frontend/.env.local`:
-
-```powershell
-Copy-Item frontend/.env.example frontend/.env.local
-```
-
-Restart the Vite development server after creating or changing the environment file:
+Mock login is the default for Vite development, so no `.env.local` file is required:
 
 ```powershell
 cd frontend
+npm install
 npm run dev
 ```
 
-Then open the local `/login` route. The Login page shows the demo emails and shared password when mock mode is active. `frontend/.env.local` is ignored by Git and must not be committed.
+Open the `/login` URL printed by Vite. The page displays the demo emails and shared password while mock mode is active. If a local env file explicitly sets `VITE_AUTH_MODE=api`, remove that setting or change it to `VITE_AUTH_MODE=mock`. Restart Vite after changing env files.
+
+The repository's `frontend/.env.example` is a reference for optional local API configuration. Developers may copy it to `.env.local` when they need to customize the API URL; `.env.local` is ignored by Git.
 
 ## What was implemented
 
 - Added `frontend/src/api/services/mockAuth.ts` with the four demo users and credential validation.
-- Added `frontend/src/utils/authMode.ts` to enable mock authentication only when `import.meta.env.DEV` is true and `VITE_AUTH_MODE=mock`.
-- Updated `frontend/src/api/services/auth.service.ts` so `Auth.login` uses the mock users in development mock mode and uses the backend API otherwise.
-- Updated `frontend/src/features/auth/pages/LoginPage.tsx` to show demo credentials in development mock mode and route users by role after sign-in.
+- Added `frontend/src/utils/authMode.ts` to enable mock authentication by default only in Vite development; developers can explicitly opt into API authentication with `VITE_AUTH_MODE=api`.
+- Updated `frontend/src/api/services/auth.service.ts` so `Auth.login` uses mock users in development mock mode and uses the backend API otherwise.
+- Updated `frontend/src/features/auth/pages/LoginPage.tsx` to show demo credentials in mock mode and route users by role after sign-in.
 - Updated `frontend/src/context/AuthContext.tsx` to restore a valid mock session after a page refresh in mock mode.
 - Updated `frontend/src/api/client.ts` so a mock session token is not sent to backend API requests.
-- Updated `frontend/.env.example` and the Vite environment types for `VITE_AUTH_MODE`.
-- Created the local, ignored `frontend/.env.local` for this checkout.
+- Updated `frontend/.env.example` and the Vite environment types.
 
 ## Boundaries
 
