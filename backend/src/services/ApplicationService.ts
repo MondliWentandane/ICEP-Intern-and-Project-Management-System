@@ -265,6 +265,10 @@ export class ApplicationService {
     if (data.status === "REJECTED" && !data.rejectionReason?.trim()) {
       throw Object.assign(new Error("rejectionReason is required when rejecting an application"), { statusCode: 400 });
     }
+    // Accepting creates the intern account first, so a problem (e.g. the email belongs to a staff
+    // member) stops the acceptance instead of leaving an accepted applicant without an account.
+    if (data.status === "ACCEPTED") await repository.createInternFromApplication(id);
+
     const updated = await repository.updateStatus(id, {
       status: data.status,
       ...(data.interviewAt ? { interviewAt: new Date(data.interviewAt) } : {}),
@@ -275,9 +279,10 @@ export class ApplicationService {
 
     // Tell the applicant. The decision is already saved, so a failed email doesn't undo it:
     // the response says emailSent: false and the page can warn the reviewer.
-    if (data.status !== "INTERVIEWEE" && data.status !== "REJECTED") return updated;
+    if (data.status === "PENDING") return updated;
     try {
       if (data.status === "INTERVIEWEE") await emailService.sendInterviewInvite(id);
+      else if (data.status === "ACCEPTED") await emailService.sendAcceptanceEmail(id); // includes the set-password link
       else await emailService.sendRejectionEmail(id);
       return { ...updated, emailSent: true };
     } catch (error) {

@@ -355,7 +355,7 @@ export function ApplicantsPage() {
         saveRow(updated, kind === "accept" ? { startDate, startVenue, ...emailMeta } : emailMeta)
         if (updated.emailSent === false) say(`Saved, but the email to ${a.fullName} could not be sent.`)
         else say(kind === "interview" ? `Interview invite sent to ${a.fullName}`
-          : kind === "accept" ? `${a.fullName} accepted` : `${a.fullName} rejected — email sent`)
+          : kind === "accept" ? `${a.fullName} accepted — welcome email with the set-password link sent` : `${a.fullName} rejected — email sent`)
         setAction(null)
       })
       .catch((error) => say(apiErrorMessage(error, "Could not save the decision. Please try again.")))

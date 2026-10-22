@@ -1,4 +1,3 @@
-import jwt from 'jsonwebtoken';
 import { OutlookService } from './OutlookService';
 import { prisma } from '../config/prisma';
 import crypto from 'crypto';
@@ -15,56 +14,47 @@ export class EmailService {
         this.outlookService = new OutlookService();
     }
 
+    /**
+     * "Welcome to ICEP" email for an accepted applicant, with a one-time link to set their password
+     * (the same /reset-password flow as staff invites). Their intern account must already exist.
+     */
     public async sendAcceptanceEmail(applicationId: string): Promise<void> {
-
         const application = await prisma.application.findUnique({
-            where: { id: applicationId }
+            where: { id: applicationId },
+            include: { intern: { select: { userId: true } } }
         });
         if (!application) throw new Error(`Application ${applicationId} not found.`);
-
+        if (!application.intern) throw new Error('The intern account has not been created for this application.');
 
         const template = await prisma.emailTemplate.findUnique({
             where: { key: 'APPLICATION_ACCEPTED' }
         });
         if (!template) throw new Error("Template 'APPLICATION_ACCEPTED' not found.");
 
-        const token = jwt.sign(
-            { userId: application.id, email: application.email },
-            process.env.JWT_SECRET || 'fallback_secret',
-            { expiresIn: '48h' }
-        );
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const setupLink = `${frontendUrl}/set-password?token=${token}`;
-
-
+        const setupLink = await this.createPasswordSetupLink(application.intern.userId);
         const subject = template.subject.split('{{fullName}}').join(application.fullName);
-        const content = template.body
-            .split('{{fullName}}').join(application.fullName)
-            .split('{{passwordLink}}').join(setupLink);
+        const htmlContent = asHtml(template.body
+            .split('{{fullName}}').join(escapeHtml(application.fullName))
+            .split('{{passwordLink}}').join(setupLink));
 
-        const htmlContent = content.split('\n').join('<br>');
-
-        const sent = await this.outlookService.sendTemplateEmail(
-            application.email,
-            subject,
-            `Welcome to ICEP!`,
-            htmlContent,
-            setupLink,
-            'Create Your Password'
-        );
-
+        const sent = await this.outlookService.sendEmail(application.email, subject, htmlContent);
+        await this.logEmail(template.id, application.email, subject, sent, application.id);
         if (!sent) throw new Error(`Failed to send email to ${application.email}`);
+    }
 
-
-        await prisma.emailLog.create({
+    /** One-time set-password link (valid 24 hours). Only a hash of the token is stored. */
+    private async createPasswordSetupLink(userId: string): Promise<string> {
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        await prisma.passwordToken.create({
             data: {
-                templateId: template.id,
-                toEmail: application.email,
-                subject: subject,
-                status: 'SENT',
-                applicationId: application.id
+                userId,
+                tokenHash: crypto.createHash('sha256').update(rawToken).digest('hex'),
+                purpose: 'SET_PASSWORD',
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
             }
         });
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return `${frontendUrl}/reset-password?token=${rawToken}`;
     }
 
     public async sendRejectionEmail(applicationId: string): Promise<void> {
@@ -150,23 +140,7 @@ export class EmailService {
             throw new Error("User not found in the system.");
         }
 
-        const rawToken = crypto.randomBytes(32).toString('hex');
-
-        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-        await prisma.passwordToken.create({
-            data: {
-                userId: user.id,
-                tokenHash: tokenHash,
-                purpose: 'SET_PASSWORD',
-                expiresAt: expiresAt
-            }
-        });
-
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const actualResetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
+        const actualResetLink = await this.createPasswordSetupLink(user.id);
 
         const template = await prisma.emailTemplate.findUnique({
             where: { key: 'PASSWORD_RESET' }
