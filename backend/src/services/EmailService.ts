@@ -131,10 +131,11 @@ export class EmailService {
 
         const finalHtmlBody = template.body.replace('{{resetLink}}', actualResetLink);
 
-        await this.outlookService.sendTemplateEmail(
+        const sent = await this.outlookService.sendTemplateEmail(
             email,
             template.subject,
             finalHtmlBody
         );
+        if (!sent) throw new Error(`Failed to send the password setup email to ${email}.`);
     }
 }
