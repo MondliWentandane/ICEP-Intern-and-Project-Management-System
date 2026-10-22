@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { IcepLogo } from '@/components/brand/IcepLogo'
 import styles from './MentorDashboardPage.module.css'
 
 interface TeamMember {
@@ -219,6 +220,10 @@ export function MentorDashboardPage() {
 
   return (
     <main className={styles.page}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <IcepLogo />
+      </div>
+
       {/* Top Bar Actions */}
       <section className={styles.topBar} aria-label="Dashboard controls">
         <button

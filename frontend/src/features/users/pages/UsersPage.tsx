@@ -3,6 +3,10 @@ import { Alert, Avatar, Box, Dialog, DialogActions, DialogContent, DialogTitle, 
 import { BriefcaseBusiness, Plus, Search, ShieldCheck, UserRoundCog, UsersRound } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { Campuses } from '@/api/services/campuses.service'
+import { sampleCampuses } from '@/features/shared/workspace/sample'
+import { useList } from '@/features/shared/workspace/useList'
+import type { CampusView } from '@/features/shared/workspace/types'
 
 type UserRole = 'ADMIN' | 'WIL_HANDLER' | 'MENTOR' | 'INTERN'
 interface UserRecord { id: number; name: string; email: string; role: UserRole; campus: string }
@@ -22,6 +26,8 @@ const demoUsers: UserRecord[] = [
   { id: 3, name: 'Demo Mentor', email: 'mentor@example.com', role: 'MENTOR', campus: 'Pretoria' },
   { id: 4, name: 'Demo Intern', email: 'intern1@example.com', role: 'INTERN', campus: 'Soshanguve South' },
 ]
+// Intern accounts are created when an application is accepted, so they are not offered when adding a user by hand.
+const assignableRoles = (Object.keys(roleNames) as UserRole[]).filter((role) => role !== 'INTERN')
 const headerCellSx = { py: 1.5, fontSize: 12, fontWeight: 700, color: 'var(--icep-secondary)', textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' } as const
 
 export function UsersPage() {
@@ -30,6 +36,7 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [error, setError] = useState('')
+  const campuses = useList<CampusView>(() => Campuses.list(), sampleCampuses)
   const filteredUsers = useMemo(() => users.filter((user) => `${user.name} ${user.email} ${user.campus}`.toLowerCase().includes(query.trim().toLowerCase()) && (!roleFilter || user.role === roleFilter)), [users, query, roleFilter])
   const counts = useMemo(() => ({
     total: users.length,
@@ -44,8 +51,8 @@ export function UsersPage() {
     const name = String(form.get('name') ?? '').trim()
     const email = String(form.get('email') ?? '').trim()
     const role = String(form.get('role') ?? '') as UserRole
-    const campus = String(form.get('campus') ?? '').trim() || '—'
-    if (!name || !email || !role) { setError('Complete the required fields.'); return }
+    const campus = String(form.get('campus') ?? '').trim()
+    if (!name || !email || !role || !campus) { setError('Complete the required fields, including the campus.'); return }
     setUsers((current) => [...current, { id: Date.now(), name, email, role, campus }])
     setError('')
     setDialogOpen(false)
@@ -119,12 +126,11 @@ export function UsersPage() {
           <TextField name="name" label="Full name" required fullWidth />
           <TextField name="email" label="Email address" type="email" required fullWidth />
           <TextField name="role" label="Role" select required defaultValue="">
-            <MenuItem value="ADMIN">Administrator</MenuItem>
-            <MenuItem value="WIL_HANDLER">WIL Handler</MenuItem>
-            <MenuItem value="MENTOR">Mentor</MenuItem>
-            <MenuItem value="INTERN">Intern</MenuItem>
+            {assignableRoles.map((role) => <MenuItem key={role} value={role}>{roleNames[role]}</MenuItem>)}
           </TextField>
-          <TextField name="campus" label="Campus (optional)" fullWidth />
+          <TextField name="campus" label="Campus" select required defaultValue="" fullWidth>
+            {campuses.items.map((campus) => <MenuItem key={campus.id} value={campus.name}>{campus.name}</MenuItem>)}
+          </TextField>
         </Box></DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}><Button appearance="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button><Button type="submit">Save user</Button></DialogActions>
       </form>
