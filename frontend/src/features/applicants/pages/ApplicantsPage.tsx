@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { acceptApplication, apiErrorMessage, downloadDocumentById, fetchApplications, rejectApplication, scheduleInterview, type ApiApplication } from '../data/applicationsApi'
 
 // Self-contained shell: this file can be copied directly into a React/TSX project.
 function PageScaffold({ title, children }: { title: string; children: ReactNode }) {
@@ -17,7 +19,7 @@ function PageScaffold({ title, children }: { title: string; children: ReactNode 
 /* ---------- types (mirror the Prisma schema) ---------- */
 type ApplicationStatus = "PENDING" | "INTERVIEWEE" | "ACCEPTED" | "REJECTED"
 type DocumentType = "CV" | "ID_COPY" | "ACADEMIC_RECORD" | "MOTIVATION_LETTER" | "WIL_LETTER" | "CERTIFICATE" | "OTHER"
-type Doc = { id: string; type: DocumentType; fileName: string; fileUrl: string; mimeType?: string; sizeBytes?: number; uploadedAt: string }
+type Doc = { id: string; applicationId?: string; type: DocumentType; fileName: string; fileUrl: string; mimeType?: string; sizeBytes?: number; uploadedAt: string }
 type Application = {
   id: string; referenceCode: string; status: ApplicationStatus;
   fullName: string; email: string; phone?: string; idNumber?: string;
@@ -112,51 +114,21 @@ function formatRejection(reason: string): string {
 
 const LABEL: Record<ApplicationStatus, string> = { PENDING: "Pending", INTERVIEWEE: "Interview", ACCEPTED: "Accepted", REJECTED: "Rejected" }
 const DOC_LABEL: Record<DocumentType, string> = { CV: "CV", ID_COPY: "ID copy", ACADEMIC_RECORD: "Academic record", MOTIVATION_LETTER: "Motivation letter", WIL_LETTER: "WIL letter", CERTIFICATE: "Certificate", OTHER: "Other" }
-const ADMIN = "Alex Williamson" // current logged-in reviewer (use your auth user)
-
-/* ---------- mock data (replace with GET /api/applications, include position.campus, skills, documents) ---------- */
-const BASE: [string, string, string, string, string, string, ApplicationStatus][] = [
-  ["Thabo Molefe", "210000000", "Soshanguve South", "Computer Science", "2026-09-30", "", "PENDING"],
-  ["Lerato Dlamini", "217919317", "Arcadia", "Information Technology", "2026-09-30", "", "PENDING"],
-  ["Sipho Nkosi", "225838634", "Mbombela", "Computer Systems Eng.", "2026-09-29", "", "INTERVIEWEE"],
-  ["Naledi Khumalo", "233757951", "Soshanguve North", "Multimedia Computing", "2026-09-29", "", "PENDING"],
-  ["Kabelo Sithole", "241677268", "Ga-Rankuwa", "Information Technology", "2026-09-28", "", "ACCEPTED"],
-  ["Zanele Mokoena", "249596585", "Polokwane", "Informatics", "2026-09-27", "", "PENDING"],
-  ["Tshepo Mahlangu", "257515902", "Arcadia", "Multimedia Computing", "2026-09-26", "", "REJECTED"],
-  ["Palesa Radebe", "265435219", "eMalahleni", "Computer Science", "2026-09-26", "", "PENDING"],
-]
-const FIRST = ["Karabo", "Mpho", "Lindiwe", "Themba", "Nomsa", "Bongani", "Refilwe", "Sandile", "Dineo", "Katlego"]
-const LAST = ["Mthembu", "Ndlovu", "Maseko", "Mabaso", "Phiri", "Baloyi", "Chauke", "Sebola", "Moloi", "Zulu"]
-const CAMP = ["Soshanguve South", "Arcadia", "Mbombela", "Soshanguve North", "Ga-Rankuwa", "Polokwane", "eMalahleni"]
-const CRS = ["Computer Science", "Information Technology", "Computer Systems Eng.", "Multimedia Computing", "Informatics"]
-const POS = ["Frontend Developer Intern", "Backend Developer Intern", "UI/UX Intern", "QA Tester Intern", "Systems Support Intern"]
-const SKL = ["React", "Node.js", "PostgreSQL", "Java", "PL/SQL"]
-const STS: ApplicationStatus[] = ["PENDING", "PENDING", "INTERVIEWEE", "ACCEPTED", "REJECTED", "PENDING"]
-
-const SEED: Application[] = [
-  ...BASE,
-  ...Array.from({ length: 28 }, (_, i): typeof BASE[number] => [
-    `${FIRST[i % 10]} ${LAST[(i * 3) % 10]}`, String(270000000 + (i * 7919317) % 99999999), CAMP[i % 7], CRS[i % 5],
-    `2026-09-${String(25 - Math.floor(i / 3)).padStart(2, "0")}`, "", STS[i % 6],
-  ]),
-].map(([fullName, studentNumber, campus, course, createdAt, , status], i): Application => {
-  const slug = fullName.replace(" ", "_")
-  const d = (s: string, type: DocumentType, name: string, sizeBytes: number): Doc =>
-    ({ id: `${i}${s}`, type, fileName: `${slug}_${name}.pdf`, fileUrl: "", mimeType: "application/pdf", sizeBytes, uploadedAt: createdAt })
-  return {
-    id: String(i + 1), referenceCode: `3f2a91c${i}-7b1e-4c1d-9a55-0d2e6b8f${String(i).padStart(4, "0")}`, status,
-    fullName, email: `${fullName.split(" ")[0].toLowerCase()}@student.tut.ac.za`, phone: "072 345 6789",
-    idNumber: `0${3 + (i % 6)}0${1 + (i % 9)}1260${String(10 + i).padStart(2, "0")}083`,
-    studentNumber, institution: "Tshwane University of Technology", qualification: `Diploma in ${course}`, yearOfStudy: 2 + (i % 2),
-    interviewAt: status === "INTERVIEWEE" ? "2026-10-28T10:00" : undefined,
-    interviewVenue: status === "INTERVIEWEE" ? `ICEP ${campus}, Room 2` : undefined,
-    reviewedBy: status !== "PENDING" ? { fullName: ADMIN } : undefined,
-    reviewedAt: status !== "PENDING" ? "2026-10-01" : undefined,
-    rejectionReason: status === "REJECTED" ? "Position filled" : undefined,
-    createdAt, position: { title: POS[i % 5], campus: { name: campus } },
-    skills: [SKL[i % 5], SKL[(i + 2) % 5], SKL[(i + 3) % 5]],
-    documents: [d("a", "CV", "CV", 182000), d("b", "ACADEMIC_RECORD", "Academic_Record", 244000), d("c", "ID_COPY", "ID", 96000), d("d", "MOTIVATION_LETTER", "Motivation_Letter", 158000), d("e", "WIL_LETTER", "WIL_Letter", 132000)],
-  }
+/* ---------- data: GET /api/applicants (Prisma Application with position, skills, documents) ---------- */
+const toApplication = (a: ApiApplication): Application => ({
+  id: a.id, referenceCode: a.referenceCode, status: a.status,
+  fullName: a.fullName, email: a.email, phone: a.phone ?? undefined, idNumber: a.idNumber ?? undefined,
+  studentNumber: a.studentNumber, institution: a.institution, qualification: a.qualification, yearOfStudy: a.yearOfStudy ?? undefined,
+  interviewAt: a.interviewAt ?? undefined, interviewVenue: a.interviewVenue ?? undefined,
+  reviewedBy: a.reviewedBy ? { fullName: a.reviewedBy.fullName } : undefined, reviewedAt: a.reviewedAt ?? undefined,
+  rejectionReason: a.rejectionReason ?? undefined,
+  createdAt: a.createdAt,
+  position: { title: a.position.title, campus: { name: a.position.campus.name } },
+  skills: a.skills.map((s) => s.skill.name),
+  documents: a.documents.map((d) => ({
+    id: d.id, applicationId: a.id, type: d.type as DocumentType, fileName: d.fileName, fileUrl: '',
+    mimeType: d.mimeType ?? undefined, sizeBytes: d.sizeBytes ?? undefined, uploadedAt: d.uploadedAt ?? a.createdAt,
+  })),
 })
 
 /* ---------- helpers ---------- */
@@ -169,6 +141,7 @@ const split = (q: string) => { const [lvl, ...rest] = q.split(" in "); return re
 const maskId = (id?: string) => (id ? `${id.slice(0, 6)}${"•".repeat(Math.max(id.length - 6, 0))}` : "—")
 
 async function downloadDoc(d: Doc) {
+  if (d.applicationId) return downloadDocumentById(d.applicationId, d.id, d.fileName)
   try {
     let blob: Blob
     if (d.fileUrl) {
@@ -197,7 +170,17 @@ const Row = ({ k, v }: { k: string; v?: string | number }) => (<div className="k
 
 /* ---------- page ---------- */
 export function ApplicantsPage() {
-  const [rows, setRows] = useState<Application[]>(SEED)
+  const queryClient = useQueryClient()
+  const applicationsQuery = useQuery({ queryKey: ['applications'], queryFn: fetchApplications })
+  // Start date / reporting venue and the email text are not stored by the backend yet, so they live here.
+  const [extras, setExtras] = useState<Record<string, Partial<Application>>>({})
+  const rows = useMemo(() => (applicationsQuery.data ?? []).map((a) => ({ ...toApplication(a), ...extras[a.id] })), [applicationsQuery.data, extras])
+  // Campus filter options come from the applications themselves.
+  const campuses = useMemo(() => [...new Set(rows.map((r) => r.position.campus.name))].sort(), [rows])
+  const saveRow = (updated: ApiApplication, extra: Partial<Application> = {}) => {
+    queryClient.setQueryData<ApiApplication[]>(['applications'], (list) => (list ?? []).map((item) => (item.id === updated.id ? updated : item)))
+    if (Object.keys(extra).length) setExtras((current) => ({ ...current, [updated.id]: { ...current[updated.id], ...extra } }))
+  }
   const [q, setQ] = useState("")
   const [campus, setCampus] = useState("")
   const [status, setStatus] = useState("")
@@ -363,33 +346,36 @@ export function ApplicantsPage() {
     if (kind === "interview" && (!when || !venue)) return
     if (kind === "accept" && (!startDate || !startVenue)) return
     setBusy(true)
-    setTimeout(() => {
-      const review = { reviewedBy: { fullName: ADMIN }, reviewedAt: new Date().toISOString() }
-      const emailMeta = { emailSubject: displaySubject, emailBody: displayBodyString }
-      const patch: Partial<Application> =
-        kind === "interview"
-          ? { ...review, status: "INTERVIEWEE", interviewAt: when, interviewVenue: venue, ...emailMeta }
-        : kind === "accept"
-          ? { ...review, status: "ACCEPTED", startDate, startVenue, ...emailMeta }
-        : { ...review, status: "REJECTED", rejectionReason: reason || undefined, ...emailMeta }
-      setRows(rs => rs.map(r => (r.id === a.id ? { ...r, ...patch } : r)))
-      say(kind === "interview" ? `Interview invite sent to ${a.fullName}`
-        : kind === "accept" ? `${a.fullName} accepted — email sent` : `${a.fullName} rejected`)
-      setAction(null); setBusy(false)
-    }, 600)
+    const emailMeta = { emailSubject: displaySubject, emailBody: displayBodyString }
+    const request = kind === "interview" ? scheduleInterview(a.id, new Date(when).toISOString(), venue)
+      : kind === "accept" ? acceptApplication(a.id)
+      : rejectApplication(a.id, reason)
+    request
+      .then((updated) => {
+        saveRow(updated, kind === "accept" ? { startDate, startVenue, ...emailMeta } : emailMeta)
+        say(kind === "interview" ? `Interview invite sent to ${a.fullName}`
+          : kind === "accept" ? `${a.fullName} accepted — email sent` : `${a.fullName} rejected`)
+        setAction(null)
+      })
+      .catch((error) => say(apiErrorMessage(error, "Could not save the decision. Please try again.")))
+      .finally(() => setBusy(false))
   }
 
   const bulkAction = (kind: Action["kind"]) => {
     const targets = rows.filter(r => selected.has(r.id))
     if (!targets.length) return
+    // An interview needs its own date and venue, so invites are sent one at a time.
+    if (kind === "interview") { say("Interview invites need a date and venue — invite applicants one at a time."); return }
     setBusy(true)
-    setTimeout(() => {
-      const review = { reviewedBy: { fullName: ADMIN }, reviewedAt: new Date().toISOString() }
-      const newStatus: ApplicationStatus = kind === "interview" ? "INTERVIEWEE" : kind === "accept" ? "ACCEPTED" : "REJECTED"
-      setRows(rs => rs.map(r => selected.has(r.id) ? { ...r, ...review, status: newStatus, rejectionReason: kind === "reject" ? "Bulk rejection" : undefined } : r))
-      say(`${targets.length} applicant${targets.length > 1 ? "s" : ""} updated`)
-      clearSelection(); setBusy(false)
-    }, 800)
+    Promise.allSettled(targets.map((t) => (kind === "accept" ? acceptApplication(t.id) : rejectApplication(t.id, "Bulk rejection"))))
+      .then((results) => {
+        results.forEach((result) => { if (result.status === "fulfilled") saveRow(result.value) })
+        const done = results.filter((result) => result.status === "fulfilled").length
+        const failed = results.length - done
+        say(failed ? `${done} updated, ${failed} could not be changed (already decided?)` : `${done} applicant${done > 1 ? "s" : ""} updated`)
+        clearSelection()
+      })
+      .finally(() => setBusy(false))
   }
 
   const onRowClick = (e: MouseEvent, a: Application) => {
@@ -411,7 +397,7 @@ export function ApplicantsPage() {
           {q && <button className="search-clear" onClick={() => setQ("")} aria-label="Clear search">×</button>}
         </label>
         <select className="field sel" value={campus} onChange={e => { setCampus(e.target.value); setPage(1) }}>
-          <option value="">All campuses</option>{CAMP.map(c => <option key={c}>{c}</option>)}</select>
+          <option value="">All campuses</option>{campuses.map(c => <option key={c}>{c}</option>)}</select>
         <select className="field sel" value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}>
           <option value="">All statuses</option>
           {(Object.keys(LABEL) as ApplicationStatus[]).map(s => <option key={s} value={s}>{LABEL[s]}</option>)}</select>
@@ -500,10 +486,12 @@ export function ApplicantsPage() {
               {!shown.length && (
                 <tr><td colSpan={8} className="empty">
                   <div className="empty-state">
-                    <div className="empty-icon">📭</div>
-                    <b>No applicants found</b>
-                    <span className="muted">Try adjusting your filters or search terms.</span>
-                    <button className="b view" onClick={() => { setQ(""); setCampus(""); setStatus(""); setPage(1) }}>Reset filters</button>
+                    <div className="empty-icon">{applicationsQuery.isError ? "⚠️" : "📭"}</div>
+                    <b>{applicationsQuery.isLoading ? "Loading applicants…" : applicationsQuery.isError ? "We couldn't load applicants" : "No applicants found"}</b>
+                    <span className="muted">{applicationsQuery.isError ? apiErrorMessage(applicationsQuery.error, "Please try again.") : applicationsQuery.isLoading ? "One moment." : "Try adjusting your filters or search terms."}</span>
+                    {applicationsQuery.isError
+                      ? <button className="b view" onClick={() => void applicationsQuery.refetch()}>Try again</button>
+                      : <button className="b view" onClick={() => { setQ(""); setCampus(""); setStatus(""); setPage(1) }}>Reset filters</button>}
                   </div>
                 </td></tr>
               )}
