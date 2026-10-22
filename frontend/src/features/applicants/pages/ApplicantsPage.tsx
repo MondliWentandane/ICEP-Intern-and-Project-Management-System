@@ -1,597 +1,822 @@
-import { useEffect, useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from 'react'
-import { useAuth } from '@/hooks/useAuth'
-import { PlacementLetterPreview } from '@/features/placement-letter/PlacementLetterCard'
-import { placementLetterFileName, printPlacementLetter, type PlacementLetterDetails } from '@/features/placement-letter/placementLetter'
-import { acceptApplication, apiErrorMessage, fetchApplications, rejectApplication, scheduleInterview, yearLabel, type ApiApplication } from '../data/applicationsApi'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
-/** frontend/src/features/applicants/pages/ApplicantsPage.tsx — page content only (no sidebar / top bar); styles are included below. */
-
-const CSS = `
-.ap{--nv:#132845;--nv2:#1d3862;--pr:#1a3358;--bg:#f4f6f9;--ln:#e6eaf0;--mu:#6b7a90;--tx:#0f1a2b;color:var(--tx);font-family:inherit;font-size:13.5px}
-.ap *{box-sizing:border-box}
-.ap button,.ap input,.ap select{font:inherit}
-.ap-b,.ap-pg{color:var(--tx)}
-.ap-av{width:30px;height:30px;border-radius:50%;background:#e9eef6;color:var(--nv);font-weight:700;font-size:11px;display:grid;place-items:center;flex:none}
-.ap-body{padding:21px}
-.ap-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.ap-in,.ap-sel{height:37px;background:#fff;border:1px solid var(--ln);border-radius:9px;display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--mu)}
-.ap-in{width:270px}.ap-in input{border:0;outline:0;width:100%;background:none;color:var(--tx)}
-.ap-sel{width:148px;position:relative}.ap-sel select{appearance:none;border:0;outline:0;background:none;width:100%;height:100%;cursor:pointer;color:var(--tx);padding-right:18px}
-.ap-sel svg{position:absolute;right:10px;pointer-events:none}
-.ap-clr{height:37px;padding:0 14px;background:#fff;border:1px solid var(--ln);border-radius:9px;color:var(--mu);font-weight:600;cursor:pointer}.ap-clr.on{color:var(--pr);border-color:var(--pr)}.ap-clr:hover{background:var(--bg)}
-.ap-add{margin-left:auto;height:37px;padding:0 16px;border:0;border-radius:9px;background:var(--pr);color:#fff;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer}
-.ap-card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(16,24,40,.06);overflow:hidden}
-.ap table{width:100%;min-width:1120px;border-collapse:collapse;table-layout:fixed}
-.ap-tw{overflow-x:auto}
-.ap th{height:40px;text-align:left;font-size:11.5px;font-weight:600;color:var(--mu);letter-spacing:.02em;padding:0 0 0 0;text-transform:uppercase;border-bottom:1px solid var(--ln)}
-.ap td{height:54px;border-bottom:1px solid var(--ln);padding:0;vertical-align:middle}
-.ap th:first-child,.ap td:first-child{padding-left:20px}
-.ap-nm{display:flex;align-items:center;gap:10px}
-.ap-sub{display:block;color:var(--mu);font-size:12px}
-.ap-pill{display:inline-block;white-space:nowrap;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
-.s-Pending{background:#fdf0c4;color:#a15c07}.s-Interview{background:#dbe8fe;color:#1d4ed8}.s-Accepted{background:#d3f5de;color:#15803d}.s-Rejected{background:#fcd9d9;color:#b42318}
-.ap-act{display:flex;align-items:center;gap:6px;white-space:nowrap}
-.ap-b{height:27px;padding:0 12px;border-radius:7px;border:1px solid var(--ln);background:#fff;cursor:pointer}
-.ap-b.a{border-color:var(--pr);color:var(--pr);font-weight:600}.ap-b.r{border-color:#c0392b;color:#b42318;font-weight:600}
-.ap-ok{color:#15803d;display:flex;align-items:center;gap:6px;margin-left:6px;white-space:nowrap}
-.ap-ft{display:flex;align-items:center;padding:14px 20px;color:var(--mu);gap:8px}
-.ap-ft .ap-sel{width:70px;height:30px;color:var(--tx);margin-right:8px}
-.ap-pg{min-width:30px;height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--ln);background:#fff;cursor:pointer}
-.ap-pg.on{background:var(--pr);border-color:var(--pr);color:#fff;font-weight:700}
-.ap-pg.n{border-color:var(--pr);color:var(--pr);font-weight:600}.ap-pg:disabled{color:#a9b4c4;cursor:default}
-.ap-empty{text-align:center;color:var(--mu);height:90px}
-.ap-ov{position:fixed;inset:0;background:rgba(15,26,43,.55);display:grid;place-items:center;z-index:50;padding:16px}
-.ap-dl{background:#fff;border-radius:14px;width:min(403px,100%);max-height:100%;overflow:auto;box-shadow:0 20px 50px rgba(16,24,40,.25)}
-.ap-dh{display:flex;align-items:center;min-height:66px;padding:12px 27px;border-bottom:1px solid var(--ln)}
-.ap-dh h2{margin:0;font-size:19.5px;font-weight:700}.ap-dh p{margin:2px 0 0;color:var(--mu);font-size:14px}
-.ap-x{margin-left:auto;border:0;background:none;color:var(--mu);cursor:pointer;display:flex}
-.ap-bd{padding:19px 27px 18px}
-.ap-df{display:flex;justify-content:flex-end;gap:9px;padding:16px 27px 14px;border-top:1px solid var(--ln)}
-.ap-dd{display:grid;gap:11px;margin:0}.ap-dd>div{display:flex;align-items:center;min-height:23px}.ap-dd dt{width:134px;color:var(--mu);font-size:14px}.ap-dd dd{margin:0;font-size:14.5px}
-.ap-q{margin:0 0 14px;font-size:14.5px}.ap-hint{margin:-8px 0 16px;color:var(--mu);font-size:14px}
-.ap-mail{display:flex;gap:12px;align-items:center;background:#f3f5f8;border-radius:10px;padding:14px;color:var(--mu);font-size:14px;line-height:1.5}.ap-mail svg{flex:none}
-.ap-rl{display:grid;gap:8px;font-size:14.5px}.ap-rl span{color:var(--mu)}
-.ap-fm{display:grid;gap:8px}.ap-fm label{display:grid;gap:8px;font-size:14.5px}.ap-fm small{color:#b42318;font-size:12.5px}.ap-fm small:empty{display:none}
-.ap-fi{height:33px;border:1px solid #e2e7ef;border-radius:8px;padding:0 12px;background:#fff;font-weight:400;font-size:14.5px;color:var(--tx);width:100%}.ap-fi::placeholder{color:#9aa7b8}
-.ap-fi:focus{outline:2px solid var(--pr);border-color:transparent}
-.ap-ta{height:68px;padding:10px 12px;resize:none;font-size:14px}
-.ap-dl .ap-b{height:33px;padding:0 16px;border-radius:8px;font-size:14px}
-.ap-dl .ap-add{margin-left:0;height:33px;border-radius:8px;font-size:14px;font-weight:700}
-.ap-bt{font-weight:700}.ap-bl{font-weight:500}
-.ap-bp{background:var(--pr);border-color:var(--pr);color:#fff;font-weight:700}
-.ap-br{background:#9b1c1c;border-color:#9b1c1c;color:#fff;font-weight:700}
-.ap-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--nv);color:#fff;padding:10px 16px;border-radius:10px;z-index:60;box-shadow:0 8px 24px rgba(16,24,40,.25)}
-.ap-fsel{position:relative;display:flex}.ap-fsel select{appearance:none;padding-right:34px;cursor:pointer}.ap-fsel svg{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none}
-.ap-note{margin-right:auto;color:var(--mu);font-size:12.5px;line-height:1.4}
-.ap-vp{display:inline-flex;align-items:center;gap:6px;background:#d9f5e3;color:#15803d;font-weight:700;font-size:12.5px;padding:3px 10px;border-radius:999px;white-space:nowrap}
-.ap-vp i{width:7px;height:7px;border-radius:50%;background:#16a34a}
-.ap-ar{display:flex;align-items:center;gap:0;margin-bottom:10px;min-height:27px}
-.ap-ar .l{width:49px;flex:none;color:var(--mu);font-size:14px}.ap-ar .v{flex:1;padding-left:8px;font-size:14.5px}
-.ap-ar .ap-i2{height:27px}
-.ap-row2{display:flex;align-items:center;height:40px;border-bottom:1px solid #eef1f5}.ap-row2:last-child{border-bottom:0}
-.ap-row2>span:first-child{width:67px;flex:none;color:var(--mu);font-size:14px}.ap-row2 b{font-weight:400;font-size:14.5px}.ap-row2 .ap-vp{margin-left:20px}
-.ap-msg{background:#f4f6f9;border:1px solid var(--ln);border-radius:12px;padding:16px 17px;font-size:14px;line-height:1.2;margin-top:14px}
-.ap-ar+.ap-msg{margin-top:14px}.ap-row2+.ap-msg{margin-top:16px}
-.ap-msg p{margin:0 0 7px}.ap-msg b{font-weight:700}
-.ap-msg .btn{display:inline-block;background:var(--pr);color:#fff;font-weight:700;padding:8px 13px;border-radius:7px;margin:3px 0 14px}
-.ap-msg.big{font-size:15px;line-height:1.25;min-height:257px;padding:18px 20px}.ap-msg.big p{margin:0 0 12px}
-.ap-b.sl{border-color:#2563eb;color:#1d4ed8;font-weight:600}
-.ap-b.pl{border-color:#15803d;color:#15803d;font-weight:600}
-.ap-att{display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 12px;border:1px solid var(--ln);border-radius:10px;background:#fff}
-.ap-att .ic{width:34px;height:34px;border-radius:8px;background:#fde2e2;color:#b42318;display:grid;place-items:center;font-size:10px;font-weight:800;flex:none}
-.ap-att .nm{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ap-att .nm span{display:block;font-weight:400;color:var(--mu);font-size:12px}
-.ap-att .ap-b{height:29px}
-.ap-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-`
-
-type Status = 'Pending' | 'Interview' | 'Accepted' | 'Rejected'
-export interface Applicant {
-  id: number | string; name: string; studentNo: string; campus: string; course: string; level: string; date: string; status: Status
-  note?: string
-  /** Real application details (rows loaded from the database). */
-  reference?: string; email?: string; phone?: string; qualification?: string; institution?: string; positionTitle?: string
-  /** true once the interview invitation email has been sent */
-  interviewEmailSent?: boolean
-  /** Date, time and venue chosen in the interview email. */
-  interview?: Interview
-  /** Set on acceptance: the details on the WIL placement letter attached to the acceptance email. */
-  placement?: Placement
-}
-
-/** Interview slot chosen when sending the interview invitation (date is YYYY-MM-DD, time is HH:mm). */
-interface Interview { date: string; time: string; venue: string }
-
-/** Placement details captured when accepting, used for the WIL placement letter. */
-interface Placement { department: string; startDate: string; endDate: string; acceptedAt: string; signatory: string }
-const DEPARTMENTS = ['Software Development', 'Cybersecurity & Informatics', 'Systems Engineering', 'Multimedia & Design']
-
-const CAMPUSES = ['Soshanguve South', 'Arcadia', 'Mbombela', 'Soshanguve North', 'Ga-Rankuwa', 'Polokwane', 'eMalahleni']
-const COURSES = ['Computer Science', 'Information Technology', 'Computer Systems Eng.', 'Multimedia Computing', 'Informatics']
-
-const STATUS_FROM_API: Record<ApiApplication['status'], Status> = { PENDING: 'Pending', INTERVIEWEE: 'Interview', ACCEPTED: 'Accepted', REJECTED: 'Rejected' }
-const pad2 = (n: number) => String(n).padStart(2, '0')
-/** Database application -> table row. */
-function toApplicant(a: ApiApplication): Applicant {
-  const at = a.interviewAt ? new Date(a.interviewAt) : null
-  return {
-    id: a.id, name: a.fullName, studentNo: a.studentNumber, campus: a.position.campus.name,
-    course: a.qualification, level: yearLabel(a.yearOfStudy) || a.institution,
-    date: new Date(a.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-    status: STATUS_FROM_API[a.status],
-    note: a.rejectionReason ?? undefined,
-    interviewEmailSent: a.status === 'INTERVIEWEE',
-    interview: at ? { date: `${at.getFullYear()}-${pad2(at.getMonth() + 1)}-${pad2(at.getDate())}`, time: `${pad2(at.getHours())}:${pad2(at.getMinutes())}`, venue: a.interviewVenue ?? '' } : undefined,
-    reference: a.referenceCode, email: a.email, phone: a.phone ?? undefined, qualification: a.qualification,
-    institution: a.institution, positionTitle: a.position.title,
-  }
-}
-
-const P = {
-  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',
-  down: 'm6 9 6 6 6-6',
-  plus: 'M12 5v14M5 12h14',
-  check: 'm5 12 5 5 9-10',
-  x: 'M18 6 6 18M6 6l12 12',
-  mail: 'M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM2 7l10 7 10-7',
-}
-const Ic = ({ d, s = 20 }: { d: string; s?: number }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
-)
-
-const HEAD = ['Name', 'Student no.', 'Campus', 'Course', 'Date applied', 'Status', 'Actions']
-// Actions column is wide enough for View + Interview + Accept + Reject.
-const WIDTH = ['17%', '10%', '11%', '15%', '9%', '8%', '30%']
-const initials = (n: string) => n.split(' ').map((w) => w[0]).join('')
-
-const today = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-type Dlg = null | { kind: 'add' } | { kind: 'view' | 'accept' | 'reject' | 'mailR' | 'mailI'; a: Applicant } | { kind: 'mailA'; a: Applicant; placement: Placement }
-const prog = (a: Applicant) => a.qualification ?? `${a.level} in ${a.course}`
-const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-// Letter details come from the application (reference, institution, position).
-const letterDetails = (a: Applicant, p: Placement): PlacementLetterDetails => ({
-  fullName: a.name,
-  reference: a.reference ?? `ICEP-${p.acceptedAt.slice(0, 4)}-${String(a.id).slice(-5).padStart(5, '0')}`,
-  studentNumber: a.studentNo,
-  institution: a.institution ?? 'Tshwane University of Technology',
-  qualification: prog(a),
-  positionTitle: a.positionTitle ?? `${a.course} Intern`,
-  department: p.department,
-  campus: a.campus,
-  startDate: p.startDate,
-  endDate: p.endDate,
-  issuedAt: p.acceptedAt,
-  signatory: p.signatory,
-})
-const TIMES = Array.from({ length: 19 }, (_, i) => `${String(8 + (i >> 1)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`) // 08:00 – 17:00
-const ONLINE = 'Online (Microsoft Teams)'
-const OTHER_VENUE = '__other'
-const fmtDate = (d: string) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—')
-const nextWorkday = () => {
-  const d = new Date()
-  do d.setDate(d.getDate() + 1)
-  while (d.getDay() === 0 || d.getDay() === 6)
-  return isoDate(d)
-}
-type NewApplicant = Pick<Applicant, 'name' | 'studentNo' | 'campus' | 'course' | 'level'>
-
-function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: ReactNode }) {
+// Self-contained shell: this file can be copied directly into a React/TSX project.
+function PageScaffold({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <label className="ap-sel">
-      <select value={value} onChange={(e) => onChange(e.target.value)}>{children}</select>
-      <Ic d={P.down} s={16} />
-    </label>
+    <main className="page-scaffold">
+      <header className="page-scaffold__header">
+        <h1>{title}</h1>
+      </header>
+      {children}
+    </main>
   )
 }
 
-function Modal({ title, subtitle, width = 403, bodyStyle, onClose, children, footer }: {
-  title: string; subtitle?: string; width?: number; bodyStyle?: CSSProperties; onClose: () => void; children: ReactNode; footer: ReactNode
-}) {
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    addEventListener('keydown', k)
-    return () => removeEventListener('keydown', k)
-  }, [onClose])
-  return (
-    <div className="ap-ov" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="ap-dl" style={{ width: `min(${width}px, 100%)` }} role="dialog" aria-modal="true" aria-label={title}>
-        <div className="ap-dh">
-          <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>
-          <button className="ap-x" onClick={onClose} aria-label="Close"><Ic d={P.x} s={18} /></button>
-        </div>
-        <div className="ap-bd" style={bodyStyle}>{children}</div>
-        <div className="ap-df">{footer}</div>
-      </div>
-    </div>
-  )
+// TODO: Implement the Figma screen and connect the matching feature service.
+
+/* ---------- types (mirror the Prisma schema) ---------- */
+type ApplicationStatus = "PENDING" | "INTERVIEWEE" | "ACCEPTED" | "REJECTED"
+type DocumentType = "CV" | "ID_COPY" | "ACADEMIC_RECORD" | "MOTIVATION_LETTER" | "WIL_LETTER" | "CERTIFICATE" | "OTHER"
+type Doc = { id: string; type: DocumentType; fileName: string; fileUrl: string; mimeType?: string; sizeBytes?: number; uploadedAt: string }
+type Application = {
+  id: string; referenceCode: string; status: ApplicationStatus;
+  fullName: string; email: string; phone?: string; idNumber?: string;
+  studentNumber: string; institution: string; qualification: string; yearOfStudy?: number;
+  interviewAt?: string; interviewVenue?: string;
+  startDate?: string; startVenue?: string;
+  reviewedBy?: { fullName: string }; reviewedAt?: string; rejectionReason?: string;
+  emailSubject?: string; emailBody?: string;
+  createdAt: string;
+  position: { title: string; campus: { name: string } };
+  skills: string[];
+  documents: Doc[];
+}
+type Action = { kind: "interview" | "accept" | "reject"; a: Application }
+type SortField = "fullName" | "studentNumber" | "campus" | "createdAt" | "status"
+type SortDir = "asc" | "desc"
+
+/* ---------- email templates ---------- */
+type EmailDraft = { subject: string; body: string }
+
+const DEFAULT_TEMPLATES: Record<Action["kind"], EmailDraft> = {
+  interview: {
+    subject: "Interview Invitation — {{position}} at TUT",
+    body: `Dear {{fullName}},
+
+Thank you for applying for the {{position}} role at Tshwane University of Technology ({{campus}} campus). We are pleased to invite you to attend an interview as part of the next stage of the selection process.
+
+Interview details
+  Date & time: {{interviewDate}}
+  Venue: {{interviewVenue}}
+
+Please arrive 10 minutes before the scheduled time and bring a copy of your ID document, your CV, and your academic record. If you cannot attend at the time above, reply to this email within 48 hours so that we can arrange an alternative slot.
+
+Reference: {{reference}}
+
+Kind regards
+TUT Internship Recruitment Team`,
+  },
+  accept: {
+    subject: "Offer of Internship — {{position}} at TUT",
+    body: `Dear {{fullName}},
+
+Congratulations! We are delighted to offer you the {{position}} internship at Tshwane University of Technology ({{campus}} campus). Your application, reference {{reference}}, was successful.
+
+Start details
+  Start date & time: {{startDate}}
+  Reporting venue: {{startVenue}}
+
+What happens next
+  1. A user account and intern profile have been created for you.
+  2. You will receive a separate email with instructions to set your password.
+  3. Please report to the venue above on the start date with your signed letter of appointment and a certified copy of your ID.
+
+If you have any questions before your start date, reply to this email or contact the internship office.
+
+We look forward to welcoming you to the team.
+
+Kind regards
+TUT Internship Recruitment Team`,
+  },
+  reject: {
+    subject: "Update on your application — {{position}} at TUT",
+    body: `Dear {{fullName}},
+
+Thank you for applying for the {{position}} role at Tshwane University of Technology ({{campus}} campus). We appreciate the time and effort you put into your application.
+
+After careful consideration, we regret to inform you that we are unable to proceed with your application at this time.{{rejectionReason}}
+
+We encourage you to apply for future opportunities that match your skills and interests. Wishing you every success in your studies and career.
+
+Reference: {{reference}}
+
+Kind regards
+TUT Internship Recruitment Team`,
+  },
 }
 
-function AddForm({ onAdd }: { onAdd: (v: NewApplicant) => void }) {
-  const [v, setV] = useState({ name: '', studentNo: '', campus: CAMPUSES[0], course: COURSES[0] })
-  const [err, setErr] = useState<{ name?: string; studentNo?: string }>({})
-  const on = (k: keyof typeof v) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV((o) => ({ ...o, [k]: e.target.value }))
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    const bad: typeof err = {}
-    if (!v.name.trim()) bad.name = 'Enter a name'
-    if (!/^\d{9}$/.test(v.studentNo)) bad.studentNo = 'Student number must be 9 digits'
-    setErr(bad)
-    if (!Object.keys(bad).length) onAdd({ ...v, name: v.name.trim(), level: 'Diploma' })
-  }
-  return (
-    <form id="add-form" className="ap-fm" onSubmit={submit} noValidate>
-      <label>Full name<input className="ap-fi" value={v.name} onChange={on('name')} placeholder="e.g. Thabo Molefe" />{err.name && <small>{err.name}</small>}</label>
-      <label>Student number<input className="ap-fi" value={v.studentNo} onChange={on('studentNo')} placeholder="9 digits" inputMode="numeric" />{err.studentNo && <small>{err.studentNo}</small>}</label>
-      <label>Campus
-        <span className="ap-fsel"><select className="ap-fi" value={v.campus} onChange={on('campus')}>{CAMPUSES.map((c) => <option key={c}>{c}</option>)}</select><Ic d={P.down} s={16} /></span>
-      </label>
-      <label>Course applied for
-        <span className="ap-fsel"><select className="ap-fi" value={v.course} onChange={on('course')}>{COURSES.map((c) => <option key={c} value={c}>Diploma in {c}</option>)}</select><Ic d={P.down} s={16} /></span>
-      </label>
-    </form>
-  )
-}
-
-const first = (a: Applicant) => a.name.split(' ')[0]
-
-/** Accept step: the placement details that go on the WIL placement letter. */
-function AcceptForm({ signatory, onAccept }: { signatory: string; onAccept: (p: Placement) => void }) {
-  // Defaults: a six-month placement starting on the 1st of next month.
-  const [v, setV] = useState(() => {
-    const now = new Date()
-    const start = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    const end = new Date(start.getFullYear(), start.getMonth() + 6, 0)
-    return { department: DEPARTMENTS[0], startDate: isoDate(start), endDate: isoDate(end) }
+function fillTemplate(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const k = key as keyof typeof vars
+    return vars[k] != null && vars[k] !== "" ? vars[k] : `—`
   })
-  const [err, setErr] = useState('')
-  const on = (k: keyof typeof v) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV((o) => ({ ...o, [k]: e.target.value }))
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    if (!v.startDate || !v.endDate) return setErr('Enter the placement start and end dates')
-    if (v.endDate <= v.startDate) return setErr('The end date must be after the start date')
-    setErr('')
-    onAccept({ ...v, acceptedAt: new Date().toISOString(), signatory })
+}
+
+function formatRejection(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) return ""
+  let r = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+  if (!/[.!?]$/.test(r)) r += "."
+  return ` Reason: ${r}`
+}
+
+const LABEL: Record<ApplicationStatus, string> = { PENDING: "Pending", INTERVIEWEE: "Interview", ACCEPTED: "Accepted", REJECTED: "Rejected" }
+const DOC_LABEL: Record<DocumentType, string> = { CV: "CV", ID_COPY: "ID copy", ACADEMIC_RECORD: "Academic record", MOTIVATION_LETTER: "Motivation letter", WIL_LETTER: "WIL letter", CERTIFICATE: "Certificate", OTHER: "Other" }
+const ADMIN = "Alex Williamson" // current logged-in reviewer (use your auth user)
+
+/* ---------- mock data (replace with GET /api/applications, include position.campus, skills, documents) ---------- */
+const BASE: [string, string, string, string, string, string, ApplicationStatus][] = [
+  ["Thabo Molefe", "210000000", "Soshanguve South", "Computer Science", "2026-09-30", "", "PENDING"],
+  ["Lerato Dlamini", "217919317", "Arcadia", "Information Technology", "2026-09-30", "", "PENDING"],
+  ["Sipho Nkosi", "225838634", "Mbombela", "Computer Systems Eng.", "2026-09-29", "", "INTERVIEWEE"],
+  ["Naledi Khumalo", "233757951", "Soshanguve North", "Multimedia Computing", "2026-09-29", "", "PENDING"],
+  ["Kabelo Sithole", "241677268", "Ga-Rankuwa", "Information Technology", "2026-09-28", "", "ACCEPTED"],
+  ["Zanele Mokoena", "249596585", "Polokwane", "Informatics", "2026-09-27", "", "PENDING"],
+  ["Tshepo Mahlangu", "257515902", "Arcadia", "Multimedia Computing", "2026-09-26", "", "REJECTED"],
+  ["Palesa Radebe", "265435219", "eMalahleni", "Computer Science", "2026-09-26", "", "PENDING"],
+]
+const FIRST = ["Karabo", "Mpho", "Lindiwe", "Themba", "Nomsa", "Bongani", "Refilwe", "Sandile", "Dineo", "Katlego"]
+const LAST = ["Mthembu", "Ndlovu", "Maseko", "Mabaso", "Phiri", "Baloyi", "Chauke", "Sebola", "Moloi", "Zulu"]
+const CAMP = ["Soshanguve South", "Arcadia", "Mbombela", "Soshanguve North", "Ga-Rankuwa", "Polokwane", "eMalahleni"]
+const CRS = ["Computer Science", "Information Technology", "Computer Systems Eng.", "Multimedia Computing", "Informatics"]
+const POS = ["Frontend Developer Intern", "Backend Developer Intern", "UI/UX Intern", "QA Tester Intern", "Systems Support Intern"]
+const SKL = ["React", "Node.js", "PostgreSQL", "Java", "PL/SQL"]
+const STS: ApplicationStatus[] = ["PENDING", "PENDING", "INTERVIEWEE", "ACCEPTED", "REJECTED", "PENDING"]
+
+const SEED: Application[] = [
+  ...BASE,
+  ...Array.from({ length: 28 }, (_, i): typeof BASE[number] => [
+    `${FIRST[i % 10]} ${LAST[(i * 3) % 10]}`, String(270000000 + (i * 7919317) % 99999999), CAMP[i % 7], CRS[i % 5],
+    `2026-09-${String(25 - Math.floor(i / 3)).padStart(2, "0")}`, "", STS[i % 6],
+  ]),
+].map(([fullName, studentNumber, campus, course, createdAt, , status], i): Application => {
+  const slug = fullName.replace(" ", "_")
+  const d = (s: string, type: DocumentType, name: string, sizeBytes: number): Doc =>
+    ({ id: `${i}${s}`, type, fileName: `${slug}_${name}.pdf`, fileUrl: "", mimeType: "application/pdf", sizeBytes, uploadedAt: createdAt })
+  return {
+    id: String(i + 1), referenceCode: `3f2a91c${i}-7b1e-4c1d-9a55-0d2e6b8f${String(i).padStart(4, "0")}`, status,
+    fullName, email: `${fullName.split(" ")[0].toLowerCase()}@student.tut.ac.za`, phone: "072 345 6789",
+    idNumber: `0${3 + (i % 6)}0${1 + (i % 9)}1260${String(10 + i).padStart(2, "0")}083`,
+    studentNumber, institution: "Tshwane University of Technology", qualification: `Diploma in ${course}`, yearOfStudy: 2 + (i % 2),
+    interviewAt: status === "INTERVIEWEE" ? "2026-10-28T10:00" : undefined,
+    interviewVenue: status === "INTERVIEWEE" ? `ICEP ${campus}, Room 2` : undefined,
+    reviewedBy: status !== "PENDING" ? { fullName: ADMIN } : undefined,
+    reviewedAt: status !== "PENDING" ? "2026-10-01" : undefined,
+    rejectionReason: status === "REJECTED" ? "Position filled" : undefined,
+    createdAt, position: { title: POS[i % 5], campus: { name: campus } },
+    skills: [SKL[i % 5], SKL[(i + 2) % 5], SKL[(i + 3) % 5]],
+    documents: [d("a", "CV", "CV", 182000), d("b", "ACADEMIC_RECORD", "Academic_Record", 244000), d("c", "ID_COPY", "ID", 96000), d("d", "MOTIVATION_LETTER", "Motivation_Letter", 158000), d("e", "WIL_LETTER", "WIL_Letter", 132000)],
   }
-  return (
-    <form id="accept-form" className="ap-fm" onSubmit={submit} noValidate style={{ marginTop: 14 }}>
-      <label>Department
-        <span className="ap-fsel"><select className="ap-fi" value={v.department} onChange={on('department')}>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select><Ic d={P.down} s={16} /></span>
-      </label>
-      <div className="ap-two">
-        <label>Placement start<input type="date" className="ap-fi" value={v.startDate} onChange={on('startDate')} /></label>
-        <label>Placement end<input type="date" className="ap-fi" value={v.endDate} onChange={on('endDate')} /></label>
-      </div>
-      <small>{err}</small>
-    </form>
-  )
-}
+})
 
-function LetterAttachment({ details }: { details: PlacementLetterDetails }) {
-  const [preview, setPreview] = useState(false)
-  return (
-    <div className="ap-att">
-      <span className="ic">PDF</span>
-      <span className="nm">{placementLetterFileName(details.fullName)}.pdf<span>WIL placement letter · attached</span></span>
-      <button type="button" className="ap-b" onClick={() => setPreview(true)}>Preview</button>
-      <PlacementLetterPreview details={details} open={preview} onClose={() => setPreview(false)} />
-    </div>
-  )
-}
+/* ---------- helpers ---------- */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const fmtDate = (iso?: string) => { if (!iso) return "—"; const d = new Date(iso); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` }
+const fmtDateTime = (iso?: string) => { if (!iso) return "—"; const d = new Date(iso); return `${fmtDate(iso)}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` }
+const initials = (n: string) => n.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+const kb = (n?: number) => (n ? `${Math.round(n / 1024)} KB` : "")
+const split = (q: string) => { const [lvl, ...rest] = q.split(" in "); return rest.length ? { level: lvl, course: rest.join(" in ") } : { level: "", course: q } }
+const maskId = (id?: string) => (id ? `${id.slice(0, 6)}${"•".repeat(Math.max(id.length - 6, 0))}` : "—")
 
-function AcceptMail({ a, placement, onClose, onSend }: { a: Applicant; placement: Placement; onClose: () => void; onSend: (to: string) => void }) {
-  const [to, setTo] = useState(a.name)
-  const [subject, setSubject] = useState('Application accepted – ICEP Internship Programme')
-  return (
-    <Modal title="Send acceptance email" width={470} bodyStyle={{ padding: '14px 27px 18px' }} onClose={onClose} footer={<>
-      <span className="ap-note">Template: Application accepted</span>
-      <button className="ap-b ap-bt" onClick={onClose}>Cancel</button>
-      <button className="ap-b ap-bp" onClick={() => onSend(to.trim() || a.name)}>Send email</button>
-    </>}>
-      <div className="ap-ar"><span className="l">From</span><span className="v">Alex Williamson (Admin)</span><span className="ap-vp">Outlook connected</span></div>
-      <div className="ap-ar"><label className="l" htmlFor="mail-to">To</label><input id="mail-to" className="ap-fi ap-i2" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-      <div className="ap-ar"><label className="l" htmlFor="mail-subject">Subject</label><input id="mail-subject" className="ap-fi ap-i2" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
-      <div className="ap-msg">
-        <p>Dear {first(a)},</p>
-        <p>Congratulations! Your application for the {prog(a)} ({a.campus}) has been accepted.</p>
-        <p>Please find your <b>WIL placement letter</b> attached. Submit it to your institution's WIL / experiential learning office.</p>
-        <p>Regards,<br /><b>ICEP WIL Office</b></p>
-      </div>
-      <LetterAttachment details={letterDetails(a, placement)} />
-    </Modal>
-  )
-}
-
-function RejectMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void; onSend: () => void }) {
-  return (
-    <Modal title="Send rejection email" subtitle="Review the message before it is sent to the applicant." width={537}
-      bodyStyle={{ padding: '0 27px 20px' }} onClose={onClose} footer={<>
-      <span className="ap-note">Template: Application Rejection</span>
-      <button className="ap-b ap-bt" onClick={onClose}>Cancel</button>
-      <button className="ap-b ap-bp" onClick={onSend}>Send email</button>
-    </>}>
-      <div className="ap-row2"><span>From</span><b>Amy Tomlinson (Chairman)</b><span className="ap-vp"><i />Verified</span></div>
-      <div className="ap-row2"><span>To</span><b>{a.name}</b></div>
-      <div className="ap-row2"><span>Subject</span><b>Update on your ICEP application</b></div>
-      <div className="ap-msg big">
-        <p>Dear {first(a)},</p>
-        <p>Thank you for applying for the Intern in {a.course} internship at {a.campus}.</p>
-        <p>After careful consideration, we are unable to offer you a placement at this time. We encourage you to apply again in a future intake.</p>
-        <p>Regards,<br /><b>ICEP SPL Office</b></p>
-      </div>
-    </Modal>
-  )
-}
-
-function InterviewMail({ a, onClose, onSend }: { a: Applicant; onClose: () => void; onSend: (to: string, iv: Interview) => void }) {
-  const campusVenue = `${a.campus} Campus – WIL Office`
-  const [to, setTo] = useState(a.name)
-  const [subject, setSubject] = useState('Interview invitation – ICEP Internship Programme')
-  const [date, setDate] = useState(nextWorkday)
-  const [time, setTime] = useState('10:00')
-  const [venueSel, setVenueSel] = useState(campusVenue)
-  const [other, setOther] = useState('')
-  const [err, setErr] = useState('')
-  const venue = venueSel === OTHER_VENUE ? other.trim() : venueSel
-
-  const send = () => {
-    if (!date) return setErr('Select the interview date')
-    if (date < isoDate(new Date())) return setErr('The interview date cannot be in the past')
-    if (!venue) return setErr('Enter the interview venue')
-    setErr('')
-    onSend(to.trim() || a.name, { date, time, venue })
-  }
-
-  return (
-    <Modal title="Send interview email" width={470} bodyStyle={{ padding: '14px 27px 18px' }} onClose={onClose} footer={<>
-      <span className="ap-note">Template: Interview invitation</span>
-      <button className="ap-b ap-bt" onClick={onClose}>Cancel</button>
-      <button className="ap-b ap-bp" onClick={send}>Send email</button>
-    </>}>
-      <div className="ap-ar"><span className="l">From</span><span className="v">Alex Williamson (Admin)</span><span className="ap-vp">Outlook connected</span></div>
-      <div className="ap-ar"><label className="l" htmlFor="mail-to">To</label><input id="mail-to" className="ap-fi ap-i2" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-      <div className="ap-ar"><label className="l" htmlFor="mail-subject">Subject</label><input id="mail-subject" className="ap-fi ap-i2" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
-
-      <div className="ap-fm" style={{ marginTop: 14 }}>
-        <div className="ap-two">
-          <label>Interview date<input type="date" className="ap-fi" value={date} min={isoDate(new Date())} onChange={(e) => setDate(e.target.value)} /></label>
-          <label>Time
-            <span className="ap-fsel"><select className="ap-fi" value={time} onChange={(e) => setTime(e.target.value)}>{TIMES.map((t) => <option key={t}>{t}</option>)}</select><Ic d={P.down} s={16} /></span>
-          </label>
-        </div>
-        <label>Venue
-          <span className="ap-fsel">
-            <select className="ap-fi" value={venueSel} onChange={(e) => setVenueSel(e.target.value)}>
-              <option value={campusVenue}>{campusVenue}</option>
-              <option value={ONLINE}>{ONLINE}</option>
-              <option value={OTHER_VENUE}>Other venue…</option>
-            </select>
-            <Ic d={P.down} s={16} />
-          </span>
-        </label>
-        {venueSel === OTHER_VENUE && <input className="ap-fi" placeholder="Type the venue" value={other} onChange={(e) => setOther(e.target.value)} aria-label="Other venue" />}
-        <small>{err}</small>
-      </div>
-
-      <div className="ap-msg">
-        <p>Dear {first(a)},</p>
-        <p>Thank you for applying for the {prog(a)} ({a.campus}).</p>
-        <p>We are pleased to let you know that you have been shortlisted. We would like to invite you to an interview:</p>
-        <p><b>Date:</b> {fmtDate(date)}<br /><b>Time:</b> {time}<br /><b>Venue:</b> {venue || '—'}</p>
-        <p>Please reply to this email to confirm your availability.</p>
-        <p>Regards,<br /><b>ICEP WIL Office</b></p>
-      </div>
-    </Modal>
-  )
-}
-
-export function ApplicantsPage({ applicants }: { applicants?: Applicant[] }) {
-  const { user } = useAuth()
-  const signatory = user?.name ?? 'WIL Coordinator'
-  const [rows, setRows] = useState<Applicant[]>(applicants ?? [])
-  // Applications submitted on the careers page, loaded from the database.
-  const [loading, setLoading] = useState(!applicants)
-  const [loadError, setLoadError] = useState('')
-  const [busy, setBusy] = useState(false)
-  useEffect(() => {
-    if (applicants) return
-    let active = true
-    fetchApplications()
-      .then((data) => { if (active) setRows(data.map(toApplicant)) })
-      .catch((error: unknown) => { if (active) setLoadError(apiErrorMessage(error, 'Could not load applicants.')) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [applicants])
-  // Saves a status change in the database, then shows the saved row.
-  const save = async (a: Applicant, request: () => Promise<ApiApplication>, extra: Partial<Applicant>, done: string) => {
-    if (busy) return
-    if (typeof a.id !== 'string') { setRows((r) => r.map((x) => (x.id === a.id ? { ...x, ...extra } : x))); setToast(done); return true }
-    setBusy(true)
-    try {
-      const saved = toApplicant(await request())
-      setRows((r) => r.map((x) => (x.id === a.id ? { ...x, ...saved, ...extra, interview: extra.interview ?? saved.interview } : x)))
-      setToast(done)
-      return true
-    } catch (error) {
-      setToast(apiErrorMessage(error, 'The change could not be saved.'))
-      return false
-    } finally {
-      setBusy(false)
+async function downloadDoc(d: Doc) {
+  try {
+    let blob: Blob
+    if (d.fileUrl) {
+      const res = await fetch(d.fileUrl)
+      if (!res.ok) throw new Error("fetch failed")
+      blob = await res.blob()
+    } else {
+      blob = new Blob([`Demo file: ${d.fileName}\n(no fileUrl set yet)`], { type: "text/plain" })
     }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = d.fileName
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    if (d.fileUrl) window.open(d.fileUrl, "_blank")
   }
-  const [q, setQ] = useState('')
-  const [campus, setCampus] = useState('')
-  const [status, setStatus] = useState('')
+}
+
+/* ---------- icons ---------- */
+const Search = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>)
+const Check = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>)
+const Arrow = ({ dir }: { dir: "asc" | "desc" }) => (<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "middle", marginLeft: 4, transition: "transform .2s", transform: dir === "desc" ? "rotate(180deg)" : "none" }}><path d="m6 9 6 6 6-6" /></svg>)
+
+const Row = ({ k, v }: { k: string; v?: string | number }) => (<div className="kv"><span>{k}</span><b>{v || "—"}</b></div>)
+
+/* ---------- page ---------- */
+export function ApplicantsPage() {
+  const [rows, setRows] = useState<Application[]>(SEED)
+  const [q, setQ] = useState("")
+  const [campus, setCampus] = useState("")
+  const [status, setStatus] = useState("")
   const [page, setPage] = useState(1)
-  const [rpp, setRpp] = useState(8)
-  const [dlg, setDlg] = useState<Dlg>(null)
-  const [note, setNote] = useState('')
-  const [toast, setToast] = useState('')
+  const [size, setSize] = useState(8)
+  const [viewing, setViewing] = useState<Application | null>(null)
+  const [action, setAction] = useState<Action | null>(null)
+  const [toast, setToast] = useState("")
+  const [when, setWhen] = useState("")
+  const [venue, setVenue] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [startVenue, setStartVenue] = useState("")
+  const [reason, setReason] = useState("")
+  const [sortField, setSortField] = useState<SortField>("createdAt")
+  const [sortDir, setSortDir] = useState<SortDir>("desc")
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const [animKey, setAnimKey] = useState(0)
+  const searchRef = useRef<HTMLInputElement>(null)
 
+  // keyboard shortcuts: Esc closes modals, "/" focuses search
   useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(''), 2600)
-    return () => clearTimeout(t)
-  }, [toast])
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { if (action) setAction(null); else if (viewing) setViewing(null) }
+      if (e.key === "/" && !action && !viewing && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA" && document.activeElement?.tagName !== "SELECT") {
+        e.preventDefault(); searchRef.current?.focus()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [action, viewing])
 
-  const campuses = [...new Set(rows.map((a) => a.campus))]
-  const list = rows.filter((a) =>
-    (!q || `${a.name} ${a.studentNo}`.toLowerCase().includes(q.toLowerCase())) && (!campus || a.campus === campus) && (!status || a.status === status))
-  const pages = Math.max(1, Math.ceil(list.length / rpp))
+  const filtered = useMemo(() => {
+    const list = rows.filter(r =>
+      (r.fullName + r.studentNumber).toLowerCase().includes(q.toLowerCase()) &&
+      (!campus || r.position.campus.name === campus) && (!status || r.status === status))
+    const dir = sortDir === "asc" ? 1 : -1
+    list.sort((a, b) => {
+      let av: string, bv: string
+      if (sortField === "campus") { av = a.position.campus.name; bv = b.position.campus.name }
+      else if (sortField === "status") { av = a.status; bv = b.status }
+      else if (sortField === "createdAt") { av = a.createdAt; bv = b.createdAt }
+      else if (sortField === "studentNumber") { av = a.studentNumber; bv = b.studentNumber }
+      else { av = a.fullName; bv = b.fullName }
+      return av.localeCompare(bv) * dir
+    })
+    return list
+  }, [rows, q, campus, status, sortField, sortDir])
+
+  const pages = Math.max(1, Math.ceil(filtered.length / size))
   const cur = Math.min(page, pages)
-  const shown = list.slice((cur - 1) * rpp, cur * rpp)
-  const from = Math.min(Math.max(1, cur - 1), Math.max(1, pages - 2))
-  const nums = Array.from({ length: Math.min(3, pages) }, (_, i) => from + i)
-  const filter = (fn: (v: string) => void) => (v: string) => { fn(v); setPage(1) }
+  const start = (cur - 1) * size
+  const shown = filtered.slice(start, start + size)
+  const winStart = Math.max(1, Math.min(cur - 1, pages - 2))
+  const nums = Array.from({ length: Math.min(3, pages) }, (_, i) => winStart + i)
 
-  const clearFilters = () => { setQ(''); setCampus(''); setStatus(''); setPage(1) }
+  const activeFilters: { label: string; clear: () => void }[] = []
+  if (q) activeFilters.push({ label: `Search: "${q}"`, clear: () => setQ("") })
+  if (campus) activeFilters.push({ label: `Campus: ${campus}`, clear: () => setCampus("") })
+  if (status) activeFilters.push({ label: `Status: ${LABEL[status as ApplicationStatus]}`, clear: () => setStatus("") })
 
-  const close = () => setDlg(null)
-  // Accept: confirm + placement details -> review email (WIL placement letter attached) -> Send email marks the applicant Accepted.
-  const sendAccept = async (a: Applicant, placement: Placement, to: string) => {
-    if (await save(a, () => acceptApplication(String(a.id)), { status: 'Accepted', placement }, `Email with WIL placement letter sent to ${to}.`)) close()
+  const say = (m: string) => { setToast(m); setTimeout(() => setToast(""), 3000) }
+  const open = (kind: Action["kind"], a: Application) => {
+    setWhen(""); setVenue("")
+    setStartDate(""); setStartVenue("")
+    setReason("")
+    setAction({ kind, a })
   }
-  // Interview: click Interview -> review the interview email -> Send email sets the status to Interview
-  // and the Interview button disappears. Cancelling the email leaves the status as Pending.
-  const sendInterview = async (a: Applicant, to: string, interview: Interview) => {
-    const interviewAt = new Date(`${interview.date}T${interview.time}:00`).toISOString()
-    if (await save(a, () => scheduleInterview(String(a.id), interviewAt, interview.venue), { status: 'Interview', interviewEmailSent: true, interview }, `Interview email sent to ${to}.`)) close()
+
+  // Static template vars — pre-filled immediately when the modal opens (name, position, campus, reference)
+  const staticVars = useMemo<Record<string, string>>(() => {
+    if (!action) return {} as Record<string, string>
+    const a = action.a
+    return {
+      fullName: a.fullName,
+      position: a.position.title,
+      campus: a.position.campus.name,
+      reference: a.referenceCode,
+    }
+  }, [action])
+
+  // Dynamic template vars — these are the ONLY editable fields; they update the email body live
+  const dynamicVars = useMemo<Record<string, { value: string; placeholder: string }>>(() => {
+    if (!action) return {} as Record<string, { value: string; placeholder: string }>
+    if (action.kind === "interview") return {
+      interviewDate: { value: when ? fmtDateTime(when) : "", placeholder: "[date & time]" },
+      interviewVenue: { value: venue, placeholder: "[venue]" },
+    }
+    if (action.kind === "accept") return {
+      startDate: { value: startDate ? fmtDateTime(startDate) : "", placeholder: "[start date & time]" },
+      startVenue: { value: startVenue, placeholder: "[reporting venue]" },
+    }
+    return {
+      rejectionReason: { value: formatRejection(reason), placeholder: "" },
+    }
+  }, [action, when, venue, startDate, startVenue, reason])
+
+  // Subject line — fully rendered string (static vars already replaced)
+  const displaySubject = useMemo(() => {
+    if (!action) return ""
+    return fillTemplate(DEFAULT_TEMPLATES[action.kind].subject, staticVars)
+  }, [action, staticVars])
+
+  // Body as a plain string — for saving to the application record (all placeholders replaced)
+  const displayBodyString = useMemo(() => {
+    if (!action) return ""
+    let text = DEFAULT_TEMPLATES[action.kind].body
+    for (const [key, val] of Object.entries(staticVars)) {
+      text = text.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), val)
+    }
+    for (const [key, info] of Object.entries(dynamicVars)) {
+      const replacement = info.value || info.placeholder
+      text = text.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), replacement)
+    }
+    return text
+  }, [action, staticVars, dynamicVars])
+
+  // Body as React nodes — for display, with dynamic parts highlighted
+  const renderedBody = useMemo(() => {
+    if (!action) return null
+    let text = DEFAULT_TEMPLATES[action.kind].body
+    for (const [key, val] of Object.entries(staticVars)) {
+      text = text.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), val)
+    }
+    const dynamicKeys = Object.keys(dynamicVars)
+    if (!dynamicKeys.length) return text
+    const pattern = new RegExp(`\\{\\{(${dynamicKeys.join("|")})\\}\\}`, "g")
+    const segments = text.split(pattern)
+    return segments.map((seg, i) => {
+      if (i % 2 === 0) return seg
+      const info = dynamicVars[seg]
+      if (!info) return `{{${seg}}}`
+      if (info.value) return <span key={i} className="em-var filled">{info.value}</span>
+      return <span key={i} className="em-var empty">{info.placeholder}</span>
+    })
+  }, [action, staticVars, dynamicVars])
+
+  const sort = (field: SortField) => {
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc")
+    else { setSortField(field); setSortDir("asc") }
+    setAnimKey(k => k + 1)
   }
-  // Reject: confirm marks the applicant Rejected, then the rejection email can be reviewed and sent (or skipped with Cancel).
-  const confirmReject = async (a: Applicant, n: string) => {
-    if (await save(a, () => rejectApplication(String(a.id), n), { status: 'Rejected', ...(n ? { note: n } : {}) }, 'Applicant rejected.')) setDlg({ kind: 'mailR', a })
+
+  const toggleRow = (id: string) => setSelected(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const toggleAllShown = () => {
+    const allShownSelected = shown.every(r => selected.has(r.id))
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (allShownSelected) shown.forEach(r => next.delete(r.id))
+      else shown.forEach(r => next.add(r.id))
+      return next
+    })
   }
-  const add = (v: NewApplicant) => {
-    setRows((r) => [{ id: Date.now(), ...v, date: today(), status: 'Pending' }, ...r])
-    close(); setPage(1); setToast('Applicant added.')
+  const clearSelection = () => setSelected(new Set())
+
+  const confirm = () => {
+    if (!action) return
+    const { kind, a } = action
+    if (kind === "interview" && (!when || !venue)) return
+    if (kind === "accept" && (!startDate || !startVenue)) return
+    setBusy(true)
+    setTimeout(() => {
+      const review = { reviewedBy: { fullName: ADMIN }, reviewedAt: new Date().toISOString() }
+      const emailMeta = { emailSubject: displaySubject, emailBody: displayBodyString }
+      const patch: Partial<Application> =
+        kind === "interview"
+          ? { ...review, status: "INTERVIEWEE", interviewAt: when, interviewVenue: venue, ...emailMeta }
+        : kind === "accept"
+          ? { ...review, status: "ACCEPTED", startDate, startVenue, ...emailMeta }
+        : { ...review, status: "REJECTED", rejectionReason: reason || undefined, ...emailMeta }
+      setRows(rs => rs.map(r => (r.id === a.id ? { ...r, ...patch } : r)))
+      say(kind === "interview" ? `Interview invite sent to ${a.fullName}`
+        : kind === "accept" ? `${a.fullName} accepted — email sent` : `${a.fullName} rejected`)
+      setAction(null); setBusy(false)
+    }, 600)
   }
-  const open = (s: Status) => s === 'Pending' || s === 'Interview'
+
+  const bulkAction = (kind: Action["kind"]) => {
+    const targets = rows.filter(r => selected.has(r.id))
+    if (!targets.length) return
+    setBusy(true)
+    setTimeout(() => {
+      const review = { reviewedBy: { fullName: ADMIN }, reviewedAt: new Date().toISOString() }
+      const newStatus: ApplicationStatus = kind === "interview" ? "INTERVIEWEE" : kind === "accept" ? "ACCEPTED" : "REJECTED"
+      setRows(rs => rs.map(r => selected.has(r.id) ? { ...r, ...review, status: newStatus, rejectionReason: kind === "reject" ? "Bulk rejection" : undefined } : r))
+      say(`${targets.length} applicant${targets.length > 1 ? "s" : ""} updated`)
+      clearSelection(); setBusy(false)
+    }, 800)
+  }
+
+  const onRowClick = (e: MouseEvent, a: Application) => {
+    const target = e.target as HTMLElement
+    if (target.closest("button,input,label,td.acts-cell")) return
+    setViewing(a)
+  }
 
   return (
-    <div className="ap">
-      <style>{CSS}</style>
+    <PageScaffold title="Applicants">
+      <div className="ap">
+        <style>{CSS}</style>
 
-        <div className="ap-body">
-          <div className="ap-bar">
-            <label className="ap-in"><Ic d={P.search} /><input placeholder="Search name or student number" value={q} onChange={(e) => filter(setQ)(e.target.value)} /></label>
-            <Select value={campus} onChange={filter(setCampus)}>
-              <option value="">All campuses</option>
-              {campuses.map((c) => <option key={c}>{c}</option>)}
-            </Select>
-            <Select value={status} onChange={filter(setStatus)}>
-              <option value="">All statuses</option>
-              {['Pending', 'Interview', 'Accepted', 'Rejected'].map((s) => <option key={s}>{s}</option>)}
-            </Select>
-            <button type="button" className={`ap-clr${q || campus || status ? ' on' : ''}`} onClick={clearFilters}>Clear filters</button>
-            <button className="ap-add" onClick={() => setDlg({ kind: 'add' })}><Ic d={P.plus} />Add applicant</button>
+      {/* Filter bar */}
+      <div className="bar">
+        <label className="field search">
+          <Search />
+          <input ref={searchRef} placeholder="Search name or student number  (press /)" value={q} onChange={e => { setQ(e.target.value); setPage(1) }} />
+          {q && <button className="search-clear" onClick={() => setQ("")} aria-label="Clear search">×</button>}
+        </label>
+        <select className="field sel" value={campus} onChange={e => { setCampus(e.target.value); setPage(1) }}>
+          <option value="">All campuses</option>{CAMP.map(c => <option key={c}>{c}</option>)}</select>
+        <select className="field sel" value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}>
+          <option value="">All statuses</option>
+          {(Object.keys(LABEL) as ApplicationStatus[]).map(s => <option key={s} value={s}>{LABEL[s]}</option>)}</select>
+        <button className="clear" onClick={() => { setQ(""); setCampus(""); setStatus(""); setPage(1) }}>Clear filters</button>
+      </div>
+
+      {/* Active filter pills */}
+      {activeFilters.length > 0 && (
+        <div className="filters">
+          {activeFilters.map((f, i) => (
+            <button key={i} className="filter-pill" onClick={f.clear}>
+              {f.label} <span className="filter-x">×</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="bulk">
+          <div className="bulk-info">
+            <button className="bulk-clear" onClick={clearSelection} aria-label="Clear selection">×</button>
+            <span><b>{selected.size}</b> selected</span>
           </div>
+          <div className="bulk-actions">
+            <button className="b interview" disabled={busy} onClick={() => bulkAction("interview")}>Invite to interview</button>
+            <button className="b view" disabled={busy} onClick={() => bulkAction("accept")}>Accept all</button>
+            <button className="b reject" disabled={busy} onClick={() => bulkAction("reject")}>Reject all</button>
+          </div>
+        </div>
+      )}
 
-          <div className="ap-card">
-            <div className="ap-tw"><table>
-              <colgroup>{WIDTH.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
-              <thead><tr>{HEAD.map((h) => <th key={h}>{h}</th>)}</tr></thead>
-              <tbody>
-                {shown.map((a) => (
-                  <tr key={a.id}>
-                    <td><div className="ap-nm"><div className="ap-av">{initials(a.name)}</div>{a.name}</div></td>
-                    <td>{a.studentNo}</td>
-                    <td>{a.campus}</td>
-                    <td>{a.course}<span className="ap-sub">{a.level}</span></td>
-                    <td>{a.date}</td>
-                    <td><span className={`ap-pill s-${a.status}`}>{a.status}</span></td>
+      <div className="card">
+        <div className="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th className="cb-col">
+                  <label className="cb">
+                    <input type="checkbox" checked={shown.length > 0 && shown.every(r => selected.has(r.id))} onChange={toggleAllShown} />
+                    <span />
+                  </label>
+                </th>
+                <th className="sortable" onClick={() => sort("fullName")}>Name {sortField === "fullName" && <Arrow dir={sortDir} />}</th>
+                <th className="sortable" onClick={() => sort("studentNumber")}>Student No. {sortField === "studentNumber" && <Arrow dir={sortDir} />}</th>
+                <th className="sortable" onClick={() => sort("campus")}>Campus {sortField === "campus" && <Arrow dir={sortDir} />}</th>
+                <th>Course</th>
+                <th className="sortable" onClick={() => sort("createdAt")}>Date applied {sortField === "createdAt" && <Arrow dir={sortDir} />}</th>
+                <th className="sortable" onClick={() => sort("status")}>Status {sortField === "status" && <Arrow dir={sortDir} />}</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody key={animKey} className="row-anim">
+              {shown.map((a, i) => {
+                const { level, course } = split(a.qualification)
+                const isSel = selected.has(a.id)
+                return (
+                  <tr key={a.id} className={isSel ? "sel" : undefined} style={{ animationDelay: `${i * 30}ms` }} onClick={e => onRowClick(e, a)}>
+                    <td className="cb-col" onClick={e => e.stopPropagation()}>
+                      <label className="cb">
+                        <input type="checkbox" checked={isSel} onChange={() => toggleRow(a.id)} />
+                        <span />
+                      </label>
+                    </td>
                     <td>
-                      <div className="ap-act">
-                        <button className="ap-b" onClick={() => setDlg({ kind: 'view', a })}>View</button>
-                        {a.status === 'Pending' && !a.interviewEmailSent && (
-                          <button className="ap-b sl" onClick={() => setDlg({ kind: 'mailI', a })}>Interview</button>
-                        )}
-                        {open(a.status) && (
-                          <>
-                            <button className="ap-b a" onClick={() => setDlg({ kind: 'accept', a })}>Accept</button>
-                            <button className="ap-b r" onClick={() => { setNote(''); setDlg({ kind: 'reject', a }) }}>Reject</button>
-                          </>
-                        )}
-                        {a.status === 'Interview' && a.interviewEmailSent && (
-                          <span className="ap-ok" title={a.interview ? `${fmtDate(a.interview.date)} at ${a.interview.time} – ${a.interview.venue}` : undefined}><Ic d={P.check} s={16} />Interview email sent</span>
-                        )}
-                        {a.status === 'Accepted' && a.placement && <button className="ap-b pl" onClick={() => printPlacementLetter(letterDetails(a, a.placement!))}>Placement letter</button>}
-                        {a.status === 'Accepted' && <span className="ap-ok"><Ic d={P.check} s={16} />Email sent</span>}
+                      <div className="nm"><span className="av">{initials(a.fullName)}</span>{a.fullName}</div>
+                    </td>
+                    <td>{a.studentNumber}</td>
+                    <td>{a.position.campus.name}</td>
+                    <td>{course}{level && <small>{level}</small>}</td>
+                    <td>{fmtDate(a.createdAt)}</td>
+                    <td><span className={`pill ${a.status}`}>{LABEL[a.status]}</span></td>
+                    <td className="acts-cell">
+                      <div className="acts">
+                        <button className="b view" onClick={() => setViewing(a)}>View</button>
+                        {a.status === "PENDING" && <button className="b interview" onClick={() => open("interview", a)}>Interview</button>}
+                        {(a.status === "PENDING" || a.status === "INTERVIEWEE") && <>
+                          <button className="b view" onClick={() => open("accept", a)}>Accept</button>
+                          <button className="b reject" onClick={() => open("reject", a)}>Reject</button></>}
+                        {a.status === "ACCEPTED" && <span className="sent"><Check /> Email sent</span>}
                       </div>
                     </td>
                   </tr>
-                ))}
-                {!shown.length && <tr><td colSpan={7} className="ap-empty">{loading ? 'Loading applicants…' : loadError || 'No applicants found'}</td></tr>}
-              </tbody>
-            </table></div>
-            <div className="ap-ft">
-              <span>{shown.length ? `Showing ${(cur - 1) * rpp + 1}–${(cur - 1) * rpp + shown.length} of ${list.length} applicants` : 'No applicants'}</span>
-              <span style={{ marginLeft: 'auto' }}>Rows per page</span>
-              <Select value={String(rpp)} onChange={(v) => { setRpp(+v); setPage(1) }}>
-                {[8, 16, 24].map((n) => <option key={n}>{n}</option>)}
-              </Select>
-              <button className="ap-pg" disabled={cur === 1} onClick={() => setPage(cur - 1)}>Previous</button>
-              {nums.map((n) => <button key={n} className={`ap-pg${n === cur ? ' on' : ''}`} onClick={() => setPage(n)}>{n}</button>)}
-              <button className="ap-pg n" disabled={cur === pages} onClick={() => setPage(cur + 1)}>Next</button>
+                )
+              })}
+              {!shown.length && (
+                <tr><td colSpan={8} className="empty">
+                  <div className="empty-state">
+                    <div className="empty-icon">📭</div>
+                    <b>No applicants found</b>
+                    <span className="muted">Try adjusting your filters or search terms.</span>
+                    <button className="b view" onClick={() => { setQ(""); setCampus(""); setStatus(""); setPage(1) }}>Reset filters</button>
+                  </div>
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="foot">
+          <span className="muted">{filtered.length ? `Showing ${start + 1}–${start + shown.length} of ${filtered.length} applicants` : "Showing 0 applicants"}</span>
+          <div className="pg">
+            <span className="muted">Rows per page</span>
+            <select className="field rpp" value={size} onChange={e => { setSize(+e.target.value); setPage(1) }}>
+              {[8, 16, 24].map(n => <option key={n}>{n}</option>)}</select>
+            <button className="pb" disabled={cur === 1} onClick={() => setPage(cur - 1)}>Previous</button>
+            {nums.map(n => <button key={n} className={n === cur ? "pb on" : "pb"} onClick={() => setPage(n)}>{n}</button>)}
+            <button className="pb next" disabled={cur === pages} onClick={() => setPage(cur + 1)}>Next</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="kbd-hint">
+        <span><kbd>/</kbd> search</span>
+        <span><kbd>Esc</kbd> close</span>
+        <span>Click a row to view details</span>
+      </div>
+
+      {/* VIEW pop-up: application details + downloadable documents */}
+      {viewing && (
+        <div className="ov" onClick={() => setViewing(null)}>
+          <div className="modal wide" onClick={e => e.stopPropagation()}>
+            <div className="dh">
+              <div className="nm"><span className="av lg">{initials(viewing.fullName)}</span>
+                <div><h2>{viewing.fullName}</h2>
+                  <span className={`pill ${viewing.status}`}>{LABEL[viewing.status]}</span></div></div>
+              <button className="x" onClick={() => setViewing(null)} aria-label="Close">×</button>
+            </div>
+            <small className="muted">Reference: {viewing.referenceCode}</small>
+
+            <div className="grid">
+              <section><h3>Personal details</h3>
+                <Row k="Full name" v={viewing.fullName} /><Row k="Email" v={viewing.email} />
+                <Row k="Phone" v={viewing.phone} /><Row k="ID number" v={maskId(viewing.idNumber)} /></section>
+              <section><h3>Application</h3>
+                <Row k="Campus" v={viewing.position.campus.name} />
+                <Row k="Status" v={LABEL[viewing.status]} /><Row k="Date applied" v={fmtDate(viewing.createdAt)} /></section>
+              <section><h3>Studies</h3>
+                <Row k="Student number" v={viewing.studentNumber} /><Row k="Institution" v={viewing.institution} />
+                <Row k="Qualification" v={viewing.qualification} /><Row k="Year of study" v={viewing.yearOfStudy} /></section>
+            </div>
+
+            <h3>Documents</h3>
+            <ul className="docs">
+              {viewing.documents.map(d => (
+                <li key={d.id}>
+                  <div><b>{d.fileName}</b><small>{DOC_LABEL[d.type]}{d.sizeBytes ? ` · ${kb(d.sizeBytes)}` : ""} · uploaded {fmtDate(d.uploadedAt)}</small></div>
+                  <button className="b view" onClick={() => downloadDoc(d)}>Download</button>
+                </li>
+              ))}
+              {!viewing.documents.length && <li className="muted">No documents uploaded.</li>}
+            </ul>
+            <div className="mf">
+              {viewing.documents.length > 1 && <button className="b view" onClick={() => viewing.documents.forEach(downloadDoc)}>Download all</button>}
+              <button className="b solid accept" onClick={() => setViewing(null)}>Close</button>
             </div>
           </div>
         </div>
-
-      {dlg?.kind === 'add' && (
-        <Modal title="Add applicant" bodyStyle={{ padding: '14px 27px 27px' }} onClose={close} footer={<>
-          <button className="ap-b ap-bt" onClick={close}>Cancel</button>
-          <button type="submit" form="add-form" className="ap-add">Add applicant</button>
-        </>}>
-          <AddForm onAdd={add} />
-        </Modal>
       )}
 
-      {dlg?.kind === 'view' && (
-        <Modal title="Applicant details" onClose={close} footer={<>
-          <button className="ap-b ap-bt" onClick={close}>Close</button>
-          {open(dlg.a.status) && <button className="ap-b ap-bp" onClick={() => setDlg({ kind: 'accept', a: dlg.a })}>Accept</button>}
-        </>}>
-          <dl className="ap-dd">
-            {([['Name', dlg.a.name], ['Student number', dlg.a.studentNo], ...(dlg.a.email ? [['Email', dlg.a.email]] : []), ...(dlg.a.phone ? [['Phone', dlg.a.phone]] : []),
-              ...(dlg.a.positionTitle ? [['Position', dlg.a.positionTitle]] : []), ['Campus', dlg.a.campus], ['Course applied for', prog(dlg.a)], ['Submitted', dlg.a.date],
-              ['Status', <span className={`ap-pill s-${dlg.a.status}`}>{dlg.a.status}</span>]] as [string, ReactNode][]).map(([k, v]) => (
-              <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
-            ))}
-            {dlg.a.interview && <div><dt>Interview</dt><dd>{fmtDate(dlg.a.interview.date)} at {dlg.a.interview.time}<br />{dlg.a.interview.venue}</dd></div>}
-          </dl>
-        </Modal>
+      {/* Interview / Accept / Reject pop-up — email auto-filled, only scheduling fields editable */}
+      {action && (
+        <div className="ov" onClick={() => setAction(null)}>
+          <div className="modal email-modal" onClick={e => e.stopPropagation()}>
+            <div className="em-head">
+              <div>
+                <h2>{action.kind === "interview" ? "Invite for interview" : action.kind === "accept" ? "Accept applicant" : "Reject applicant"}</h2>
+                <p className="muted">{action.a.fullName} · {action.a.position.title} · {action.a.email}</p>
+              </div>
+              <button className="x" onClick={() => setAction(null)} aria-label="Close">×</button>
+            </div>
+
+            <div className="em-grid">
+              {/* LEFT: the ONLY editable fields — scheduling inputs */}
+              <div className="em-left">
+                <h3 className="em-sec">{action.kind === "reject" ? "Rejection reason" : "Scheduling"}</h3>
+                {action.kind === "interview" && <>
+                  <label>Date &amp; time
+                    <input className="field" type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} />
+                  </label>
+                  <label>Venue
+                    <input className="field" value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g. ICEP Arcadia, Room 2" />
+                  </label>
+                  <small className="muted">An interview invitation email will be sent to {action.a.email}. Pick a date, time and venue — the email on the right updates automatically.</small>
+                </>}
+                {action.kind === "accept" && <>
+                  <label>Start date &amp; time
+                    <input className="field" type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  </label>
+                  <label>Reporting venue
+                    <input className="field" value={startVenue} onChange={e => setStartVenue(e.target.value)} placeholder="e.g. ICEP Arcadia, Reception" />
+                  </label>
+                  <small className="muted">An offer-of-internship email will be sent to {action.a.email}. Set the start date and venue — the email on the right updates automatically.</small>
+                </>}
+                {action.kind === "reject" && <>
+                  <label>Reason (optional)
+                    <textarea className="field" rows={4} value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Position filled; please reapply next cycle." />
+                  </label>
+                  <small className="muted">A rejection email will be sent to {action.a.email}. Type a reason and it appears in the email on the right automatically.</small>
+                </>}
+              </div>
+
+              {/* RIGHT: the email — read-only, pre-filled with the applicant's name & details; dynamic parts highlighted & update live */}
+              <div className="em-right">
+                <div className="em-prev-meta">
+                  <div><span className="muted">To:</span> <b>{action.a.email}</b></div>
+                  <div><span className="muted">Subject:</span> <b>{displaySubject}</b></div>
+                </div>
+                <div className="em-prev-body">{renderedBody}</div>
+              </div>
+            </div>
+
+            <div className="mf">
+              <button className="b view" onClick={() => setAction(null)} disabled={busy}>Cancel</button>
+              <button className={`b solid ${action.kind}`}
+                disabled={(action.kind === "interview" && (!when || !venue)) || (action.kind === "accept" && (!startDate || !startVenue)) || busy}
+                onClick={confirm}>
+                {busy ? <span className="spinner" /> : action.kind === "interview" ? "Send invite" : action.kind === "accept" ? "Accept & send" : "Reject & send"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      {dlg?.kind === 'accept' && (
-        <Modal title="Accept applicant" onClose={close} footer={<>
-          <button className="ap-b ap-bl" onClick={close}>Cancel</button>
-          <button type="submit" form="accept-form" className="ap-b ap-bp">Accept and send email</button>
-        </>}>
-          <p className="ap-q">Accept <b>{dlg.a.name}</b> for {prog(dlg.a)}?</p>
-          <div className="ap-mail"><Ic d={P.mail} s={22} /><span>An acceptance email will be sent to the applicant through Outlook, with their WIL placement letter attached.</span></div>
-          <AcceptForm signatory={signatory} onAccept={(placement) => setDlg({ kind: 'mailA', a: dlg.a, placement })} />
-        </Modal>
-      )}
-
-      {dlg?.kind === 'reject' && (
-        <Modal title="Reject applicant" onClose={close} footer={<>
-          <button className="ap-b ap-bt" onClick={close}>Cancel</button>
-          <button className="ap-b ap-br" onClick={() => confirmReject(dlg.a, note.trim())}>Reject applicant</button>
-        </>}>
-          <p className="ap-q">Reject <b>{dlg.a.name}</b> ({dlg.a.studentNo})?</p>
-          <p className="ap-hint">Their status will change to Rejected.</p>
-          <label className="ap-rl">
-            <span style={{ color: 'inherit' }}>Reason <span>(optional)</span></span>
-            <textarea className="ap-fi ap-ta" placeholder="Add a note for this decision..." value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
-        </Modal>
-      )}
-      {dlg?.kind === 'mailA' && <AcceptMail a={dlg.a} placement={dlg.placement} onClose={close} onSend={(to) => sendAccept(dlg.a, dlg.placement, to)} />}
-      {dlg?.kind === 'mailR' && <RejectMail a={dlg.a} onClose={close} onSend={() => { setToast(`Rejection email sent to ${dlg.a.name}.`); close() }} />}
-
-      {dlg?.kind === 'mailI' && <InterviewMail a={dlg.a} onClose={close} onSend={(to, iv) => sendInterview(dlg.a, to, iv)} />}
-
-      {toast && <div className="ap-toast" role="status">{toast}</div>}
-    </div>
+      {toast && <div className="toast">{toast}</div>}
+      </div>
+    </PageScaffold>
   )
 }
 
 export default ApplicantsPage
+
+/* ============================ inline styles ============================ */
+const CSS = `
+.page-scaffold{min-height:100vh}
+.page-scaffold__header{padding:26px 32px 0;background:#f4f6f9}
+.page-scaffold__header h1{margin:0;color:#14284b;font-size:28px;line-height:1.2;letter-spacing:-.02em}
+@media(max-width:640px){.page-scaffold__header{padding:20px 20px 0}.page-scaffold__header h1{font-size:24px}}
+.ap{font-family:Inter,system-ui,sans-serif;color:#14284b;background:#f4f6f9;padding:28px 32px;min-height:100%;--navy:#14284b;--line:#e2e8f0;--muted:#6b7f9e}
+.ap *{box-sizing:border-box}
+.muted{color:var(--muted);font-size:15px}
+
+/* filter bar */
+.bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.field{height:48px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:0 18px;font:inherit;font-size:16px;color:var(--navy);transition:border-color .15s,box-shadow .15s}
+.field:focus,.field:focus-within{outline:0;border-color:var(--navy);box-shadow:0 0 0 3px #14284b1a}
+.search{display:flex;align-items:center;gap:12px;width:360px;color:#8a9ab5;padding-right:12px}
+.search input{border:0;outline:0;flex:1;font:inherit;color:var(--navy);background:none;min-width:0}
+.search input::placeholder{color:#a4b0c5}
+.search-clear{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:4px;border-radius:6px;transition:background .15s,color .15s}
+.search-clear:hover{background:#eef2f7;color:var(--navy)}
+.sel,.rpp{appearance:none;cursor:pointer;padding-right:40px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2314284b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 6 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 16px center}
+.sel{min-width:200px}.rpp{height:44px;min-width:84px;padding-left:14px}
+.clear{border:0;background:none;color:var(--muted);font:inherit;font-weight:700;font-size:16px;cursor:pointer;transition:color .15s}
+.clear:hover{color:var(--navy)}
+
+/* active filter pills */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.filter-pill{display:inline-flex;align-items:center;gap:8px;background:#eef2fb;color:var(--navy);border:0;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,transform .1s}
+.filter-pill:hover{background:#dde5f5;transform:translateY(-1px)}
+.filter-pill:active{transform:translateY(0)}
+.filter-x{font-size:16px;line-height:1;opacity:.6}
+.filter-pill:hover .filter-x{opacity:1}
+
+/* bulk action bar */
+.bulk{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:12px;padding:12px 18px;margin-bottom:16px;animation:slideDown .2s ease}
+.bulk-info{display:flex;align-items:center;gap:10px}
+.bulk-info b{font-weight:800}
+.bulk-clear{background:rgba(255,255,255,.18);border:0;color:#fff;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:background .15s}
+.bulk-clear:hover{background:rgba(255,255,255,.3)}
+.bulk-actions{display:flex;gap:8px;flex-wrap:wrap}
+.bulk-actions .b{background:#fff;color:var(--navy);border-color:#fff;height:36px;padding:0 14px;font-size:14px}
+.bulk-actions .b.interview{color:#1d4ed8;border-color:#fff}
+.bulk-actions .b.reject{color:#b91c1c;border-color:#fff}
+
+/* card + table */
+.b:hover,.pb:not(:disabled):hover{filter:brightness(.95)}
+.card{background:#fff;border-radius:18px;box-shadow:0 1px 2px #14284b0d;overflow:hidden}
+.scroll{overflow-x:auto}
+.ap table{width:100%;border-collapse:collapse;font-size:16px;min-width:1040px}
+.ap th{text-align:left;padding:20px 12px;font-size:14px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#5d7499;border-bottom:1px solid var(--line);white-space:nowrap}
+.ap th:first-child,.ap td:first-child{padding-left:24px}
+.ap td{padding:14px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.ap td small{display:block;color:var(--muted);font-size:15px}
+.sortable{cursor:pointer;user-select:none;transition:color .15s}
+.sortable:hover{color:var(--navy)}
+.cb-col{width:48px;text-align:center}
+.ap tbody tr{cursor:pointer;transition:background .12s}
+.ap tbody tr:hover{background:#fafbfd}
+.ap tbody tr.sel{background:#eef2fb}
+.ap tbody tr.sel:hover{background:#e3e9f7}
+.nm{display:flex;align-items:center;gap:14px}
+.av{width:40px;height:40px;border-radius:50%;background:#e8edf5;color:var(--navy);font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;flex:none;transition:background .15s,color .15s}
+.ap tbody tr:hover .av{background:#d8e0ed}
+.av.lg{width:52px;height:52px;font-size:16px}
+
+/* row entry animation */
+.row-anim tr{animation:fadeInUp .25s ease backwards}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* custom checkboxes */
+.cb{position:relative;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.cb input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.cb span{width:18px;height:18px;border-radius:5px;border:1.5px solid #cbd5e1;background:#fff;display:inline-block;position:relative;transition:background .15s,border-color .15s}
+.cb input:checked + span{background:var(--navy);border-color:var(--navy)}
+.cb input:checked + span::after{content:"";position:absolute;left:5px;top:1px;width:6px;height:11px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.cb input:focus + span{box-shadow:0 0 0 3px #14284b1a}
+
+/* status pills */
+.pill{display:inline-block;padding:6px 16px;border-radius:999px;font-weight:700;font-size:15px;transition:background .2s,color .2s}
+.pill.PENDING{background:#fdf0c8;color:#b4720d}
+.pill.INTERVIEWEE{background:#dbe8fd;color:#1d4ed8}
+.pill.ACCEPTED{background:#d5f2e0;color:#15803d}
+.pill.REJECTED{background:#fde0e0;color:#b91c1c}
+
+/* action buttons */
+.acts{display:flex;gap:8px;align-items:center}
+.acts-cell{/* marker */}
+.b{height:40px;padding:0 16px;border-radius:8px;background:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer;border:1.5px solid var(--navy);color:var(--navy);transition:transform .08s,filter .15s,box-shadow .15s}
+.b:active{transform:scale(.97)}
+.b.view{border-color:var(--line);font-weight:500;color:var(--navy)}
+.b.view:hover{border-color:var(--navy)}
+.b.reject{border-color:#c53030;color:#b91c1c}
+.b.interview{border-color:#1d4ed8;color:#1d4ed8}
+.b.solid{color:#fff}
+.b.solid.accept{background:var(--navy)}
+.b.solid.reject{background:#b91c1c}
+.b.solid.interview{background:#1d4ed8}
+.b:disabled{opacity:.5;cursor:not-allowed}
+.sent{display:inline-flex;align-items:center;gap:6px;color:#15803d;font-size:16px;margin-left:6px}
+.empty{text-align:center;color:var(--muted);padding:40px!important}
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px}
+.empty-icon{font-size:40px;margin-bottom:6px}
+
+/* footer + pagination */
+.foot{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:20px 24px}
+.pg{display:flex;align-items:center;gap:10px}
+.pb{min-width:44px;height:44px;padding:0 14px;border-radius:8px;background:#fff;border:1px solid var(--line);font:inherit;font-weight:500;font-size:16px;color:var(--navy);cursor:pointer;transition:background .12s,border-color .12s}
+.pb:not(:disabled):hover{background:#fafbfd;border-color:var(--navy)}
+.pb.on{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+.pb.next{border:1.5px solid var(--navy);font-weight:700}
+.pb:disabled{color:#a4b0c5;cursor:not-allowed}
+
+/* keyboard hint */
+.kbd-hint{display:flex;gap:18px;align-items:center;margin-top:18px;color:var(--muted);font-size:13px;flex-wrap:wrap}
+.kbd-hint kbd{display:inline-block;background:#fff;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px;font:inherit;font-size:12px;font-weight:600;color:var(--navy);margin-right:4px}
+
+/* modal + overlay */
+.ov{position:fixed;inset:0;background:#14284b66;z-index:50;display:flex;justify-content:center;align-items:center;padding:16px;animation:fadeOverlay .15s ease}
+@keyframes fadeOverlay{from{background:#14284b00}to{background:#14284b66}}
+.modal{background:#fff;border-radius:16px;padding:26px;width:min(440px,100%);max-height:92vh;overflow:auto;display:grid;gap:14px;box-shadow:0 20px 50px #14284b40;animation:popIn .2s cubic-bezier(.16,1,.3,1)}
+.modal.wide{width:min(720px,100%);gap:10px}
+
+/* email template modal */
+.modal.email-modal{width:min(960px,100%);padding:22px 26px 18px;gap:14px}
+.em-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.em-head h2{margin:0 0 4px;font-size:20px}
+.em-head p{margin:0}
+.em-grid{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:flex-start}
+@media(max-width:760px){.em-grid{grid-template-columns:1fr}}
+.em-sec{font-size:13px;text-transform:uppercase;letter-spacing:.03em;color:#5d7499;margin:0 0 8px}
+.em-left{display:flex;flex-direction:column;gap:10px;background:#fafbfd;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.em-left .field{height:42px;font-size:14px}
+.em-left label{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--navy)}
+.em-left small.muted{display:block;font-size:12px;margin-top:2px;line-height:1.4}
+
+.em-right{display:flex;flex-direction:column;gap:10px;min-width:0}
+.em-prev-meta{background:#fafbfd;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13px;display:grid;gap:4px}
+.em-prev-meta .muted{font-size:12px;margin-right:6px}
+.em-prev-body{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 20px;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto;margin:0;box-shadow:inset 0 1px 2px #14284b08;color:var(--navy)}
+
+/* dynamic parts inside the email body */
+.em-var{display:inline}
+.em-var.filled{color:#1d4ed8;font-weight:600}
+.em-var.empty{color:#94a3b8;font-style:italic}
+
+@keyframes popIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.modal h2{margin:0 0 6px;font-size:20px}
+.modal p{margin:0}
+.modal label{display:grid;gap:6px;font-size:14px;font-weight:600}
+.modal .field{font-weight:400;font-size:15px}
+.modal textarea.field{height:auto;padding:12px 14px}
+
+.dh{display:flex;justify-content:space-between;align-items:flex-start}
+.x{border:0;background:none;font-size:30px;line-height:1;color:var(--muted);cursor:pointer;transition:color .15s;transition:transform .1s}
+.x:hover{color:var(--navy)}
+.x:active{transform:scale(.9)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 28px;margin-top:6px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+.modal h3{font-size:13px;text-transform:uppercase;letter-spacing:.03em;color:#5d7499;margin:12px 0 6px}
+.kv{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #eef2f7;font-size:14px}
+.kv span{color:var(--muted)}
+.kv b{font-weight:600;text-align:right;word-break:break-word}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips span{background:#eef2fb;color:var(--navy);padding:4px 12px;border-radius:999px;font-size:13px}
+.docs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.docs li{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px;transition:border-color .15s,background .12s}
+.docs li:hover{border-color:var(--navy);background:#fafbfd}
+.docs small{display:block;color:var(--muted);font-size:12px}
+.docs .b{height:36px;font-size:14px}
+.mf{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+
+/* spinner */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:13px 22px;border-radius:10px;font-size:15px;z-index:80;box-shadow:0 8px 24px #14284b44;animation:toastIn .25s cubic-bezier(.16,1,.3,1)}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translateX(-50%)}}
+`

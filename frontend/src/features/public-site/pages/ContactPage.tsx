@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Paper, Typography } from '@mui/material'
 import { CursorFollower } from '../story/CursorFollower'
+import { HeroWaves } from '../story/HeroMotion'
 import { RevealTitle } from '../story/Reveal'
 import { riseSx, useReveal } from '../story/useScrollProgress'
 import { introSx } from '../story/motion'
@@ -21,25 +22,21 @@ const CAMPUS = {
 const CSS = `
 .cp{--p:var(--mui-palette-primary-main,#1f3a68);--t:var(--mui-palette-text-primary,#0f1a2b);--m:var(--mui-palette-text-secondary,#5b6678);--b:var(--mui-palette-background-paper,#fff);--l:var(--mui-palette-divider,#d9dee7);--e:cubic-bezier(.65,0,.35,1);color:var(--t)}
 .cp-w{max-width:1200px;margin:0 auto;display:grid;gap:32px}
-.cp-st{display:grid;gap:32px}
-.cp-on .cp-st{gap:0;overflow:hidden}
-.cp-on .cp-ly{grid-area:1/1;will-change:opacity,transform}
-.cp-on .cp-a{z-index:2;transition:transform .7s var(--e),opacity .3s ease 0s,visibility 0s linear 0s}
-.cp-on.is-map .cp-a{transform:translateX(-110%);opacity:0;visibility:hidden;pointer-events:none;transition:transform .7s var(--e),opacity .3s ease .4s,visibility 0s linear .7s}
-.cp-on .cp-z{display:flex;flex-direction:column;opacity:0;visibility:hidden;pointer-events:none;transform:scale(.97);transition:opacity .45s ease 0s,transform .5s ease 0s,visibility 0s linear .5s}
-.cp-on .cp-z>*{flex:1}
-.cp-on.is-map .cp-z{opacity:1;visibility:visible;pointer-events:auto;transform:scale(1);transition:opacity .45s ease .3s,transform .5s ease .3s,visibility 0s linear 0s}
 .cp-c,.cp-mc{background:var(--b);border:1px solid var(--l);border-radius:16px;padding:12px}
 .cp-cols{display:grid;gap:24px}
 .cp-i{position:relative;overflow:hidden;background:var(--p);color:#fff;border-radius:12px;padding:24px;min-height:440px}
-.cp-i h2{margin:0 0 32px;font-size:26px}
+.cp-i h2{margin:0 0 32px;font-size:26px;position:relative;z-index:1}
 .cp-rows{display:grid;gap:32px;position:relative;z-index:1}
 .cp-r{display:flex;gap:20px;align-items:flex-start}
 .cp-ic{width:44px;height:44px;flex:none;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center}
 .cp-r b{display:block;font-weight:600}
 .cp-r div div{color:rgba(255,255,255,.85);line-height:1.6}
 .cp-o{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);right:-60px;bottom:-150px;width:300px;height:300px}
-.cp-o+.cp-o{right:90px;width:190px;height:190px;background:rgba(255,255,255,.06)}
+.cp-o+.cp-o{right:90px;width:190px;height:190px;background:rgba(255,255,255,.06);animation-duration:22s;animation-delay:-6s}
+/* Same slow drift as the circles in the home page hero */
+.cp-o{animation:cp-float 18s ease-in-out infinite}
+@keyframes cp-float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-24px,18px) scale(1.05)}}
+@media(prefers-reduced-motion:reduce){.cp-o{animation:none}}
 .cp-f{display:grid;gap:20px;align-content:start;padding:12px}
 .cp-2{display:grid;gap:20px}
 .cp label{display:block;margin-bottom:8px}
@@ -149,76 +146,6 @@ function MapCard() {
   )
 }
 
-/**
- * Both frames sit in the same spot. Scroll down until the end of the contact frame is on screen; the next scroll
- * (wheel, swipe or arrow/page keys) swipes it left and shows the whole map frame. Scroll up until the top of the
- * frame is on screen and scroll once more to swipe the contact frame back. Wide screens only; stacked elsewhere.
- */
-const SWAP = '(min-width:900px) and (prefers-reduced-motion: no-preference)'
-
-function ScrollSwap({ first, second }: { first: ReactNode; second: ReactNode }) {
-  const [swap, setSwap] = useState(() => matchMedia(SWAP).matches)
-  const [map, setMap] = useState(false)
-  const stage = useRef<HTMLDivElement>(null)
-  const shown = useRef(false)
-  const lock = useRef(0)
-
-  useEffect(() => {
-    const mq = matchMedia(SWAP), f = () => setSwap(mq.matches)
-    mq.addEventListener('change', f)
-    return () => mq.removeEventListener('change', f)
-  }, [])
-
-  useEffect(() => {
-    if (!swap) return
-    const go = (n: boolean) => { shown.current = n; setMap(n); lock.current = Date.now() + 900 } // ignore rest of gesture
-    const handle = (dir: 1 | -1) => { // true = gesture used for the swap, page must not scroll
-      const r = stage.current?.getBoundingClientRect()
-      if (!r || !(r.top < innerHeight - 80 && r.bottom > 80)) return false
-      if (Date.now() < lock.current) return true
-      if (dir === 1 && !shown.current && r.bottom <= innerHeight - 8) { go(true); return true }
-      if (dir === -1 && shown.current && r.top >= -20) { go(false); return true }
-      return false
-    }
-    const inField = (e: Event, sel: string) => !!(e.target as HTMLElement | null)?.closest?.(sel)
-    const wheel = (e: WheelEvent) => {
-      if (e.ctrlKey || Math.abs(e.deltaY) < 2 || inField(e, 'textarea')) return
-      if (handle(e.deltaY > 0 ? 1 : -1)) e.preventDefault()
-    }
-    let y0 = 0
-    const ts = (e: TouchEvent) => { y0 = e.touches[0].clientY }
-    const tm = (e: TouchEvent) => {
-      const dy = y0 - e.touches[0].clientY
-      if (Math.abs(dy) > 24 && handle(dy > 0 ? 1 : -1)) { e.preventDefault(); y0 = e.touches[0].clientY }
-    }
-    const key = (e: KeyboardEvent) => {
-      if (inField(e, 'input,textarea,select,button,a,[contenteditable]')) return
-      const down = ['ArrowDown', 'PageDown'].includes(e.key) || (e.key === ' ' && !e.shiftKey)
-      const up = ['ArrowUp', 'PageUp'].includes(e.key) || (e.key === ' ' && e.shiftKey)
-      if ((down || up) && handle(down ? 1 : -1)) e.preventDefault()
-    }
-    addEventListener('wheel', wheel, { passive: false })
-    addEventListener('touchstart', ts, { passive: true })
-    addEventListener('touchmove', tm, { passive: false })
-    addEventListener('keydown', key)
-    return () => {
-      removeEventListener('wheel', wheel)
-      removeEventListener('touchstart', ts)
-      removeEventListener('touchmove', tm)
-      removeEventListener('keydown', key)
-    }
-  }, [swap])
-
-  return (
-    <div className={`${swap ? 'cp-on' : ''}${swap && map ? ' is-map' : ''}`}>
-      <div className="cp-st" ref={stage}>
-        <div className="cp-ly cp-a" aria-hidden={swap && map}>{first}</div>
-        <div className="cp-ly cp-z" aria-hidden={swap && !map}>{second}</div>
-      </div>
-    </div>
-  )
-}
-
 function ContactHeader() {
   const { ref, p } = useReveal<HTMLDivElement>()
   
@@ -279,28 +206,29 @@ export function ContactPage({ onSendMessage }: { onSendMessage?: (m: ContactMess
       <CursorFollower />
       <div className="cp-w">
         <ContactHeader />
-        <ScrollSwap
-          first={
-            <div className="cp-c">
-              <div className="cp-cols">
-                <div className="cp-i">
-                  <h2>Contact information</h2>
-                  <div className="cp-rows">
-                    {ROWS.map(([icon, title, text]) => (
-                      <div className="cp-r" key={title}>
-                        <div className="cp-ic">{icon}</div>
-                        <div><b>{title}</b><div>{text}</div></div>
-                      </div>
-                    ))}
+        
+        <div className="cp-c">
+          <div className="cp-cols">
+            <div className="cp-i">
+              {/* Smoky waves drifting behind the panel, as in the home page hero */}
+              <HeroWaves />
+              <h2>Contact information</h2>
+              <div className="cp-rows">
+                {ROWS.map(([icon, title, text]) => (
+                  <div className="cp-r" key={title}>
+                    <div className="cp-ic">{icon}</div>
+                    <div><b>{title}</b><div>{text}</div></div>
                   </div>
-                  <div className="cp-o" aria-hidden="true" /><div className="cp-o" aria-hidden="true" />
-                </div>
-                <ContactForm onSubmit={onSendMessage} />
+                ))}
               </div>
+              <div className="cp-o" aria-hidden="true" /><div className="cp-o" aria-hidden="true" />
             </div>
-          }
-          second={<MapCard />}
-        />
+            <ContactForm onSubmit={onSendMessage} />
+          </div>
+        </div>
+        
+        <MapCard />
+        
       </div>
     </section>
   )
