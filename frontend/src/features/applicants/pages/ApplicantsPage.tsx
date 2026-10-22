@@ -82,6 +82,24 @@ const CSS = `
 .ap-att .nm{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ap-att .nm span{display:block;font-weight:400;color:var(--mu);font-size:12px}
 .ap-att .ap-b{height:29px}
 .ap-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Rows as separate cards that rise in one by one and pop out in navy on hover (as in the dashboard preview) */
+.ap-tw{padding:6px 14px 0}
+.ap table{border-collapse:separate;border-spacing:0 8px}
+.ap th{border-bottom:0;background:var(--bg)}
+.ap th:first-child{border-radius:10px 0 0 10px}.ap th:last-child{border-radius:0 10px 10px 0}
+.ap tr.ap-row{animation:ap-rise .5s cubic-bezier(.2,.8,.2,1) backwards;transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .35s ease}
+.ap tr.ap-row td{background:#fff;border-top:1px solid var(--ln);border-bottom:1px solid var(--ln);transition:background-color .3s ease,color .3s ease,border-color .3s ease}
+.ap tr.ap-row td:first-child{border-left:1px solid var(--ln);border-radius:12px 0 0 12px}
+.ap tr.ap-row td:last-child{border-right:1px solid var(--ln);border-radius:0 12px 12px 0}
+.ap tr.ap-row:hover{position:relative;z-index:1;transform:scale(1.012,1.07);filter:drop-shadow(0 12px 16px rgba(27,58,92,.3))}
+.ap tr.ap-row:hover td{background:#1B3A5C;color:#fff;border-color:#1B3A5C;box-shadow:1px 0 0 #1B3A5C}
+.ap tr.ap-row:hover td:last-child{box-shadow:none}
+.ap tr.ap-row:hover .ap-sub{color:#C8D5E6}
+.ap tr.ap-row:hover .ap-av{background:rgba(255,255,255,.16);color:#fff}
+.ap tr.ap-row:hover .ap-ok{color:#86EFAC}
+.ap tr.ap-row:hover .ap-b{border-color:transparent}
+@keyframes ap-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ap tr.ap-row{animation:none;transition:none}.ap tr.ap-row:hover{transform:none;filter:none}}
 `
 
 type Status = 'Pending' | 'Interview' | 'Accepted' | 'Rejected'
@@ -490,8 +508,8 @@ export function ApplicantsPage({ applicants }: { applicants?: Applicant[] }) {
               <colgroup>{WIDTH.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
               <thead><tr>{HEAD.map((h) => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>
-                {shown.map((a) => (
-                  <tr key={a.id}>
+                {shown.map((a, i) => (
+                  <tr key={a.id} className="ap-row" style={{ animationDelay: `${i * 45}ms` }}>
                     <td><div className="ap-nm"><div className="ap-av">{initials(a.name)}</div>{a.name}</div></td>
                     <td>{a.studentNo}</td>
                     <td>{a.campus}</td>
