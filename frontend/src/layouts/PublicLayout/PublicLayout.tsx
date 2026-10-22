@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Box, Drawer, IconButton, Link, Typography } from '@mui/material'
 import { Menu, X } from 'lucide-react'
 import { Link as RouterLink, NavLink, Outlet, useLocation } from 'react-router-dom'
 import icepLogo from '../../assets/icep-logo.png'
+import icepLogoBW from '../../assets/icep-logo-b&w.png'
 import { APPLY_PARAM, ApplicationDialog, CHOOSE_POSITION } from '@/features/application/components/ApplicationDialog'
 
 const navItems = [
@@ -34,11 +35,33 @@ function Brand() {
 
 export function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
-  // The landing page uses full-width bands; other public pages keep the centred content container.
   const { pathname } = useLocation()
   const fullBleed = pathname === '/'
-  // "Apply now" opens the application pop-up over the current page, with a position dropdown.
   const applyNow = `${pathname}?${APPLY_PARAM}=${CHOOSE_POSITION}`
+
+  // 1. Fix: Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+
+  // 2. Setup observer for the footer animation
+  const footerRef = useRef<HTMLElement>(null)
+  const [footerVisible, setFooterVisible] = useState(false)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      // Trigger the slide-up animation when the footer enters the viewport
+      if (entry.isIntersecting) {
+        setFooterVisible(true)
+      } else {
+        // Reset state when scrolling far away so it can trigger again when scrolling back down
+        setFooterVisible(false) 
+      }
+    }, { threshold: 0.1, rootMargin: '50px' })
+    
+    if (footerRef.current) observer.observe(footerRef.current)
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'var(--icep-page)' }}>
@@ -73,13 +96,67 @@ export function PublicLayout() {
       </Box>
       <ApplicationDialog />
 
-      <Box component="footer" sx={{ bgcolor: '#0F1E30', color: '#C2CCDA' }}>
-        <Box sx={{ ...shell, pt: 4, pb: 3 }}>
-          <Typography sx={{ color: '#fff', fontSize: 20, fontWeight: 750 }}>ICEP</Typography>
-          <Typography sx={{ fontSize: 13 }}>Informatics Community Engagement Programme</Typography>
-          <Box sx={{ mt: 3, pt: 2.5, borderTop: '1px solid rgba(255,255,255,.12)', display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', fontSize: 13 }}>
+      {/* Footer */}
+      <Box component="footer" ref={footerRef} sx={{ bgcolor: '#0F1E30', color: '#C2CCDA', display: 'flex', flexDirection: 'column' }}>
+        
+        {/* Back to top banner container with overflow hidden so it animates upwards from behind the footer */}
+        <Box sx={{ overflow: 'hidden', bgcolor: '#0F1E30' }}>
+          <Box 
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && window.scrollTo({ top: 0, behavior: 'smooth' })}
+            sx={{ 
+              bgcolor: '#1C2E45', 
+              color: '#fff', 
+              py: 1.25, 
+              textAlign: 'center', 
+              cursor: 'pointer', 
+              fontSize: 14, 
+              fontWeight: 600,
+              transform: footerVisible ? 'translateY(0)' : 'translateY(100%)',
+              transition: 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+              '&:hover': { bgcolor: '#233954' }
+            }}
+          >
+            Back to top
+          </Box>
+        </Box>
+
+        {/* Main Footer Container */}
+        <Box sx={{ ...shell, pt: { xs: 5, md: 6 }, pb: 3, width: '100%', position: 'relative', zIndex: 2 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 1fr 1fr' }, gap: 4, mb: { xs: 4, md: 5 } }}>
+            {/* Branding Column */}
+            <Box>
+              <Box component={RouterLink} to="/" aria-label="ICEP home" sx={{ display: 'inline-block' }}>
+                <img src={icepLogoBW} alt="ICEP" style={{ height: 120, width: 'auto', display: 'block' }} />
+              </Box>
+            </Box>
+            
+            {/* Explore Links */}
+            <Box>
+              <Typography sx={{ color: '#fff', fontSize: 15, fontWeight: 700, mb: 2, textTransform: 'uppercase', letterSpacing: '.05em' }}>Explore</Typography>
+              <Box sx={{ display: 'grid', gap: 1.5 }}>
+                <Link component={RouterLink} to="/" underline="hover" sx={{ color: '#C2CCDA', fontSize: 15, width: 'fit-content' }}>Home</Link>
+                <Link component={RouterLink} to="/about" underline="hover" sx={{ color: '#C2CCDA', fontSize: 15, width: 'fit-content' }}>About</Link>
+                <Link component={RouterLink} to="/careers" underline="hover" sx={{ color: '#C2CCDA', fontSize: 15, width: 'fit-content' }}>Careers</Link>
+                <Link component={RouterLink} to="/contact" underline="hover" sx={{ color: '#C2CCDA', fontSize: 15, width: 'fit-content' }}>Contact</Link>
+              </Box>
+            </Box>
+            
+            {/* Portals Links */}
+            <Box>
+              <Typography sx={{ color: '#fff', fontSize: 15, fontWeight: 700, mb: 2, textTransform: 'uppercase', letterSpacing: '.05em' }}>Portals</Typography>
+              <Box sx={{ display: 'grid', gap: 1.5 }}>
+                <Link component={RouterLink} to="/track" underline="hover" sx={{ color: '#C2CCDA', fontSize: 15, width: 'fit-content' }}>Track Application</Link>
+                <Link component={RouterLink} to="/login" underline="hover" sx={{ color: '#C2CCDA', fontSize: 15, width: 'fit-content' }}>Login</Link>
+                <Link component={RouterLink} to={applyNow} underline="hover" sx={{ color: '#C2CCDA', fontSize: 15, width: 'fit-content' }}>Apply now</Link>
+              </Box>
+            </Box>
+          </Box>
+
+          <Box sx={{ pt: 3, borderTop: '1px solid rgba(255,255,255,.12)', display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap', fontSize: 14 }}>
             <span>© {year} ICEP · Tshwane University of Technology</span>
-            <Link component={RouterLink} to="/about" underline="hover" sx={{ color: '#C2CCDA' }}>Privacy notice</Link>
           </Box>
         </Box>
       </Box>
