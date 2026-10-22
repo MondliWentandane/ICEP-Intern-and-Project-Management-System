@@ -2,19 +2,21 @@ import { useMemo, useState } from 'react'
 import { Box, IconButton, InputBase, Typography } from '@mui/material'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, Building2, CalendarDays, ChartNoAxesGantt, ClipboardList, FolderKanban, History, LayoutDashboard, LogOut, Search, Users, X } from 'lucide-react'
-import { getNavigation, type NavigationItem } from '@/config/navigation'
+import { getNavigation, type NavigationItem, type NavigationSection } from '@/config/navigation'
+import icepLogo from '@/assets/icep-logo-b&w.png'
 import { useAuth } from '@/hooks/useAuth'
 import styles from './DashboardLayout.module.css'
 
 const icons: Record<string, typeof LayoutDashboard> = {
   Dashboard: LayoutDashboard, Applicants: ClipboardList, Interns: Users, 'Campuses & Intakes': Building2,
   'Past Interns': History, Projects: FolderKanban, 'My Project': FolderKanban, 'Task Board': ClipboardList,
-  Calendar: CalendarDays, 'Gantt Chart': ChartNoAxesGantt, Reports: ClipboardList, Users: Users,
-  Notifications: Bell, 'My Profile': Users,
+  Calendar: CalendarDays, 'Gantt Chart': ChartNoAxesGantt, Gantt: ChartNoAxesGantt, Reports: ClipboardList,
+  Users: Users, Notifications: Bell, 'My Profile': Users, 'Email Templates': ClipboardList,
 }
-const sectionLabels: Record<NavigationItem['section'], string> = {
-  MAIN: 'Main', PROJECTS: 'Projects', ADMIN: 'Admin',
+const sectionLabels: Record<NavigationSection, string> = {
+  MAIN: 'Main', PROJECTS: 'Projects', COMMUNICATION: 'Communication', ADMIN: 'Admin',
 }
+const sections: NavigationSection[] = ['MAIN', 'PROJECTS', 'COMMUNICATION', 'ADMIN']
 const roleLabels: Record<string, string> = { admin: 'Administrator', wil_handler: 'WIL Handler', mentor: 'Mentor', intern: 'Intern' }
 
 export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
@@ -24,7 +26,6 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
   const [query, setQuery] = useState('')
   const links = useMemo(() => user ? getNavigation(user.role).filter((item) => item.label.toLowerCase().includes(query.toLowerCase())) : [], [user, query])
   if (!user) return null
-  const sections: NavigationItem['section'][] = ['MAIN', 'PROJECTS', 'ADMIN']
   const initials = user.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -32,7 +33,7 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
     {mobileOpen && <button className={styles.scrim} aria-label="Close navigation" onClick={onClose} />}
     <Box component="aside" className={`${styles.sidebar} ${mobileOpen ? styles['sidebar-open'] : ''}`}>
       <Box className={styles['sidebar-brand']}>
-        <Typography component="span" className={styles['brand-wordmark']}>ICEP.</Typography>
+        <Box component="img" src={icepLogo} alt="ICEP" className={styles['brand-logo']} />
         <IconButton className={styles['mobile-close']} aria-label="Close menu" onClick={onClose}><X size={20} /></IconButton>
       </Box>
       <Box className={styles['sidebar-search']}>
@@ -45,10 +46,10 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
           if (!items.length) return null
           return <Box component="section" key={section} className={styles['nav-section']}>
             <Typography component="h2" className={styles['nav-heading']}>{sectionLabels[section]}</Typography>
-            {items.map((item) => {
+            {items.map((item: NavigationItem) => {
               const Icon = icons[item.label] ?? LayoutDashboard
               return <NavLink key={item.path} to={item.path} onClick={onClose} end className={({ isActive }) => `${styles['nav-link']} ${isActive || location.pathname.startsWith(`${item.path}/`) ? styles['nav-link-active'] : ''}`}>
-                <Icon size={20} strokeWidth={2} aria-hidden="true" />
+                <Icon size={22} strokeWidth={2} aria-hidden="true" />
                 <span>{item.label}</span>
                 {item.readOnly && <span className={styles['read-only']}>View only</span>}
               </NavLink>
@@ -64,5 +65,3 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
     </Box>
   </>
 }
-
-
