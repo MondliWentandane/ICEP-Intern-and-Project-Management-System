@@ -66,6 +66,35 @@ export class ApplicationService {
     return application;
   }
 
+  /**
+   * Public "Track application": the applicant proves it is theirs with the email they applied with
+   * plus the reference number. A wrong email and an unknown reference give the same answer, so the
+   * lookup cannot be used to find out who has applied.
+   */
+  async track(email: unknown, reference: unknown) {
+    const normalisedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const referenceCode = typeof reference === "string" ? reference.trim().toUpperCase() : "";
+    if (!normalisedEmail || !referenceCode) {
+      throw Object.assign(new Error("Enter the email address and reference number you applied with."), { statusCode: 400 });
+    }
+    const application = await repository.findForTracking(referenceCode);
+    if (!application || application.email.toLowerCase() !== normalisedEmail) {
+      throw Object.assign(new Error("No application matches that email address and reference number."), { statusCode: 404 });
+    }
+    const { position, documents, reviewedBy, interviewAt, interviewVenue, ...rest } = application;
+    return {
+      ...rest,
+      positionTitle: position.title,
+      campus: position.campus.name,
+      department: position.department.name,
+      intake: position.intake,
+      interview: interviewAt ? { at: interviewAt, venue: interviewVenue } : null,
+      documents: documents.map((document) => document.type),
+      // Signs the WIL placement letter once accepted.
+      reviewerName: reviewedBy?.fullName ?? null,
+    };
+  }
+
   createApplication(input: Parameters<ApplicationRepository["create"]>[0]) { return this.create(input); }
 
   async create(input: Parameters<ApplicationRepository["create"]>[0]) {

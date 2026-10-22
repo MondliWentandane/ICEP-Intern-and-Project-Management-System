@@ -41,6 +41,12 @@ export async function getApplication(req: Request, res: Response) {
   catch (error) { return sendError(res, error); }
 }
 
+/** POST /applications/track — public. Body: { email, reference } */
+export async function trackApplication(req: Request, res: Response) {
+  try { return res.json(await service.track(req.body?.email, req.body?.reference)); }
+  catch (error) { return sendError(res, error); }
+}
+
 export async function getApplicationStatus(req: Request, res: Response) {
   try { return res.json(await service.checkStatus(routeParam(req.params.referenceCode))); }
   catch (error) { return sendError(res, error); }
@@ -121,6 +127,7 @@ export async function reviewApplication(req: Request, res: Response) {
 }
 export class ApplicationController {
   static registerApplicant = createApplication;
+  static trackApplication = trackApplication;
   static getPendingApplicants = getPendingApplications;
   static getApplicants = listApplications;
   static getApplicant = getApplication;

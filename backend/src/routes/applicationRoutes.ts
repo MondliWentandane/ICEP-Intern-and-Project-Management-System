@@ -62,7 +62,7 @@ router.post("/applications", applicationUploads, ApplicationController.registerA
 router.post("/register", applicationUploads, ApplicationController.registerApplicant);
 
 // "View Application Status": applicant looks up with email + reference (no account needed).
-router.post("/applications/track", notImplemented("POST /applications/track"));
+router.post("/applications/track", ApplicationController.trackApplication); // body: { email, reference }
 router.post("/applications/track/link", notImplemented("POST /applications/track/link"));
 
 // ---- Careers management (Admin / WIL Handler) ---------------------------------

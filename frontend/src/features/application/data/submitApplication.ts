@@ -1,7 +1,6 @@
 import { apiClient, endpoints } from '@/api'
 import type { CareerPosition } from '@/features/public-site/data/positions'
 import type { ApplicationValues } from './applicationSchema'
-import { saveApplication } from './applications'
 
 export interface SubmittedApplication {
   reference: string
@@ -52,7 +51,5 @@ export async function submitApplication(values: ApplicationValues, position: Car
     positionTitle: data.position?.title ?? position.title,
     campus: data.position?.campus ?? position.campus,
   }
-  // Also kept in this browser so "Track application" works with the email and reference number.
-  saveApplication({ ...result, surname: values.surname, updatedAt: result.submittedAt, stage: 'under_review', documents: ['Curriculum vitae', 'ID document', 'Academic record'] })
   return result
 }
