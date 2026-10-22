@@ -1,5 +1,5 @@
 // TODO: Implement the Figma screen and connect the matching feature service.
-import { useEffect, useState, type FormEvent, type JSX, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type JSX, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageScaffold } from '@/components/ui/PageScaffold'
 import CreateProjectButton, { type Group, type Id, type NewProject } from '@/components/ui/CreateProjectButton'
@@ -9,7 +9,15 @@ const PageScaffoldWithChildren = PageScaffold as unknown as (props: {
   children?: ReactNode
 }) => JSX.Element
 
-export type Project = NewProject & { id: number; progress: number }
+// category and campus are optional: projects without a category are grouped under "Projects".
+export type Project = NewProject & {
+  id: number
+  progress: number
+  category?: string
+  campus?: string
+}
+
+type Status = 'Active' | 'Pending' | 'Completed'
 
 // TODO: replace with groups from your Team Builder feature service.
 const GROUPS: Group[] = [
@@ -25,10 +33,23 @@ const COVERS = [
   ['#2f5fa8', '#9cc0f2'],
   ['#0b2a5b', '#4a78c4'],
 ]
+const COVER_HEIGHTS = [190, 130, 160, 150, 200, 170, 140]
 const AVATARS = ['#0b2a5b', '#2f5fa8', '#13397d', '#5b8bd6', '#4a78c4']
+
+const BADGE: Record<Status, string> = {
+  Active: 'bg-[#dff3e7] text-[#1f8a4c]',
+  Pending: 'bg-[#fdeccf] text-[#b86200]',
+  Completed: 'bg-[#e0eafa] text-[#2f5fa8]',
+}
 
 const initials = (name: string) =>
   name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
+
+const statusOf = (p: Project, group?: Group): Status =>
+  p.progress >= 100 ? 'Completed' : group ? 'Active' : 'Pending'
+
+const pill =
+  'rounded-full border border-transparent bg-[#f1f4fa] px-5 py-3 text-sm text-[#0f1b33] focus:border-[#0b2a5b] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b2a5b]/20'
 
 /* ---------- shared modal ---------- */
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -129,8 +150,11 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
   onOpen: () => void; onEdit: () => void; onDelete: () => void
 }) {
   const [from, to] = COVERS[index % COVERS.length]
+  const height = COVER_HEIGHTS[index % COVER_HEIGHTS.length]
   const members = group?.members ?? 0
   const shown = Math.min(members, 4)
+  const status = statusOf(project, group)
+
   return (
     <div
       role="link"
@@ -144,22 +168,23 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
           onOpen()
         }
       }}
-      className="cursor-pointer overflow-hidden rounded-3xl bg-white shadow-[0_1px_3px_rgba(11,42,91,.08),0_14px_30px_rgba(11,42,91,.07)] transition hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(11,42,91,.12),0_20px_40px_rgba(11,42,91,.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2a5b]"
+      className="mb-[18px] cursor-pointer break-inside-avoid overflow-hidden rounded-3xl bg-white shadow-[0_1px_3px_rgba(11,42,91,.08),0_14px_30px_rgba(11,42,91,.07)] transition duration-200 hover:-translate-y-[3px] hover:shadow-[0_2px_4px_rgba(11,42,91,.1),0_22px_40px_rgba(11,42,91,.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2a5b]"
     >
-      <div className="relative flex h-36 items-end overflow-hidden p-5" style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}>
+      <div
+        className="relative flex items-end overflow-hidden px-[18px] py-4"
+        style={{ height, backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+      >
         <div className="absolute -right-6 -top-8 h-32 w-32 rounded-full bg-white/20" />
         <div className="absolute bottom-[-2.5rem] right-16 h-24 w-24 rounded-full bg-white/10" />
         <span className="relative text-5xl font-extrabold tracking-tight text-white">{initials(project.name)}</span>
       </div>
 
-      <div className="p-5">
-        <h3 className="text-lg font-bold text-[#0f1b33]">{project.name}</h3>
-        <p className="mb-3 text-sm text-[#55627a]">{group ? group.name : 'No group yet'}</p>
+      <div className="px-[18px] pb-[18px] pt-3.5">
+        <h3 className="text-[17px] font-bold text-[#0f1b33]">{project.name}</h3>
+        <p className="mb-2.5 mt-0.5 text-[13px] text-[#55627a]">{group ? group.name : 'No group yet'}</p>
 
-        <div className="flex items-center justify-between">
-          <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${group ? 'bg-[#dff3e7] text-[#1f8a4c]' : 'bg-[#fdeccf] text-[#b86200]'}`}>
-            {group ? 'Active' : 'Pending'}
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${BADGE[status]}`}>{status}</span>
           {/* TODO: replace the placeholder letters with real member initials */}
           <div className="flex">
             {Array.from({ length: shown }).map((_, i) => (
@@ -173,10 +198,10 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
           </div>
         </div>
 
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#d5dbe6]">
+        <div className="mb-1.5 mt-3 h-1.5 overflow-hidden rounded-full bg-[#d5dbe6]">
           <div className="h-full rounded-full bg-[#0b2a5b]" style={{ width: `${project.progress}%` }} />
         </div>
-        <div className="mt-1.5 flex justify-between text-xs text-[#55627a]">
+        <div className="flex justify-between text-[13px] text-[#55627a]">
           <span>{project.progress > 0 ? `${project.progress}% complete` : 'Not started'}</span>
           <span>{members > 0 ? `${members} members` : 'No members'}</span>
         </div>
@@ -211,6 +236,10 @@ export function ProjectsPage() {
   const [editing, setEditing] = useState<Project | null>(null)
   const [deleting, setDeleting] = useState<Project | null>(null)
 
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
+  const [campusFilter, setCampusFilter] = useState('all')
+
   const handleCreate = (project: NewProject) => {
     // TODO: save through your projects service, then update the list from its response.
     setProjects((list) => [{ ...project, id: Date.now(), progress: 0 }, ...list])
@@ -229,33 +258,85 @@ export function ProjectsPage() {
     setDeleting(null)
   }
 
+  const campuses = useMemo(
+    () => Array.from(new Set(projects.map((p) => p.campus).filter((c): c is string => !!c))),
+    [projects],
+  )
+
+  // Filter, then group by category (keeps each project's original index for its cover).
+  const sections = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const map = new Map<string, { project: Project; index: number }[]>()
+    projects.forEach((project, index) => {
+      const group = GROUPS.find((g) => g.id === project.groupId)
+      if (q && !project.name.toLowerCase().includes(q) && !(group?.name.toLowerCase().includes(q))) return
+      if (statusFilter !== 'all' && statusOf(project, group) !== statusFilter) return
+      if (campusFilter !== 'all' && project.campus !== campusFilter) return
+      const key = project.category ?? 'Projects'
+      map.set(key, [...(map.get(key) ?? []), { project, index }])
+    })
+    return Array.from(map.entries())
+  }, [projects, search, statusFilter, campusFilter])
+
   return (
     <PageScaffoldWithChildren title="Projects">
-      <div className="mb-6 flex justify-end">
+      <p className="mb-5 text-base text-[#55627a]">Admins see every project. Mentors see only their own.</p>
+
+      <div className="mb-2 flex flex-wrap items-center gap-2.5">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by project or group name"
+          aria-label="Search projects"
+          className={`${pill} min-w-[180px] flex-1`}
+        />
+        <select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | Status)} className={pill}>
+          <option value="all">All statuses</option>
+          <option value="Active">Active</option>
+          <option value="Pending">Pending</option>
+          <option value="Completed">Completed</option>
+        </select>
+        <select aria-label="Campus" value={campusFilter} onChange={(e) => setCampusFilter(e.target.value)} className={pill}>
+          <option value="all">All campuses</option>
+          {campuses.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
         <CreateProjectButton groups={GROUPS} onCreate={handleCreate} />
       </div>
 
       {projects.length === 0 ? (
-        <p className="rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">
+        <p className="mt-6 rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">
           No projects yet. Click <b>Create project</b> to add one.
         </p>
+      ) : sections.length === 0 ? (
+        <p className="mt-6 rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">No projects match your filters.</p>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p, i) => {
-            const group = GROUPS.find((g) => g.id === p.groupId)
-            return (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                index={i}
-                group={group}
-                onOpen={() => navigate(`/projects/${p.id}`, { state: { project: p, group } })}
-                onEdit={() => setEditing(p)}
-                onDelete={() => setDeleting(p)}
-              />
-            )
-          })}
-        </div>
+        sections.map(([category, items]) => (
+          <section key={category}>
+            <h2 className="mb-3.5 mt-8 flex items-center gap-2.5 text-xl font-bold text-[#0f1b33]">
+              {category}
+              <span className="text-[13px] font-normal text-[#55627a]">
+                {items.length} {items.length === 1 ? 'project' : 'projects'}
+              </span>
+            </h2>
+            <div className="columns-1 gap-[18px] sm:columns-2 lg:columns-3">
+              {items.map(({ project, index }) => {
+                const group = GROUPS.find((g) => g.id === project.groupId)
+                return (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    index={index}
+                    group={group}
+                    onOpen={() => navigate(String(project.id), { state: { project, group } })}
+                    onEdit={() => setEditing(project)}
+                    onDelete={() => setDeleting(project)}
+                  />
+                )
+              })}
+            </div>
+          </section>
+        ))
       )}
 
       {editing && <EditProjectDialog project={editing} groups={GROUPS} onSave={handleSave} onClose={() => setEditing(null)} />}
