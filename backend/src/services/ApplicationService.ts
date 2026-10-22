@@ -6,6 +6,39 @@ import {
   type ApplicationStatusValue,
 } from "../repositories/ApplicationRepository";
 import { prisma } from "../config/prisma";
+import { readDocument, removeDocument, storeDocument, type StoredFile } from "./DocumentStorage";
+
+type UploadedFiles = Record<string, Express.Multer.File[] | undefined> | undefined;
+const badRequest = (message: string) => Object.assign(new Error(message), { statusCode: 400 });
+const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+const digits = (value: unknown) => text(value).replace(/\s+/g, "");
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** "2nd year" / "2" -> 2 */
+function parseYear(value: unknown): number | undefined {
+  const match = text(value).match(/\d+/);
+  return match ? Number(match[0]) : undefined;
+}
+
+/** Skills arrive as a JSON array string, repeated form fields, or a comma-separated list. */
+function parseSkills(value: unknown): string[] {
+  let list: unknown[] = [];
+  if (Array.isArray(value)) list = value;
+  else if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      list = Array.isArray(parsed) ? parsed : [value];
+    } catch {
+      list = value.split(",");
+    }
+  }
+  const names = list.map((item) => text(item)).filter(Boolean);
+  return [...new Map(names.map((name) => [name.toLowerCase(), name])).values()].slice(0, 15);
+}
+
+/** Positions stay open for applications until the end of their closing date. */
+const isAcceptingApplications = (position: { status: string; closingDate: Date } | null) =>
+  Boolean(position && position.status === "OPEN" && position.closingDate.getTime() + DAY_MS > Date.now());
 
 const repository = new ApplicationRepository();
 const transitions: Record<ApplicationStatusValue, ApplicationStatusValue[]> = {
@@ -44,10 +77,99 @@ export class ApplicationService {
       where: { id: input.positionId },
       select: { status: true, closingDate: true },
     });
-    if (!position || position.status !== "OPEN" || position.closingDate < new Date()) {
+    if (!isAcceptingApplications(position)) {
       throw Object.assign(new Error("This position is not accepting applications"), { statusCode: 400 });
     }
     return repository.create(input);
+  }
+
+  /**
+   * Public application form (multipart/form-data from the careers "Apply" pop-up).
+   * Saves the applicant's details, skills and the three PDF documents, status PENDING.
+   */
+  async submit(body: Record<string, unknown>, files: UploadedFiles) {
+    const positionId = text(body.positionId);
+    const fullName = text(body.fullName) || [text(body.firstName), text(body.surname)].filter(Boolean).join(" ");
+    const email = text(body.email).toLowerCase();
+    const phone = digits(body.phone);
+    const idNumber = digits(body.idNumber);
+    const studentNumber = text(body.studentNumber);
+    const qualification = text(body.qualification);
+    const institution = text(body.institution) || "Tshwane University of Technology";
+    const yearOfStudy = parseYear(body.yearOfStudy);
+
+    if (!positionId) throw badRequest("Choose the position you are applying for.");
+    if (!fullName) throw badRequest("Enter your name and surname.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw badRequest("Enter a valid email address.");
+    if (phone && !/^(\+27|0)[6-8]\d{8}$/.test(phone)) throw badRequest("Enter a South African mobile number.");
+    if (idNumber && !/^\d{13}$/.test(idNumber)) throw badRequest("Your ID number must be 13 digits.");
+    if (!studentNumber) throw badRequest("Enter your student number.");
+    if (!qualification) throw badRequest("Enter your qualification.");
+
+    const cv = files?.cv?.[0];
+    const idDocument = files?.idDocument?.[0];
+    const academicRecord = files?.academicRecord?.[0];
+    if (!cv || !idDocument || !academicRecord) {
+      throw badRequest("Upload your CV, ID document and academic record (PDF).");
+    }
+
+    const position = await prisma.position.findUnique({
+      where: { id: positionId },
+      select: { status: true, closingDate: true },
+    });
+    if (!isAcceptingApplications(position)) throw badRequest("This position is not accepting applications.");
+
+    const existing = await prisma.application.findFirst({ where: { email, positionId }, select: { id: true } });
+    if (existing) {
+      throw Object.assign(new Error("You have already applied for this position with this email address."), { statusCode: 409 });
+    }
+
+    // Skills are stored by name; new ones are added to the skills table.
+    const skillIds: string[] = [];
+    for (const name of parseSkills(body.skills)) {
+      const skill = await prisma.skill.upsert({ where: { name }, update: {}, create: { name } });
+      skillIds.push(skill.id);
+    }
+
+    const referenceCode = await this.newReferenceCode();
+    const stored: Array<StoredFile & { type: "CV" | "ID_COPY" | "ACADEMIC_RECORD" }> = [];
+    try {
+      stored.push({ type: "CV", ...(await storeDocument(referenceCode, cv)) });
+      stored.push({ type: "ID_COPY", ...(await storeDocument(referenceCode, idDocument)) });
+      stored.push({ type: "ACADEMIC_RECORD", ...(await storeDocument(referenceCode, academicRecord)) });
+
+      return await repository.create({
+        referenceCode, positionId, fullName, email,
+        phone: phone || undefined, idNumber: idNumber || undefined,
+        studentNumber, institution, qualification, yearOfStudy,
+        skillIds, documents: stored,
+      });
+    } catch (error) {
+      await Promise.all(stored.map((file) => removeDocument(file.fileUrl)));
+      throw error;
+    }
+  }
+
+  /** e.g. ICEP-2026-04821 (what the applicant uses to track the application). */
+  private async newReferenceCode() {
+    const year = new Date().getFullYear();
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const code = `ICEP-${year}-${String(Math.floor(10000 + Math.random() * 90000))}`;
+      if (!(await repository.referenceExists(code))) return code;
+    }
+    return `ICEP-${year}-${Date.now().toString().slice(-8)}`;
+  }
+
+  async getDocuments(id: string) {
+    const application = await this.get(id);
+    return application.documents.map(({ id: documentId, type, fileName, mimeType, sizeBytes, uploadedAt }) =>
+      ({ id: documentId, type, fileName, mimeType, sizeBytes, uploadedAt }));
+  }
+
+  async downloadDocument(id: string, documentId: string) {
+    const document = await repository.findDocument(id, documentId);
+    if (!document) throw Object.assign(new Error("Document not found"), { statusCode: 404 });
+    return { document, content: await readDocument(document.fileUrl) };
   }
 
   async updateProfile(id: string, input: ApplicationProfileUpdate) {
@@ -94,6 +216,7 @@ export class ApplicationService {
   async updateStatus(id: string, data: {
     status: ApplicationStatusValue;
     interviewAt?: string;
+    interviewVenue?: string;
     rejectionReason?: string;
     reviewedById?: string;
   }) {
@@ -114,6 +237,7 @@ export class ApplicationService {
     return repository.updateStatus(id, {
       status: data.status,
       ...(data.interviewAt ? { interviewAt: new Date(data.interviewAt) } : {}),
+      ...(data.interviewVenue?.trim() ? { interviewVenue: data.interviewVenue.trim() } : {}),
       ...(data.status === "REJECTED" ? { rejectionReason: data.rejectionReason!.trim() } : {}),
       ...(data.reviewedById ? { reviewedById: data.reviewedById } : {}),
     });
@@ -128,7 +252,8 @@ export class ApplicationService {
   rejectApplication(id: string, rejectionReason: string, reviewedById?: string) { return this.rejectApplicant(id, rejectionReason, reviewedById); }
 
   rejectApplicant(id: string, rejectionReason: string, reviewedById?: string) {
-    return this.updateStatus(id, { status: "REJECTED", rejectionReason, reviewedById });
+    // The reason is optional on the Applicants page.
+    return this.updateStatus(id, { status: "REJECTED", rejectionReason: rejectionReason?.trim() || "No reason given", reviewedById });
   }
 }
 

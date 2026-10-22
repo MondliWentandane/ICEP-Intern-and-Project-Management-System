@@ -55,8 +55,13 @@ export class ApplicationRepository {
     positionId: string; fullName: string; email: string; phone?: string;
     idNumber?: string; studentNumber: string; institution: string;
     qualification: string; yearOfStudy?: number; skillIds?: string[];
+    referenceCode?: string;
+    documents?: Array<{
+      type: "CV" | "ID_COPY" | "ACADEMIC_RECORD";
+      fileName: string; fileUrl: string; mimeType?: string; sizeBytes?: number;
+    }>;
   }) {
-    const { skillIds = [], ...application } = data;
+    const { skillIds = [], documents = [], ...application } = data;
     return prisma.application.create({
       data: {
         ...application,
@@ -64,9 +69,18 @@ export class ApplicationRepository {
         skills: skillIds.length
           ? { create: skillIds.map((skillId) => ({ skill: { connect: { id: skillId } } })) }
           : undefined,
+        documents: documents.length ? { create: documents } : undefined,
       },
       include: applicationInclude,
     });
+  }
+
+  referenceExists(referenceCode: string) {
+    return prisma.application.count({ where: { referenceCode } }).then((count) => count > 0);
+  }
+
+  findDocument(applicationId: string, documentId: string) {
+    return prisma.document.findFirst({ where: { id: documentId, applicationId } });
   }
 
   updateProfile(id: string, data: ApplicationProfileUpdate) {
@@ -90,6 +104,7 @@ export class ApplicationRepository {
   updateStatus(id: string, data: {
     status: ApplicationStatusValue;
     interviewAt?: Date | null;
+    interviewVenue?: string | null;
     rejectionReason?: string | null;
     reviewedById?: string;
   }) {

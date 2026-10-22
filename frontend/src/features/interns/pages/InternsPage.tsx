@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { apiErrorMessage, downloadApplicationDocument, fetchApplications, yearLabel, type ApiApplication } from "@/features/applicants/data/applicationsApi";
 
 /* ------------------------------ Styles ------------------------------ */
 
@@ -75,43 +76,29 @@ const CSS = `
 type Status = "Intern" | "Interviewee" | "Applicant" | "Past Intern";
 
 interface Intern {
-  id: number;
+  id: string;
   name: string;
   studentNo: string;
   campus: string;
   status: Status;
+  /** The full application from the database (details, position, skills, documents). */
+  application: ApiApplication;
 }
 
-const SEED: Omit<Intern, "id">[] = [
-  { name: "Sarah Johnson", studentNo: "21901234", campus: "Pretoria", status: "Intern" },
-  { name: "David Williams", studentNo: "21905678", campus: "Soshanguve South", status: "Interviewee" },
-  { name: "Emily Chen", studentNo: "21909012", campus: "eMalahleni", status: "Applicant" },
-  { name: "Mark Thompson", studentNo: "21903456", campus: "Mbombela", status: "Past Intern" },
-  { name: "Aisha Banda", studentNo: "21902123", campus: "Polokwane", status: "Intern" },
-  { name: "Kabelo Sithole", studentNo: "21904567", campus: "Ga-Rankuwa", status: "Intern" },
-  { name: "Naledi Khumalo", studentNo: "21906789", campus: "Pretoria", status: "Intern" },
-  { name: "Tshepo Mahlangu", studentNo: "21907890", campus: "Soshanguve North", status: "Past Intern" },
-];
-
-// Placeholder data (42 interns) – replace with your API response.
-const FIRST = ["Sarah","David","Emily","Mark","Aisha","Kabelo","Naledi","Tshepo","Lerato","Thabo","Zanele","Pieter","Nomsa","Sipho"];
-const LAST = ["Johnson","Williams","Chen","Thompson","Banda","Sithole","Khumalo","Mahlangu","Molefe","Nkosi","Naidoo","Botha","Dlamini","Mokoena"];
-const CAMPUS_LIST = ["Pretoria","Soshanguve South","eMalahleni","Mbombela","Polokwane","Ga-Rankuwa","Soshanguve North"];
-const STATUS_LIST: Status[] = ["Intern","Interviewee","Applicant","Past Intern","Intern","Intern"];
-
-const INTERNS: Intern[] = Array.from({ length: 42 }, (_, i) => {
-  const a = i % 8 < FIRST.length ? i % FIRST.length : 0;
-  return {
-    id: i,
-    name: i < SEED.length ? SEED[i].name : `${FIRST[(i * 5) % FIRST.length]} ${LAST[(i * 3 + Math.floor(i / 14)) % LAST.length]}`,
-    studentNo: i < SEED.length ? SEED[i].studentNo : String(21900000 + ((i * 397) % 9999)).padStart(8, "0"),
-    campus: i < SEED.length ? SEED[i].campus : CAMPUS_LIST[(i * 2 + a) % CAMPUS_LIST.length],
-    status: i < SEED.length ? SEED[i].status : STATUS_LIST[(i * 7) % STATUS_LIST.length],
-  };
-});
-
 const STATUSES: Status[] = ["Intern", "Interviewee", "Applicant", "Past Intern"];
-const CAMPUSES = Array.from(new Set(INTERNS.map((p) => p.campus)));
+const STATUS_FROM_API: Partial<Record<ApiApplication["status"], Status>> = {
+  PENDING: "Applicant",
+  INTERVIEWEE: "Interviewee",
+  ACCEPTED: "Intern",
+};
+
+/** Everyone who applied through the careers page (rejected applications are left out). */
+function toInterns(applications: ApiApplication[]): Intern[] {
+  return applications.flatMap((a) => {
+    const status = STATUS_FROM_API[a.status];
+    return status ? [{ id: a.id, name: a.fullName, studentNo: a.studentNumber, campus: a.position.campus.name, status, application: a }] : [];
+  });
+}
 
 const initials = (name: string) =>
   name
@@ -120,23 +107,16 @@ const initials = (name: string) =>
     .join("");
 
 const pillClass = (s: Status) => `pill ${s.replace(" ", "")}`;
+const fmt = (date?: string | null) =>
+  date ? new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const ago = (date: string) => {
+  const days = Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+  return days <= 0 ? "Today" : days === 1 ? "1 day ago" : `${days} days ago`;
+};
 
+// Downloads the CV the applicant uploaded with their application.
 function downloadCv(p: Intern) {
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>CV - ${p.name}</title>
-<style>body{font-family:Inter,Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#12263f}
-h1{margin:0;font-size:28px}h2{font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#16345a;border-bottom:2px solid #16345a;padding-bottom:4px;margin-top:28px}
-p{margin:6px 0}.m{color:#6b7a90}</style></head><body>
-<h1>${p.name}</h1>
-<p class="m">Student No. ${p.studentNo} &middot; ${p.studentNo}@tut4life.ac.za &middot; +27 82 123 4567 &middot; ${p.campus} Campus</p>
-<h2>Education</h2><p><b>BSc Computer Science</b>, 3rd Year</p><p>Information &amp; Communication Technology</p><p>Average mark: 78%</p>
-<h2>Internship</h2><p><b>ICEP Web Portal</b></p><p>Mentor: John Doe</p><p>01 Feb 2024 &ndash; 30 Nov 2024</p>
-</body></html>`;
-  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${p.name.replace(/\s+/g, "_")}_CV.html`;
-  a.click();
-  URL.revokeObjectURL(url);
+  return downloadApplicationDocument(p.application, "CV");
 }
 
 /* ---------------------------- Profile view ---------------------------- */
@@ -148,11 +128,27 @@ interface ProfileProps {
 
 function InternProfile({ intern, onBack }: ProfileProps) {
   const [downloaded, setDownloaded] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+  const a = intern.application;
+  const activity = [
+    { text: "Application submitted", at: a.createdAt },
+    ...(a.interviewAt ? [{ text: `Interview scheduled for ${fmt(a.interviewAt)}`, at: a.reviewedAt ?? a.updatedAt }] : []),
+    ...(a.status === "ACCEPTED" ? [{ text: "Application accepted", at: a.reviewedAt ?? a.updatedAt }] : []),
+  ].reverse();
 
-  const handleDownload = () => {
-    downloadCv(intern);
-    setDownloaded(true);
-    window.setTimeout(() => setDownloaded(false), 2500);
+  const handleDownload = async () => {
+    setDownloadError("");
+    setDownloading(true);
+    try {
+      await downloadCv(intern);
+      setDownloaded(true);
+      window.setTimeout(() => setDownloaded(false), 2500);
+    } catch (error) {
+      setDownloadError(apiErrorMessage(error, "The CV could not be downloaded."));
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -170,44 +166,46 @@ function InternProfile({ intern, onBack }: ProfileProps) {
 
           <div className="info">
             <div className="lbl">Email address</div>
-            <div className="val">{intern.studentNo}@tut4life.ac.za</div>
+            <div className="val">{a.email}</div>
             <div className="lbl">Phone number</div>
-            <div className="val">+27 82 123 4567</div>
+            <div className="val">{a.phone || "—"}</div>
             <div className="lbl">Campus</div>
             <div className="val">{intern.campus}</div>
           </div>
 
-          <button type="button" className={`dl${downloaded ? " ok" : ""}`} onClick={handleDownload}>
-            {downloaded ? "✓ CV downloaded" : "⬇ Download CV"}
+          <button type="button" className={`dl${downloaded ? " ok" : ""}`} onClick={() => void handleDownload()} disabled={downloading}>
+            {downloaded ? "✓ CV downloaded" : downloading ? "Downloading…" : "⬇ Download CV"}
           </button>
+          <div className="dl-msg">{downloadError}</div>
         </div>
 
         <div>
           <div className="card sec">
             <h3>Academic Background</h3>
             <div className="kv">
-              <div><small>Qualification</small><b>BSc Computer Science</b></div>
-              <div><small>Year of Study</small><b>3rd Year</b></div>
-              <div><small>Faculty</small><b>Information &amp; Communication Technology</b></div>
-              <div><small>Average Mark</small><b>78%</b></div>
+              <div><small>Qualification</small><b>{a.qualification}</b></div>
+              <div><small>Year of Study</small><b>{yearLabel(a.yearOfStudy) || "—"}</b></div>
+              <div><small>Institution</small><b>{a.institution}</b></div>
+              <div><small>Skills</small><b>{a.skills.map((s) => s.skill.name).join(", ") || "—"}</b></div>
             </div>
           </div>
 
           <div className="card sec">
             <h3>Internship Details</h3>
             <div className="kv">
-              <div><small>Assigned Project</small><b>ICEP Web Portal</b></div>
-              <div><small>Mentor</small><b>John Doe</b></div>
-              <div><small>Start Date</small><b>01 Feb 2024</b></div>
-              <div><small>Expected End Date</small><b>30 Nov 2024</b></div>
+              <div><small>Position</small><b>{a.position.title}</b></div>
+              <div><small>Department</small><b>{a.position.department.name}</b></div>
+              <div><small>Start Date</small><b>{fmt(a.position.intake.startDate)}</b></div>
+              <div><small>Expected End Date</small><b>{fmt(a.position.intake.endDate)}</b></div>
             </div>
           </div>
 
           <div className="card sec">
             <h3>Recent Activity</h3>
             <div className="act">
-              <div><i />Submitted Weekly Report (Week 4)<span>2 days ago</span></div>
-              <div><i />Attended Mentor Check-In<span>5 days ago</span></div>
+              {activity.map((item) => (
+                <div key={item.text}><i />{item.text}<span>{ago(item.at)}</span></div>
+              ))}
             </div>
           </div>
         </div>
@@ -224,7 +222,20 @@ export function InternsPage() {
   const [status, setStatus] = useState<"" | Status>("");
   const [perPage, setPerPage] = useState(8);
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Applicants and interns from the database (everyone who applied on the careers page).
+  const [INTERNS, setInterns] = useState<Intern[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    let active = true;
+    fetchApplications()
+      .then((data) => { if (active) setInterns(toInterns(data)); })
+      .catch((error: unknown) => { if (active) setLoadError(apiErrorMessage(error, "Could not load interns.")); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  const CAMPUSES = useMemo(() => Array.from(new Set(INTERNS.map((p) => p.campus))), [INTERNS]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -234,7 +245,7 @@ export function InternsPage() {
         (!campus || p.campus === campus) &&
         (!status || p.status === status)
     );
-  }, [query, campus, status]);
+  }, [INTERNS, query, campus, status]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
   const current = Math.min(page, pageCount);
@@ -315,7 +326,7 @@ export function InternsPage() {
                   <tbody>
                     {rows.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ color: "var(--muted)" }}>No interns found.</td>
+                        <td colSpan={6} style={{ color: "var(--muted)" }}>{loading ? "Loading interns…" : loadError || "No interns found."}</td>
                       </tr>
                     )}
                     {rows.map((p) => (
@@ -327,7 +338,7 @@ export function InternsPage() {
                           </div>
                         </td>
                         <td>{p.studentNo}</td>
-                        <td>{p.studentNo}@tut4life.ac.za</td>
+                        <td>{p.application.email}</td>
                         <td>{p.campus}</td>
                         <td><span className={pillClass(p.status)}>{p.status}</span></td>
                         <td>
