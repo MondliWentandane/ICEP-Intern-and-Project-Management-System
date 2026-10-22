@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent, type CSSProperties, type FormEve
 import { useAuth } from '@/hooks/useAuth'
 import { PlacementLetterPreview } from '@/features/placement-letter/PlacementLetterCard'
 import { placementLetterFileName, printPlacementLetter, type PlacementLetterDetails } from '@/features/placement-letter/placementLetter'
+import { acceptApplication, apiErrorMessage, fetchApplications, rejectApplication, scheduleInterview, yearLabel, type ApiApplication } from '../data/applicationsApi'
 
 /** frontend/src/features/applicants/pages/ApplicantsPage.tsx — page content only (no sidebar / top bar); styles are included below. */
 
@@ -85,8 +86,10 @@ const CSS = `
 
 type Status = 'Pending' | 'Interview' | 'Accepted' | 'Rejected'
 export interface Applicant {
-  id: number; name: string; studentNo: string; campus: string; course: string; level: string; date: string; status: Status
+  id: number | string; name: string; studentNo: string; campus: string; course: string; level: string; date: string; status: Status
   note?: string
+  /** Real application details (rows loaded from the database). */
+  reference?: string; email?: string; phone?: string; qualification?: string; institution?: string; positionTitle?: string
   /** true once the interview invitation email has been sent */
   interviewEmailSent?: boolean
   /** Date, time and venue chosen in the interview email. */
@@ -102,31 +105,26 @@ interface Interview { date: string; time: string; venue: string }
 interface Placement { department: string; startDate: string; endDate: string; acceptedAt: string; signatory: string }
 const DEPARTMENTS = ['Software Development', 'Cybersecurity & Informatics', 'Systems Engineering', 'Multimedia & Design']
 
-const BASE: Applicant[] = [
-  { id: 1, name: 'Thabo Molefe', studentNo: '210000000', campus: 'Soshanguve South', course: 'Computer Science', level: 'Diploma', date: '30 Sep 2026', status: 'Pending' },
-  { id: 2, name: 'Lerato Dlamini', studentNo: '217919317', campus: 'Arcadia', course: 'Information Technology', level: 'Diploma', date: '30 Sep 2026', status: 'Pending' },
-  { id: 3, name: 'Sipho Nkosi', studentNo: '225838634', campus: 'Mbombela', course: 'Computer Systems Eng.', level: 'Diploma', date: '29 Sep 2026', status: 'Interview' },
-  { id: 4, name: 'Naledi Khumalo', studentNo: '233757951', campus: 'Soshanguve North', course: 'Multimedia Computing', level: 'Diploma', date: '29 Sep 2026', status: 'Pending' },
-  { id: 5, name: 'Kabelo Sithole', studentNo: '241677268', campus: 'Ga-Rankuwa', course: 'Information Technology', level: 'Diploma', date: '28 Sep 2026', status: 'Accepted' },
-  { id: 6, name: 'Zanele Mokoena', studentNo: '249596585', campus: 'Polokwane', course: 'Informatics', level: 'Diploma', date: '27 Sep 2026', status: 'Pending' },
-  { id: 7, name: 'Tshepo Mahlangu', studentNo: '257515902', campus: 'Arcadia', course: 'Multimedia Computing', level: 'Diploma', date: '26 Sep 2026', status: 'Rejected' },
-  { id: 8, name: 'Palesa Radebe', studentNo: '265435219', campus: 'eMalahleni', course: 'Computer Science', level: 'Diploma', date: '26 Sep 2026', status: 'Pending' },
-]
-
-const FIRST = ['Lindiwe', 'Mpho', 'Themba', 'Nomsa', 'Bongani', 'Refilwe', 'Sizwe', 'Karabo', 'Ayanda', 'Lesedi', 'Given', 'Precious', 'Katlego', 'Thandi']
-const LAST = ['Ndlovu', 'Mokwena', 'Zulu', 'Baloyi', 'Maseko', 'Ngwenya', 'Molefe', 'Mthembu', 'Sebola', 'Tau', 'Dube', 'Shabalala', 'Mabasa', 'Letsoalo']
 const CAMPUSES = ['Soshanguve South', 'Arcadia', 'Mbombela', 'Soshanguve North', 'Ga-Rankuwa', 'Polokwane', 'eMalahleni']
 const COURSES = ['Computer Science', 'Information Technology', 'Computer Systems Eng.', 'Multimedia Computing', 'Informatics']
-const STATUSES: Status[] = ['Pending', 'Pending', 'Interview', 'Pending', 'Accepted', 'Rejected', 'Pending']
-// Sample data: the 8 rows from the design plus 28 generated ones (36 in total). Pass real data with the `applicants` prop.
-const SAMPLE: Applicant[] = [
-  ...BASE,
-  ...Array.from({ length: 28 }, (_, i): Applicant => ({
-    id: i + 9, name: `${FIRST[i % 14]} ${LAST[(i * 5 + 3) % 14]}`, studentNo: String(273354536 + i * 7919317),
-    campus: CAMPUSES[i % 7], course: COURSES[(i * 3) % 5], level: 'Diploma',
-    date: `${String(25 - (i >> 1)).padStart(2, '0')} Sep 2026`, status: STATUSES[i % 7],
-  })),
-]
+
+const STATUS_FROM_API: Record<ApiApplication['status'], Status> = { PENDING: 'Pending', INTERVIEWEE: 'Interview', ACCEPTED: 'Accepted', REJECTED: 'Rejected' }
+const pad2 = (n: number) => String(n).padStart(2, '0')
+/** Database application -> table row. */
+function toApplicant(a: ApiApplication): Applicant {
+  const at = a.interviewAt ? new Date(a.interviewAt) : null
+  return {
+    id: a.id, name: a.fullName, studentNo: a.studentNumber, campus: a.position.campus.name,
+    course: a.qualification, level: yearLabel(a.yearOfStudy) || a.institution,
+    date: new Date(a.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    status: STATUS_FROM_API[a.status],
+    note: a.rejectionReason ?? undefined,
+    interviewEmailSent: a.status === 'INTERVIEWEE',
+    interview: at ? { date: `${at.getFullYear()}-${pad2(at.getMonth() + 1)}-${pad2(at.getDate())}`, time: `${pad2(at.getHours())}:${pad2(at.getMinutes())}`, venue: a.interviewVenue ?? '' } : undefined,
+    reference: a.referenceCode, email: a.email, phone: a.phone ?? undefined, qualification: a.qualification,
+    institution: a.institution, positionTitle: a.position.title,
+  }
+}
 
 const P = {
   search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',
@@ -147,17 +145,17 @@ const initials = (n: string) => n.split(' ').map((w) => w[0]).join('')
 
 const today = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 type Dlg = null | { kind: 'add' } | { kind: 'view' | 'accept' | 'reject' | 'mailR' | 'mailI'; a: Applicant } | { kind: 'mailA'; a: Applicant; placement: Placement }
-const prog = (a: Applicant) => `${a.level} in ${a.course}`
+const prog = (a: Applicant) => a.qualification ?? `${a.level} in ${a.course}`
 const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-// Demo letter details. TODO: take reference, institution and position from the application once the API is connected.
+// Letter details come from the application (reference, institution, position).
 const letterDetails = (a: Applicant, p: Placement): PlacementLetterDetails => ({
   fullName: a.name,
-  reference: `ICEP-${p.acceptedAt.slice(0, 4)}-${String(a.id).slice(-5).padStart(5, '0')}`,
+  reference: a.reference ?? `ICEP-${p.acceptedAt.slice(0, 4)}-${String(a.id).slice(-5).padStart(5, '0')}`,
   studentNumber: a.studentNo,
-  institution: 'Tshwane University of Technology',
+  institution: a.institution ?? 'Tshwane University of Technology',
   qualification: prog(a),
-  positionTitle: `${a.course} Intern`,
+  positionTitle: a.positionTitle ?? `${a.course} Intern`,
   department: p.department,
   campus: a.campus,
   startDate: p.startDate,
@@ -386,10 +384,40 @@ function InterviewMail({ a, onClose, onSend }: { a: Applicant; onClose: () => vo
   )
 }
 
-export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant[] }) {
+export function ApplicantsPage({ applicants }: { applicants?: Applicant[] }) {
   const { user } = useAuth()
   const signatory = user?.name ?? 'WIL Coordinator'
-  const [rows, setRows] = useState(applicants)
+  const [rows, setRows] = useState<Applicant[]>(applicants ?? [])
+  // Applications submitted on the careers page, loaded from the database.
+  const [loading, setLoading] = useState(!applicants)
+  const [loadError, setLoadError] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (applicants) return
+    let active = true
+    fetchApplications()
+      .then((data) => { if (active) setRows(data.map(toApplicant)) })
+      .catch((error: unknown) => { if (active) setLoadError(apiErrorMessage(error, 'Could not load applicants.')) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [applicants])
+  // Saves a status change in the database, then shows the saved row.
+  const save = async (a: Applicant, request: () => Promise<ApiApplication>, extra: Partial<Applicant>, done: string) => {
+    if (busy) return
+    if (typeof a.id !== 'string') { setRows((r) => r.map((x) => (x.id === a.id ? { ...x, ...extra } : x))); setToast(done); return true }
+    setBusy(true)
+    try {
+      const saved = toApplicant(await request())
+      setRows((r) => r.map((x) => (x.id === a.id ? { ...x, ...saved, ...extra, interview: extra.interview ?? saved.interview } : x)))
+      setToast(done)
+      return true
+    } catch (error) {
+      setToast(apiErrorMessage(error, 'The change could not be saved.'))
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
   const [q, setQ] = useState('')
   const [campus, setCampus] = useState('')
   const [status, setStatus] = useState('')
@@ -418,23 +446,20 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
   const clearFilters = () => { setQ(''); setCampus(''); setStatus(''); setPage(1) }
 
   const close = () => setDlg(null)
-  const setStatusOf = (a: Applicant, s: Status, n?: string) =>
-    setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: s, ...(n ? { note: n } : {}) } : x)))
   // Accept: confirm + placement details -> review email (WIL placement letter attached) -> Send email marks the applicant Accepted.
-  const sendAccept = (a: Applicant, placement: Placement, to: string) => {
-    setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: 'Accepted', placement } : x)))
-    setToast(`Email with WIL placement letter sent to ${to}.`)
-    close()
+  const sendAccept = async (a: Applicant, placement: Placement, to: string) => {
+    if (await save(a, () => acceptApplication(String(a.id)), { status: 'Accepted', placement }, `Email with WIL placement letter sent to ${to}.`)) close()
   }
   // Interview: click Interview -> review the interview email -> Send email sets the status to Interview
   // and the Interview button disappears. Cancelling the email leaves the status as Pending.
-  const sendInterview = (a: Applicant, to: string, interview: Interview) => {
-    setRows((r) => r.map((x) => (x.id === a.id ? { ...x, status: 'Interview', interviewEmailSent: true, interview } : x)))
-    setToast(`Interview email sent to ${to}.`)
-    close()
+  const sendInterview = async (a: Applicant, to: string, interview: Interview) => {
+    const interviewAt = new Date(`${interview.date}T${interview.time}:00`).toISOString()
+    if (await save(a, () => scheduleInterview(String(a.id), interviewAt, interview.venue), { status: 'Interview', interviewEmailSent: true, interview }, `Interview email sent to ${to}.`)) close()
   }
   // Reject: confirm marks the applicant Rejected, then the rejection email can be reviewed and sent (or skipped with Cancel).
-  const confirmReject = (a: Applicant, n: string) => { setStatusOf(a, 'Rejected', n); setDlg({ kind: 'mailR', a }) }
+  const confirmReject = async (a: Applicant, n: string) => {
+    if (await save(a, () => rejectApplication(String(a.id), n), { status: 'Rejected', ...(n ? { note: n } : {}) }, 'Applicant rejected.')) setDlg({ kind: 'mailR', a })
+  }
   const add = (v: NewApplicant) => {
     setRows((r) => [{ id: Date.now(), ...v, date: today(), status: 'Pending' }, ...r])
     close(); setPage(1); setToast('Applicant added.')
@@ -494,7 +519,7 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
                     </td>
                   </tr>
                 ))}
-                {!shown.length && <tr><td colSpan={7} className="ap-empty">No applicants found</td></tr>}
+                {!shown.length && <tr><td colSpan={7} className="ap-empty">{loading ? 'Loading applicants…' : loadError || 'No applicants found'}</td></tr>}
               </tbody>
             </table></div>
             <div className="ap-ft">
@@ -525,7 +550,8 @@ export function ApplicantsPage({ applicants = SAMPLE }: { applicants?: Applicant
           {open(dlg.a.status) && <button className="ap-b ap-bp" onClick={() => setDlg({ kind: 'accept', a: dlg.a })}>Accept</button>}
         </>}>
           <dl className="ap-dd">
-            {([['Name', dlg.a.name], ['Student number', dlg.a.studentNo], ['Campus', dlg.a.campus], ['Course applied for', prog(dlg.a)], ['Submitted', dlg.a.date],
+            {([['Name', dlg.a.name], ['Student number', dlg.a.studentNo], ...(dlg.a.email ? [['Email', dlg.a.email]] : []), ...(dlg.a.phone ? [['Phone', dlg.a.phone]] : []),
+              ...(dlg.a.positionTitle ? [['Position', dlg.a.positionTitle]] : []), ['Campus', dlg.a.campus], ['Course applied for', prog(dlg.a)], ['Submitted', dlg.a.date],
               ['Status', <span className={`ap-pill s-${dlg.a.status}`}>{dlg.a.status}</span>]] as [string, ReactNode][]).map(([k, v]) => (
               <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
             ))}
