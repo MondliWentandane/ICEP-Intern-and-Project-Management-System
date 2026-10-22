@@ -1,7 +1,5 @@
 import { createContext, useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { User } from '@/types'
-import { getMockUserFromToken } from '@/api/services/mockAuth'
-import { isMockAuthEnabled } from '@/utils/authMode'
 import { tokenStorage } from '@/utils/tokenStorage'
 
 interface AuthContextValue { user: User | null; isAuthenticated: boolean; setSession: (token: string, user: User, remember?: boolean) => void; logout: () => void }
@@ -11,10 +9,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     if (previewRole) {
       return { id: 'local-preview', name: previewRole === 'mentor' ? 'Pat Naidoo' : 'Local preview', email: previewRole === 'mentor' ? 'pat.naidoo@icep.co.za' : 'preview@example.com', role: previewRole }
-    }
-    if (isMockAuthEnabled()) {
-      const stored = tokenStorage.get()
-      if (stored) return getMockUserFromToken(stored)
     }
     return null
   })

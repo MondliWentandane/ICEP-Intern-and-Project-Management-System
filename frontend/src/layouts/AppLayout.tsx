@@ -1,1 +1,0 @@
-export { DashboardLayout as default, DashboardLayout as AppLayout } from './DashboardLayout/DashboardLayout'

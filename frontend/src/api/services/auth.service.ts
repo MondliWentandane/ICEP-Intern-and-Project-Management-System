@@ -1,11 +1,8 @@
 import { apiClient, endpoints } from '@/api'
 import type { AuthResponse, LoginCredentials, User } from '@/types'
-import { isMockAuthEnabled } from '@/utils/authMode'
-import { mockLogin } from './mockAuth'
 
 export const Auth = {
   login: async (payload: LoginCredentials): Promise<AuthResponse> => {
-    if (isMockAuthEnabled()) return mockLogin(payload)
     const { data } = await apiClient.post<AuthResponse>(endpoints.auth.login, payload)
     return data
   },

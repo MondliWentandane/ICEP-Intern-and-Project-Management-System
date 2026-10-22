@@ -39,42 +39,54 @@ import { MyProfilePage } from '@/features/profile/pages/MyProfilePage.tsx'
 import { EditProfilePage } from '@/features/profile/pages/EditProfilePage.tsx'
 import { NotFoundPage } from '@/features/misc/NotFoundPage.tsx'
 
-const guarded = (roles: Array<'admin' | 'wil_handler' | 'mentor' | 'intern'>, element: import('react').ReactNode) => <ProtectedRoute allowedRoles={roles}>{element}</ProtectedRoute>
+const guarded = (roles: Array<'ADMIN' | 'WIL_HANDLER' | 'MENTOR' | 'INTERN'>, element: import('react').ReactNode) => <ProtectedRoute allowedRoles={roles}>{element}</ProtectedRoute>
 export const router = createBrowserRouter([
-  { path: '/', element: <PublicLayout />, children: [
-    { index: true, element: <HomePage /> }, { path: 'about', element: <AboutPage /> }, { path: 'careers', element: <CareersPage /> },
-    { path: 'careers/:positionId', element: <PositionDetailPage /> }, { path: 'contact', element: <ContactPage /> },
-    { path: 'track', element: <TrackLoginPage /> }, { path: 'track/:reference', element: <TrackApplicationPage /> },
-  ] },
+  {
+    path: '/', element: <PublicLayout />, children: [
+      { index: true, element: <HomePage /> }, { path: 'about', element: <AboutPage /> }, { path: 'careers', element: <CareersPage /> },
+      { path: 'careers/:positionId', element: <PositionDetailPage /> }, { path: 'contact', element: <ContactPage /> },
+      { path: 'track', element: <TrackLoginPage /> }, { path: 'track/:reference', element: <TrackApplicationPage /> },
+    ]
+  },
   // The application form is a pop-up (?apply=…) mounted in PublicLayout; these paths redirect to it.
   { path: '/careers/:positionId/apply/*', element: <ApplyPage /> }, { path: '/apply/*', element: <ApplyPage /> },
-  { element: <AuthLayout />, children: [
-    { path: '/login', element: <LoginPage /> }, { path: '/forgot-password', element: <ForgotPasswordPage /> },
-    // The account email links to /reset-password?token=…; the path-token forms are kept for older links.
-    { path: '/reset-password', element: <SetPasswordPage /> },
-    { path: '/create-password/:token', element: <SetPasswordPage /> }, { path: '/set-password/:token', element: <SetPasswordPage /> },
-  ] },
-  { path: '/handler', element: guarded(['wil_handler'], <DashboardLayout />), children: [
-    { path: 'dashboard', element: <HandlerDashboardPage /> }, { path: 'applicants', element: <ApplicantsPage /> }, { path: 'interns', element: <InternsPage /> },
-    { path: 'interns/:internId', element: <InternProfilePage /> }, { path: 'campuses', element: <CampusesIntakesPage /> }, { path: 'past-interns', element: <PastInternsPage /> },
-    { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
-  ] },
-  { path: '/admin', element: guarded(['admin'], <DashboardLayout />), children: [
-    { path: 'dashboard', element: <AdminDashboardPage /> }, { path: 'applicants', element: <ApplicantsPage /> }, { path: 'interns', element: <InternsPage /> },
-    { path: 'interns/:internId', element: <InternProfilePage /> }, { path: 'campuses', element: <CampusesIntakesPage /> }, { path: 'past-interns', element: <PastInternsPage /> },
-    { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'team-builder/:projectId', element: <TeamBuilderPage /> },
-    { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> }, { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> },
-    { path: 'reports', element: <ReportsPage /> }, { path: 'users', element: <UsersPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'emails', element: <EmailTemplatesPage /> },
-    { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
-  ] },
-  { path: '/mentor', element: guarded(['mentor'], <DashboardLayout />), children: [
-    { path: 'dashboard', element: <MentorDashboardPage /> }, { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> },
-    { path: 'team-builder/:projectId', element: <TeamBuilderPage /> }, { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> },
-    { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
-  ] },
-  { path: '/intern', element: guarded(['intern'], <DashboardLayout />), children: [
-    { path: 'project', element: <MyProjectPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'tasks', element: <InternTaskBoardPage /> },
-    { path: 'calendar', element: <CalendarPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
-  ] },
+  {
+    element: <AuthLayout />, children: [
+      { path: '/login', element: <LoginPage /> }, { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      // The account email links to /reset-password?token=…; the path-token forms are kept for older links.
+      { path: '/reset-password', element: <SetPasswordPage /> },
+      { path: '/create-password/:token', element: <SetPasswordPage /> }, { path: '/set-password/:token', element: <SetPasswordPage /> },
+    ]
+  },
+  {
+    path: '/handler', element: guarded(['WIL_HANDLER'], <DashboardLayout />), children: [
+      { path: 'dashboard', element: <HandlerDashboardPage /> }, { path: 'applicants', element: <ApplicantsPage /> }, { path: 'interns', element: <InternsPage /> },
+      { path: 'interns/:internId', element: <InternProfilePage /> }, { path: 'campuses', element: <CampusesIntakesPage /> }, { path: 'past-interns', element: <PastInternsPage /> },
+      { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+    ]
+  },
+  {
+    path: '/admin', element: guarded(['ADMIN'], <DashboardLayout />), children: [
+      { path: 'dashboard', element: <AdminDashboardPage /> }, { path: 'applicants', element: <ApplicantsPage /> }, { path: 'interns', element: <InternsPage /> },
+      { path: 'interns/:internId', element: <InternProfilePage /> }, { path: 'campuses', element: <CampusesIntakesPage /> }, { path: 'past-interns', element: <PastInternsPage /> },
+      { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'team-builder/:projectId', element: <TeamBuilderPage /> },
+      { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> }, { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> },
+      { path: 'reports', element: <ReportsPage /> }, { path: 'users', element: <UsersPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'emails', element: <EmailTemplatesPage /> },
+      { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+    ]
+  },
+  {
+    path: '/mentor', element: guarded(['MENTOR'], <DashboardLayout />), children: [
+      { path: 'dashboard', element: <MentorDashboardPage /> }, { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> },
+      { path: 'team-builder/:projectId', element: <TeamBuilderPage /> }, { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> },
+      { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+    ]
+  },
+  {
+    path: '/intern', element: guarded(['INTERN'], <DashboardLayout />), children: [
+      { path: 'project', element: <MyProjectPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'tasks', element: <InternTaskBoardPage /> },
+      { path: 'calendar', element: <CalendarPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+    ]
+  },
   { path: '/403', element: <NotFoundPage /> }, { path: '*', element: <NotFoundPage /> },
 ])

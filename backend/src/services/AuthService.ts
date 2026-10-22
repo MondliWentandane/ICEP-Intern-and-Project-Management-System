@@ -1,6 +1,6 @@
 
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 import crypto from "crypto";
 import { authRepository } from "../repositories/AuthRepository";
 
@@ -59,13 +59,14 @@ export class AuthService {
       );
     }
 
+        const expiresIn = (
+      process.env.JWT_EXPIRES_IN || "1h"
+    ) as SignOptions["expiresIn"];
+
     const token = jwt.sign(
-      {
-        sub: user.id,
-        role: user.role,
-      },
+      { sub: user.id, role: user.role },
       secret,
-      { expiresIn: "1h" },
+      { expiresIn }
     );
 
     await authRepository.updateLastLogin(user.id);
@@ -74,7 +75,7 @@ export class AuthService {
       token,
       user: {
         id: user.id,
-        fullName: user.fullName,
+        name: user.fullName,
         email: user.email,
         role: user.role,
       },

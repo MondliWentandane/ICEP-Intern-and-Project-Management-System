@@ -7,6 +7,11 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootDir, '')
   const target = env.VITE_API_PROXY_TARGET
+
+  // ADD THESE TWO LINES:
+  console.log("=== CHECKING VITE PROXY ===")
+  console.log("TARGET IS:", target)
+
   return {
     plugins: [react()],
     resolve: { alias: { '@': path.resolve(rootDir, 'src') } },

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Alert, Box, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, LinearProgress, Typography, useMediaQuery } from '@mui/material'
 import { keyframes } from '@emotion/react'
+import axios from 'axios'
 import { useTheme } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
 import { Check, ClipboardCheck, LogIn, Mail, X } from 'lucide-react'
@@ -93,8 +94,10 @@ function ApplicationDialogBody({ target }: { target: string }) {
     try {
       setSubmitted(await submitApplication(values, position))
       scrollTop()
-    } catch {
-      setSubmitError('We could not submit your application. Check your connection and try again.')
+    } catch (error) {
+      // Show the backend's reason (e.g. already applied, position closed) when there is one.
+      const reason = axios.isAxiosError(error) ? (error.response?.data as { error?: string; message?: string } | undefined) : undefined
+      setSubmitError(reason?.error || reason?.message || 'We could not submit your application. Check your connection and try again.')
     }
   }, () => {
     // Something on an earlier step became invalid; jump to the first step with an error.

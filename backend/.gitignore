@@ -25,3 +25,4 @@ src/generated/
 
 # Compiled output
 dist/
+uploads/
