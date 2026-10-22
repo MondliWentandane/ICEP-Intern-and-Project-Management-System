@@ -5,4 +5,4 @@ export function TeamBuilderPage() {
   return <PageScaffold title="Team builder" />
 }
 
-export default TeamBuilderPage
+export default TeamBuilderPage;
