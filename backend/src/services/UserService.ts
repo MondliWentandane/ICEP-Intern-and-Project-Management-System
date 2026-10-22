@@ -1,11 +1,11 @@
-// Admin "Users" page: staff accounts (Admin, WIL Handler, Mentor).
-// Interns are not added here: their account is created when an application is accepted.
+// Admin "Users" page: staff accounts (WIL Handler, Mentor).
+// Not added here: the admin is created once by the seed script (prisma/seed.ts), and interns get their account when an application is accepted.
 // New staff get no password; they are emailed a one-time link to set one (EmailService.sendPasswordSetupLink).
 import { userRepository, type StaffRole } from "../repositories/UserRepository";
 import { EmailService } from "./EmailService";
 
 const emailService = new EmailService();
-const staffRoles: StaffRole[] = ["ADMIN", "WIL_HANDLER", "MENTOR"];
+const staffRoles: StaffRole[] = ["WIL_HANDLER", "MENTOR"];
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const httpError = (statusCode: number, message: string) => Object.assign(new Error(message), { statusCode });
@@ -40,7 +40,7 @@ export class UserService {
     if (fullName.length < 2) throw httpError(400, "Enter the user's full name.");
     if (!emailPattern.test(email)) throw httpError(400, "Enter a valid email address.");
     if (!staffRoles.includes(role)) {
-      throw httpError(400, "Role must be Administrator, WIL Handler or Mentor. Intern accounts are created when an application is accepted.");
+      throw httpError(400, "Role must be WIL Handler or Mentor. The administrator is set up by the system, and intern accounts are created when an application is accepted.");
     }
     if (role === "MENTOR" && (!departmentId || !(await userRepository.departmentExists(departmentId)))) {
       throw httpError(400, "Choose the mentor's department.");

@@ -23,8 +23,9 @@ const statusBadgeStyles: Record<UserStatus, { bgcolor: string; color: string }> 
   INACTIVE: { bgcolor: '#E5E7EB', color: '#374151' },
 }
 
-// Intern accounts are created when an application is accepted, so they are not offered when adding a user by hand.
-const assignableRoles: StaffRole[] = ['ADMIN', 'WIL_HANDLER', 'MENTOR']
+// Only WIL handlers and mentors are added here: the admin is created once by the backend seed script,
+// and intern accounts are created when an application is accepted.
+const assignableRoles: StaffRole[] = ['WIL_HANDLER', 'MENTOR']
 const headerCellSx = { py: 1.5, fontSize: 12, fontWeight: 700, color: 'var(--icep-secondary)', textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' } as const
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -166,7 +167,7 @@ export function UsersPage() {
             helperText={departmentsQuery.isError ? 'Departments could not be loaded.' : undefined} error={departmentsQuery.isError}>
             {(departmentsQuery.data ?? []).map((department) => <MenuItem key={department.id} value={department.id}>{department.name}</MenuItem>)}
           </TextField>}
-          <Typography sx={{ fontSize: 13, color: 'var(--icep-secondary)' }}>Interns are not added here: their account is created when their application is accepted.</Typography>
+          <Typography sx={{ fontSize: 13, color: 'var(--icep-secondary)' }}>Only WIL handlers and mentors are added here. Intern accounts are created when their application is accepted.</Typography>
         </Box></DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button appearance="secondary" disabled={create.isPending} onClick={() => setDialogOpen(false)}>Cancel</Button>

@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma";
 
-export type StaffRole = "ADMIN" | "WIL_HANDLER" | "MENTOR";
+/** Roles an admin can add on the Users page. The admin itself comes from the seed script; interns from accepted applications. */
+export type StaffRole = "WIL_HANDLER" | "MENTOR";
 
 // Never select passwordHash: the Users page only needs to know whether a password has been set.
 const userSelect = {

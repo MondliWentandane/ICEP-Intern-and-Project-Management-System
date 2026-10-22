@@ -4,7 +4,8 @@ import axios from 'axios'
 import { apiClient, endpoints } from '@/api'
 
 export type UserRole = 'ADMIN' | 'WIL_HANDLER' | 'MENTOR' | 'INTERN'
-export type StaffRole = Exclude<UserRole, 'INTERN'>
+/** Roles an admin can add. The admin comes from the backend seed script; interns from accepted applications. */
+export type StaffRole = Exclude<UserRole, 'ADMIN' | 'INTERN'>
 /** INVITED = account created, password not set yet. */
 export type UserStatus = 'INVITED' | 'ACTIVE' | 'INACTIVE'
 
