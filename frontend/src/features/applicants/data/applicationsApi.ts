@@ -35,6 +35,8 @@ export interface ApiApplication {
   }
   skills: Array<{ skill: { name: string } }>
   documents: Array<{ id: string; type: 'CV' | 'ID_COPY' | 'ACADEMIC_RECORD' | string; fileName: string; mimeType?: string | null; sizeBytes?: number | null; uploadedAt?: string }>
+  /** Returned after an interview or rejection: whether the email to the applicant went out. */
+  emailSent?: boolean
 }
 
 export const fetchApplications = async () => (await apiClient.get<ApiApplication[]>(endpoints.applicants)).data

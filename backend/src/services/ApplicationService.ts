@@ -6,6 +6,7 @@ import {
   type ApplicationStatusValue,
 } from "../repositories/ApplicationRepository";
 import { prisma } from "../config/prisma";
+import { EmailService } from "./EmailService";
 import { readDocument, removeDocument, storeDocument, type StoredFile } from "./DocumentStorage";
 
 type UploadedFiles = Record<string, Express.Multer.File[] | undefined> | undefined;
@@ -41,6 +42,7 @@ const isAcceptingApplications = (position: { status: string; closingDate: Date }
   Boolean(position && position.status === "OPEN" && position.closingDate.getTime() + DAY_MS > Date.now());
 
 const repository = new ApplicationRepository();
+const emailService = new EmailService();
 const transitions: Record<ApplicationStatusValue, ApplicationStatusValue[]> = {
   PENDING: ["INTERVIEWEE", "ACCEPTED", "REJECTED"],
   INTERVIEWEE: ["ACCEPTED", "REJECTED", "PENDING"],
@@ -263,13 +265,25 @@ export class ApplicationService {
     if (data.status === "REJECTED" && !data.rejectionReason?.trim()) {
       throw Object.assign(new Error("rejectionReason is required when rejecting an application"), { statusCode: 400 });
     }
-    return repository.updateStatus(id, {
+    const updated = await repository.updateStatus(id, {
       status: data.status,
       ...(data.interviewAt ? { interviewAt: new Date(data.interviewAt) } : {}),
       ...(data.interviewVenue?.trim() ? { interviewVenue: data.interviewVenue.trim() } : {}),
       ...(data.status === "REJECTED" ? { rejectionReason: data.rejectionReason!.trim() } : {}),
       ...(data.reviewedById ? { reviewedById: data.reviewedById } : {}),
     });
+
+    // Tell the applicant. The decision is already saved, so a failed email doesn't undo it:
+    // the response says emailSent: false and the page can warn the reviewer.
+    if (data.status !== "INTERVIEWEE" && data.status !== "REJECTED") return updated;
+    try {
+      if (data.status === "INTERVIEWEE") await emailService.sendInterviewInvite(id);
+      else await emailService.sendRejectionEmail(id);
+      return { ...updated, emailSent: true };
+    } catch (error) {
+      console.error(`${data.status} email failed for application ${id}:`, error);
+      return { ...updated, emailSent: false };
+    }
   }
 
   acceptApplication(id: string, reviewedById?: string) { return this.acceptApplicant(id, reviewedById); }
