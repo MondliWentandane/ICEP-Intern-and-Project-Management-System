@@ -1,6 +1,7 @@
 import { OutlookService } from './OutlookService';
 import { prisma } from '../config/prisma';
 import crypto from 'crypto';
+import { placementLetterService } from './PlacementLetterService';
 
 /** Plain-text templates get line breaks; HTML templates are used as they are. */
 const asHtml = (text: string) => (/<[a-z][\s\S]*>/i.test(text) ? text : text.split('\n').join('<br>'));
@@ -33,11 +34,31 @@ export class EmailService {
 
         const setupLink = await this.createPasswordSetupLink(application.intern.userId);
         const subject = template.subject.split('{{fullName}}').join(application.fullName);
-        const htmlContent = asHtml(template.body
+        let htmlContent = asHtml(template.body
             .split('{{fullName}}').join(escapeHtml(application.fullName))
             .split('{{passwordLink}}').join(setupLink));
 
-        const sent = await this.outlookService.sendEmail(application.email, subject, htmlContent);
+        // The WIL placement letter goes with it as a PDF. If it can't be built, the welcome email
+        // (with the set-password link) still goes out; the letter stays available on Track application.
+        let letter: { fileName: string; pdf: Buffer } | null = null;
+        try {
+            letter = await placementLetterService.generate(application.id);
+        } catch (error) {
+            console.error(`Placement letter could not be generated for application ${application.id}:`, error);
+        }
+        if (letter) {
+            const note =
+                `<p style="color: #555555; font-size: 16px; line-height: 1.5;">` +
+                `Your <strong>WIL placement letter</strong> is attached. Please submit it to your institution's WIL / experiential learning office.</p>`;
+            // Before the closing line (the last paragraph), like the interview details.
+            const lastParagraph = htmlContent.lastIndexOf('<p');
+            htmlContent = lastParagraph > htmlContent.indexOf('<p')
+                ? htmlContent.slice(0, lastParagraph) + note + htmlContent.slice(lastParagraph)
+                : htmlContent + note;
+        }
+
+        const sent = await this.outlookService.sendEmail(application.email, subject, htmlContent,
+            letter ? [{ filename: letter.fileName, content: letter.pdf, contentType: 'application/pdf' }] : undefined);
         await this.logEmail(template.id, application.email, subject, sent, application.id);
         if (!sent) throw new Error(`Failed to send email to ${application.email}`);
     }
