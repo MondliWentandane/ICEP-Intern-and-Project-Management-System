@@ -25,12 +25,23 @@ interface TeamMember {
   colorClass: string
 }
 
+// Same values as the ProjectStatus enum in the Prisma schema.
+type ProjectStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD'
+
+const statusLabels: Record<ProjectStatus, string> = {
+  PLANNED: 'Planned',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+  ON_HOLD: 'On Hold',
+}
+
 interface ProjectItem {
   id: string
   name: string
-  department: string
+  groupName?: string
+  description?: string
   team: TeamMember[]
-  status: 'On Track' | 'At Risk' | 'Pending Review'
+  status: ProjectStatus
   progress: number
   dueDate: string
   colorClass: string
@@ -49,13 +60,13 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-1',
     name: 'Software Dev Alpha',
-    department: 'Software Engineering',
+    groupName: 'Group A',
     team: [
       { initials: 'MS', colorClass: styles.avatarMS },
       { initials: 'TM', colorClass: styles.avatarTM },
       { initials: 'JS', colorClass: styles.avatarJS },
     ],
-    status: 'On Track',
+    status: 'IN_PROGRESS',
     progress: 75,
     dueDate: 'Nov 15',
     colorClass: styles.barBlue,
@@ -63,12 +74,12 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-2',
     name: 'Network Security Audit',
-    department: 'Cybersecurity',
+    groupName: 'Group B',
     team: [
       { initials: 'RJ', colorClass: styles.avatarRJ },
       { initials: 'MS', colorClass: styles.avatarMS },
     ],
-    status: 'At Risk',
+    status: 'ON_HOLD',
     progress: 30,
     dueDate: 'Oct 28',
     colorClass: styles.barOrange,
@@ -76,12 +87,12 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-3',
     name: 'Data Migration Phase 2',
-    department: 'Informatics',
+    groupName: 'Group C',
     team: [
       { initials: 'TN', colorClass: styles.avatarTN },
       { initials: 'AB', colorClass: styles.avatarAB },
     ],
-    status: 'Pending Review',
+    status: 'IN_PROGRESS',
     progress: 95,
     dueDate: 'Oct 12',
     colorClass: styles.barGreen,
@@ -89,13 +100,13 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-4',
     name: 'Mobile App Beta',
-    department: 'Software Engineering',
+    groupName: 'Group D',
     team: [
       { initials: 'JS', colorClass: styles.avatarJS },
       { initials: 'MS', colorClass: styles.avatarMS },
       { initials: 'TM', colorClass: styles.avatarTM },
     ],
-    status: 'On Track',
+    status: 'IN_PROGRESS',
     progress: 45,
     dueDate: 'Dec 01',
     colorClass: styles.barBlue,
@@ -154,10 +165,13 @@ export function MentorDashboardPage() {
   // New Project modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [projectName, setProjectName] = useState('')
-  const [department, setDepartment] = useState('Software Engineering')
-  const [status, setStatus] = useState<'On Track' | 'At Risk' | 'Pending Review'>('On Track')
-  const [dueDate, setDueDate] = useState('')
+  const [groupName, setGroupName] = useState('')
+  const [description, setDescription] = useState('')
+  const [status, setStatus] = useState<ProjectStatus>('PLANNED')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [progress, setProgress] = useState(0)
+  const [formError, setFormError] = useState('')
 
   // Feedback toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -179,37 +193,46 @@ export function MentorDashboardPage() {
     setMenuAnchorEl(null)
   }
 
+  const resetForm = () => {
+    setProjectName('')
+    setGroupName('')
+    setDescription('')
+    setStatus('PLANNED')
+    setStartDate('')
+    setEndDate('')
+    setProgress(0)
+    setFormError('')
+  }
+
+  const formatShortDate = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+
+  // The department, supervisor and creator are not asked for here: the backend takes them
+  // from the signed-in mentor.
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!projectName.trim()) return
+    if (!projectName.trim()) { setFormError('Enter a project name.'); return }
+    if (startDate && endDate && endDate < startDate) { setFormError('The end date cannot be before the start date.'); return }
 
     const colorClass =
-      status === 'At Risk'
-        ? styles.barOrange
-        : status === 'Pending Review'
-        ? styles.barGreen
-        : styles.barBlue
+      status === 'ON_HOLD' ? styles.barOrange : status === 'COMPLETED' ? styles.barGreen : styles.barBlue
 
     const newProject: ProjectItem = {
       id: `proj-${Date.now()}`,
       name: projectName.trim(),
-      department,
-      team: [
-        { initials: 'PN', colorClass: styles.avatarMS },
-        { initials: 'MS', colorClass: styles.avatarJS },
-      ],
+      groupName: groupName.trim() || undefined,
+      description: description.trim() || undefined,
+      team: [],
       status,
-      progress: Number(progress) || 10,
-      dueDate: dueDate || 'Dec 15',
+      progress: Math.min(100, Math.max(0, Number(progress) || 0)),
+      dueDate: endDate ? formatShortDate(endDate) : '—',
       colorClass,
     }
 
     setProjects([newProject, ...projects])
     setActiveProjectsCount((prev) => prev + 1)
     setIsModalOpen(false)
-    setProjectName('')
-    setProgress(0)
-    setDueDate('')
+    resetForm()
     setToastMessage(`Project "${newProject.name}" successfully created!`)
   }
 
@@ -361,9 +384,9 @@ export function MentorDashboardPage() {
               <tbody>
                 {projects.map((proj) => {
                   const statusClass =
-                    proj.status === 'On Track'
+                    proj.status === 'IN_PROGRESS' || proj.status === 'COMPLETED'
                       ? styles.statusOnTrack
-                      : proj.status === 'At Risk'
+                      : proj.status === 'ON_HOLD'
                       ? styles.statusAtRisk
                       : styles.statusPendingReview
 
@@ -372,7 +395,7 @@ export function MentorDashboardPage() {
                       <td>
                         <div className={styles.projectInfo}>
                           <span className={styles.projectName}>{proj.name}</span>
-                          <span className={styles.projectDepartment}>{proj.department}</span>
+                          {proj.groupName && <span className={styles.projectDepartment}>{proj.groupName}</span>}
                         </div>
                       </td>
                       <td>
@@ -390,7 +413,7 @@ export function MentorDashboardPage() {
                       </td>
                       <td>
                         <span className={`${styles.statusBadge} ${statusClass}`}>
-                          {proj.status}
+                          {statusLabels[proj.status]}
                         </span>
                       </td>
                       <td>
@@ -503,13 +526,13 @@ export function MentorDashboardPage() {
       {/* New Project Modal */}
       <Modal
         open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); resetForm() }}
         title="Create New Project"
         maxWidth="sm"
         fullWidth
         actions={
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
-            <Button appearance="secondary" onClick={() => setIsModalOpen(false)}>
+            <Button appearance="secondary" onClick={() => { setIsModalOpen(false); resetForm() }}>
               Cancel
             </Button>
             <Button appearance="primary" onClick={handleCreateProject}>
@@ -520,6 +543,7 @@ export function MentorDashboardPage() {
       >
         <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
           <form className={styles.modalForm} onSubmit={handleCreateProject} id="new-project-form">
+            {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
             <div className={styles.formGroup}>
               <label htmlFor="project-name-input" className={styles.formLabel}>
                 Project Name
@@ -536,69 +560,92 @@ export function MentorDashboardPage() {
             </div>
 
             <div className={styles.formGroup}>
-              <label htmlFor="department-select" className={styles.formLabel}>
-                Department
+              <label htmlFor="group-name-input" className={styles.formLabel}>
+                Group Name (optional)
               </label>
-              <select
-                id="department-select"
-                className={styles.formSelect}
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-              >
-                <option value="Software Engineering">Software Engineering</option>
-                <option value="Cybersecurity">Cybersecurity</option>
-                <option value="Informatics">Informatics</option>
-                <option value="Multimedia Computing">Multimedia Computing</option>
-                <option value="Computer Science">Computer Science</option>
-              </select>
+              <input
+                id="group-name-input"
+                type="text"
+                className={styles.formInput}
+                placeholder="e.g. Group A"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="description-input" className={styles.formLabel}>
+                Description (optional)
+              </label>
+              <textarea
+                id="description-input"
+                className={styles.formInput}
+                rows={3}
+                placeholder="What is this project about?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
 
             <div className={styles.formGroup}>
               <label htmlFor="status-select" className={styles.formLabel}>
-                Initial Status
+                Status
               </label>
               <select
                 id="status-select"
                 className={styles.formSelect}
                 value={status}
-                onChange={(e) => setStatus(e.target.value as 'On Track' | 'At Risk' | 'Pending Review')}
+                onChange={(e) => setStatus(e.target.value as ProjectStatus)}
               >
-                <option value="On Track">On Track</option>
-                <option value="Pending Review">Pending Review</option>
-                <option value="At Risk">At Risk</option>
+                {(Object.keys(statusLabels) as ProjectStatus[]).map((value) => (
+                  <option key={value} value={value}>{statusLabels[value]}</option>
+                ))}
               </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className={styles.formGroup}>
-                <label htmlFor="due-date-input" className={styles.formLabel}>
-                  Target Due Date
+                <label htmlFor="start-date-input" className={styles.formLabel}>
+                  Start Date
                 </label>
                 <input
-                  id="due-date-input"
-                  type="text"
+                  id="start-date-input"
+                  type="date"
                   className={styles.formInput}
-                  placeholder="e.g. Nov 30"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label htmlFor="progress-input" className={styles.formLabel}>
-                  Initial Progress (%)
+                <label htmlFor="end-date-input" className={styles.formLabel}>
+                  End Date
                 </label>
                 <input
-                  id="progress-input"
-                  type="number"
-                  min="0"
-                  max="100"
+                  id="end-date-input"
+                  type="date"
                   className={styles.formInput}
-                  placeholder="0 - 100"
-                  value={progress || ''}
-                  onChange={(e) => setProgress(Number(e.target.value))}
+                  min={startDate || undefined}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="progress-input" className={styles.formLabel}>
+                Progress (%)
+              </label>
+              <input
+                id="progress-input"
+                type="number"
+                min="0"
+                max="100"
+                className={styles.formInput}
+                placeholder="0 - 100"
+                value={progress || ''}
+                onChange={(e) => setProgress(Number(e.target.value))}
+              />
             </div>
           </form>
         </DialogContent>
