@@ -1,4 +1,6 @@
-import { Alert, Avatar, Box, Button, Card, CardContent, Chip, Link, Stack, Typography } from '@mui/material'
+import { useState } from 'react'
+import { Alert, Avatar, Box, Button, Card, CardContent, Chip, Link, Stack, TextField, Typography } from '@mui/material'
+import { apiErrorMessage, reinstateInternship } from '@/features/applicants/data/applicationsApi'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, FileText } from 'lucide-react'
 import { Interns } from '@/api/services/interns.service'
@@ -8,6 +10,54 @@ import { sampleInterns } from '@/features/shared/workspace/sample'
 import { isPastIntern } from '@/features/shared/workspace/status'
 import { useRecord } from '@/features/shared/workspace/useList'
 import type { InternView } from '@/features/shared/workspace/types'
+
+const todayYmd = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(new Date())
+
+/** Reinstates an ended internship with a new end date (ended by mistake, or extended): they can log in again. */
+function ReinstatePanel({ internId, name }: { internId: string; name: string }) {
+  const [open, setOpen] = useState(false)
+  const [endDate, setEndDate] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  const submit = async () => {
+    setError('')
+    setSaving(true)
+    try {
+      await reinstateInternship(internId, endDate)
+      setDone(true)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'The internship could not be reinstated.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (done) return <Alert severity="success" sx={{ mb: 2 }}>{name} is an active intern again until {formatDate(endDate)} and can log in. They are back on the Interns page.</Alert>
+  return (
+    <Card variant="outlined" sx={{ mb: 2 }}>
+      <CardContent>
+        {!open ? (
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+            <Typography color="text.secondary">Ended by mistake, or has the internship been extended? Reinstate it with a new end date.</Typography>
+            <Button variant="outlined" onClick={() => setOpen(true)} sx={{ flex: 'none' }}>Reinstate internship</Button>
+          </Stack>
+        ) : (
+          <Stack spacing={2}>
+            <TextField type="date" label="New end date" value={endDate} onChange={(event) => setEndDate(event.target.value)}
+              slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: todayYmd() } }} sx={{ maxWidth: 260 }} />
+            {error && <Alert severity="error">{error}</Alert>}
+            <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'flex-end' }}>
+              <Button onClick={() => { setOpen(false); setError('') }} disabled={saving}>Cancel</Button>
+              <Button variant="contained" onClick={() => void submit()} disabled={saving || !endDate}>{saving ? 'Saving…' : 'Reinstate'}</Button>
+            </Stack>
+          </Stack>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export function InternProfilePage() {
   const { internId = '' } = useParams()
@@ -28,6 +78,8 @@ export function InternProfilePage() {
   }
 
   const past = isPastIntern(intern.status)
+  // Only ADMIN and WIL_HANDLER can end or reinstate internships (mentors also open this page).
+  const canReinstate = roleBase === '/admin' || roleBase === '/handler'
   const supervisor = intern.mentorName ?? intern.supervisor
   const department = intern.department
 
@@ -60,6 +112,7 @@ export function InternProfilePage() {
           {intern.ending ? ` · ${intern.ending.outcome}${intern.ending.reason ? `: ${intern.ending.reason}` : ''}${intern.ending.endedBy ? ` (ended by ${intern.ending.endedBy})` : ''}` : ''}. This profile is read-only history.
         </Alert>
       )}
+      {past && canReinstate && !usingSample && <ReinstatePanel internId={intern.id} name={intern.fullName} />}
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' }, alignItems: 'start' }}>
         <Stack spacing={2}>
