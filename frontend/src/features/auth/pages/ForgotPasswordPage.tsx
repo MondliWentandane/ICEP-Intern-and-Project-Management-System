@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 import { Auth } from '@/api/services/auth.service'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/FormControls'
+import { AuthBackButton } from '../components/AuthBackButton'
 
 const emailSchema = z.object({ email: z.string().trim().email('Enter a valid email address.') })
 type EmailValues = z.infer<typeof emailSchema>
@@ -29,6 +30,7 @@ export function ForgotPasswordPage() {
 
   return (
     <Stack className="auth-form auth-forgot-form" component="form" spacing={0} onSubmit={onSubmit} noValidate>
+      <AuthBackButton fallback="/login" />
       {sent ? <>
         <Typography className="auth-heading" component="h1">Check your email</Typography>
         <Typography color="text.secondary" sx={{ textAlign: 'center', mb: 3 }}>If an ICEP account matches that address, a password reset link is on its way.</Typography>
