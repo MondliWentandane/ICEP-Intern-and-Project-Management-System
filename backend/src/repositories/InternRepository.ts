@@ -77,13 +77,18 @@ export class InternRepository {
             skill: true,
           },
         },
-        documents: { select: { id: true, type: true, fileName: true } },
+        documents: { select: { id: true, type: true, fileName: true, mimeType: true, sizeBytes: true, uploadedAt: true }, orderBy: { uploadedAt: "asc" } },
         assignments: {
           include: { project: { select: { id: true, name: true, status: true } } },
           orderBy: { assignedAt: "desc" },
         },
       },
     });
+  }
+
+  /** One of the intern's documents (they keep the files uploaded with their application). */
+  findDocument(internId: string, documentId: string) {
+    return prisma.document.findFirst({ where: { id: documentId, internId } });
   }
 
   findByUserId(userId: string) {

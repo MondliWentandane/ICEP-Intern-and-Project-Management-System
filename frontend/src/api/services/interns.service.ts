@@ -1,5 +1,6 @@
 import { apiClient, endpoints } from '@/api'
-import type { InternView } from '@/features/shared/workspace/types'
+import type { InternDocument, InternView } from '@/features/shared/workspace/types'
+import { downloadBlob } from '@/utils/format'
 
 /** Intern record as GET /interns and GET /interns/:id return it (Prisma Intern with its relations). */
 interface ApiIntern {
@@ -19,7 +20,7 @@ interface ApiIntern {
   department?: { name: string }
   mentor?: { user: { fullName: string } } | null
   skills?: Array<{ skill: { name: string } }>
-  documents?: Array<{ id: string; type: string; fileName: string }>
+  documents?: InternDocument[]
   assignments?: Array<{ projectRole: string | null; leftAt: string | null; project: { id: string; name: string; status: string } }>
   ending?: InternView['ending']
 }
@@ -55,6 +56,12 @@ export const Interns = {
   list: async () => {
     const response = await apiClient.get<{ data: ApiIntern[] }>(endpoints.interns)
     return { ...response, data: Array.isArray(response.data?.data) ? response.data.data.map(toInternView) : response.data as unknown as InternView[] }
+  },
+  /** Downloads one of the intern's documents (stored privately, so it comes through the backend). */
+  downloadDocument: async (internId: string, doc: Pick<InternDocument, 'id' | 'fileName'>) => {
+    const url = `${String(endpoints.interns)}/${encodeURIComponent(internId)}/documents/${encodeURIComponent(doc.id)}/download`
+    const { data } = await apiClient.get<Blob>(url, { responseType: 'blob', timeout: 60000 })
+    downloadBlob(data, doc.fileName)
   },
   get: async (id: string) => {
     const response = await apiClient.get<{ data: ApiIntern }>(String(endpoints.interns) + '/' + encodeURIComponent(id))

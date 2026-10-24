@@ -27,6 +27,8 @@ router.put("/interns/:id/status", adminOrHandler, (req: Request, res: Response) 
 router.get("/interns/:id/projects", anyRole, ownershipCheck, notImplemented("GET /interns/:id/projects")); // current + previous
 router.get("/interns/:id/cv", staff, notImplemented("GET /interns/:id/cv")); // "View / download CV" button
 router.get("/interns/:id/documents", adminOrHandler, notImplemented("GET /interns/:id/documents"));
+// Staff can download an intern's documents; mentors only for interns they supervise (ownershipCheck).
+router.get("/interns/:id/documents/:documentId/download", staff, ownershipCheck, (req: Request, res: Response) => internController.downloadDocument(req, res));
 
 // ---- Past interns (archive of COMPLETED and WITHDRAWN internships) ------------------------
 router.get("/past-interns", adminOrHandler, (req: Request, res: Response) => internController.getPastInterns(req, res));

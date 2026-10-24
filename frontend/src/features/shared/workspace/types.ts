@@ -26,6 +26,9 @@ export interface InternDocument {
   type: string
   fileName: string
   fileUrl?: string
+  mimeType?: string | null
+  sizeBytes?: number | null
+  uploadedAt?: string
 }
 
 export interface InternView extends InternProfile {

@@ -93,6 +93,22 @@ const intern = await internService.getInternById(id);
     }
   }
 
+  /** GET /interns/:id/documents/:documentId/download */
+  async downloadDocument(req: Request, res: Response) {
+    const id = typeof req.params.id === "string" ? req.params.id : "";
+    const documentId = typeof req.params.documentId === "string" ? req.params.documentId : "";
+    try {
+      const { document, content } = await internService.downloadDocument(id, documentId);
+      res.setHeader("Content-Type", document.mimeType || "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${document.fileName.replace(/"/g, "")}"`);
+      return res.send(content);
+    } catch (error) {
+      if (error instanceof InternshipError) return res.status(error.status).json({ message: error.message });
+      console.error("Error downloading intern document:", error);
+      return res.status(500).json({ message: "The document could not be downloaded." });
+    }
+  }
+
   /** GET /past-interns */
   async getPastInterns(_req: Request, res: Response) {
     try {

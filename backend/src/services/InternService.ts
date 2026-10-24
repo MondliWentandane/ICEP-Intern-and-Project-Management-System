@@ -2,6 +2,7 @@ import internRepository, {
   InternFilters,
   type InternshipAction,
 } from "../repositories/InternRepository";
+import { readDocument } from "./DocumentStorage";
 
 /** How the WIL Handler ends an internship. RESIGNED and DISMISSED are both stored as WITHDRAWN. */
 export type InternshipOutcome = "COMPLETED" | "RESIGNED" | "DISMISSED";
@@ -97,6 +98,13 @@ class InternService {
     const endDate = parseDate(input.endDate, "New end date");
     if (!endDate || endDate < today()) throw new InternshipError("Choose a new end date from today onwards.", 400);
     return internRepository.reinstate(intern, endDate, actorId);
+  }
+
+  /** File contents of one of the intern's documents (CV, ID copy, academic record, ...). */
+  async downloadDocument(internId: string, documentId: string) {
+    const document = await internRepository.findDocument(internId, documentId);
+    if (!document) throw new InternshipError("Document not found.", 404);
+    return { document, content: await readDocument(document.fileUrl) };
   }
 
   /** Completed and withdrawn internships for the Past Interns page. */
