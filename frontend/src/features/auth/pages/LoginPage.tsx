@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Alert, IconButton, InputAdornment, Link, Stack, TextField, Typography } from '@mui/material'
 import { Eye, EyeOff } from 'lucide-react'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Auth } from '@/api/services/auth.service'
 
+import { ArrowLeftCircleIcon } from '@/components/ui/ArrowLeftCircleIcon'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -25,7 +26,10 @@ const dashboardPaths = {
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { setSession } = useAuth()
+  // Back to the previous page in the app; opened directly (e.g. from an email link) there is none, so go home.
+  const goBack = () => (location.key === 'default' ? navigate('/') : navigate(-1))
   const [requestError, setRequestError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({ resolver: zodResolver(loginSchema) })
@@ -43,6 +47,7 @@ export function LoginPage() {
 
   return (
     <Stack className="auth-form auth-login-form" component="form" spacing={0} onSubmit={onSubmit} noValidate>
+      <button type="button" className="auth-back alc-trigger" onClick={goBack} aria-label="Go back"><ArrowLeftCircleIcon size={22} /><span>Back</span></button>
       <Stack className="auth-login-main" spacing={0}>
         <Typography className="auth-heading" component="h1">Login</Typography>
         {requestError && <Alert severity="error" role="alert">{requestError}</Alert>}
