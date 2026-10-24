@@ -12,7 +12,7 @@ const CSS = `
 }
 .interns-page,.interns-page *{box-sizing:border-box}
 .interns-page{color:var(--text);font-family:Inter,Arial,sans-serif;font-size:14px}
-.interns-page .wrap{max-width:1200px;margin:0 auto}
+.interns-page .wrap{width:100%}
 
 /* Filters */
 .interns-page .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--icep-radius-lg)}

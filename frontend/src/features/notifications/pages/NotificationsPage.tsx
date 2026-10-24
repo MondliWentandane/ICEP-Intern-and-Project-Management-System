@@ -18,7 +18,7 @@ const CSS = `
 .np-btn.sm{height:36px;padding:0 14px}
 .np-btn.dark{background:var(--navy-d);color:#fff;border-color:var(--navy-d)}.np-btn.dark:hover{background:var(--navy)}
 .np-btn.line{border:1.5px solid var(--navy-d)}
-.np-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;max-width:1000px;margin-bottom:28px}
+.np-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:28px}
 .np-stat{padding:18px 20px}.np-stat b{display:block;font-size:30px}.np-stat span{color:var(--muted)}
 .np-tabs{display:flex;gap:22px;border-bottom:1px solid var(--border);margin-bottom:24px}
 .np-tab{background:none;border:0;padding:10px 2px;font-size:17px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -55,7 +55,7 @@ const CSS = `
 .np-modal dl{display:grid;grid-template-columns:110px 1fr;gap:10px 12px;margin:18px 0}.np-modal dt{color:var(--muted)}.np-modal dd{margin:0;overflow-wrap:anywhere}
 .np-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy-d);color:#fff;padding:12px 20px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 @media(max-width:900px){.np-split,.np-edit-grid{grid-template-columns:1fr}.np-stats{grid-template-columns:repeat(2,1fr)}}
-.np-stats.three{grid-template-columns:repeat(3,minmax(0,1fr));max-width:760px}
+.np-stats.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:900px){.np-stats.three{grid-template-columns:1fr}}
 `;
 
