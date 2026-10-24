@@ -1,5 +1,6 @@
 
 import { TaskRepository } from "../repositories/TaskRepository";
+import { notificationService } from "./NotificationService";
 
 type TaskUser = {
     id: string;
@@ -75,13 +76,15 @@ export class TaskService {
             }
         }
 
-        return TaskRepository.createTask({
+        const task = await TaskRepository.createTask({
             title: data.title.trim(),
             projectId: data.projectId,
             description: data.description,
             assignedToId: data.assignedToId,
             createdById: user.id
         });
+        if (data.assignedToId) await notificationService.taskAssigned(task.id);
+        return task;
     }
 
     
@@ -291,7 +294,12 @@ export class TaskService {
             throw new Error("Invalid task status");
         }
 
-        return TaskRepository.updateTaskStatus(id, status);
+        const updated = await TaskRepository.updateTaskStatus(id, status);
+        // An intern finishing their task asks the supervising mentor to review it.
+        if (status === "COMPLETED" && task.status !== "COMPLETED" && user.role === "INTERN") {
+            await notificationService.taskSubmitted(id);
+        }
+        return updated;
     }
     
     
@@ -368,7 +376,9 @@ export class TaskService {
             }
         }
 
-        return TaskRepository.assignTask(id, internId);
+        const assigned = await TaskRepository.assignTask(id, internId);
+        if (internId) await notificationService.taskAssigned(id);
+        return assigned;
     }
 
     // Approve a completed task
@@ -391,7 +401,9 @@ export class TaskService {
             throw new Error("Task already approved");
         }
 
-        return TaskRepository.approveTask(id, user.id);
+        const approved = await TaskRepository.approveTask(id, user.id);
+        await notificationService.taskApproved(id);
+        return approved;
     }
 
     // Retrieve subtasks

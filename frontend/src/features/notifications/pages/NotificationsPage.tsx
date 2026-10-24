@@ -1,221 +1,218 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { apiErrorMessage } from "@/features/applicants/data/applicationsApi";
+import {
+  useEmailLog, useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications,
+  type AppNotification, type EmailLogEntry, type NotificationType,
+} from "../data/notificationsApi";
 
 /* ------------------------------ Styles ------------------------------ */
 
 const CSS = `
 /* ICEP style guide tokens (styles/tokens.css). Light only: no dark theme. */
-.np{--bg:var(--icep-page);--card:var(--icep-card);--text:var(--icep-heading);--muted:var(--icep-secondary);--border:var(--icep-border);--navy:var(--icep-primary);--navy-d:var(--icep-primary);--navy-soft:#E8EEF5;--green:#166534;--green-bg:var(--icep-active-tint);--red:#B91C1C;--red-bg:var(--icep-rejected-tint);--blue:#1E40AF;--blue-bg:var(--icep-completed-tint);--amber:#92400E;--amber-bg:var(--icep-pending-tint);
+.np{--bg:var(--icep-page);--card:var(--icep-card);--text:var(--icep-heading);--muted:var(--icep-secondary);--border:var(--icep-border);--navy:var(--icep-primary);--navy-soft:#E8EEF5;--green:#166534;--green-bg:var(--icep-active-tint);--red:#B91C1C;--red-bg:var(--icep-rejected-tint);--blue:#1E40AF;--blue-bg:var(--icep-completed-tint);--amber:#92400E;--amber-bg:var(--icep-pending-tint);
  color:var(--text);font-family:Inter,Arial,sans-serif;font-size:14px;min-height:100%}
 .np,.np *{box-sizing:border-box}
 .np button{font-family:inherit}
-.np-head{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-bottom:28px}
+.np-head{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-bottom:24px}
 .np-head h1{margin:0 0 6px;font-size:26px}.np-head p{margin:0;color:var(--muted)}
 .np-card{background:var(--card);border:1px solid var(--border);border-radius:var(--icep-radius-lg);box-shadow:0 2px 10px rgba(26,32,44,.05)}
-.np-outlook{display:flex;align-items:center;gap:28px;padding:18px 20px}
-.np-outlook b{display:block}.np-outlook small{color:var(--muted)}
-.np-btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap}
-.np-btn:hover{background:var(--bg)}.np-btn:disabled{opacity:.6;cursor:default}
-.np-btn.sm{height:36px;padding:0 14px}
-.np-btn.dark{background:var(--navy-d);color:#fff;border-color:var(--navy-d)}.np-btn.dark:hover{background:var(--navy)}
-.np-btn.line{border:1.5px solid var(--navy-d)}
-.np-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:28px}
+.np-btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--navy);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;transition:background-color .2s,color .2s,border-color .2s}
+.np-btn:hover:not(:disabled){background:var(--navy);color:#fff;border-color:var(--navy)}.np-btn:disabled{opacity:.55;cursor:default}
+.np-btn.dark{background:var(--navy);color:#fff;border-color:var(--navy)}.np-btn.dark:hover{background:#12283F}
+.np-btn:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.np-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:24px}
 .np-stat{padding:18px 20px}.np-stat b{display:block;font-size:30px}.np-stat span{color:var(--muted)}
-.np-tabs{display:flex;gap:22px;border-bottom:1px solid var(--border);margin-bottom:24px}
-.np-tab{background:none;border:0;padding:10px 2px;font-size:17px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.np-tab.on{color:var(--text);font-weight:700;border-color:var(--navy-d)}
-.np-split{display:grid;grid-template-columns:minmax(280px,380px) 1fr;gap:24px;align-items:start}
-.np-bar{display:flex;gap:12px;margin-bottom:16px}
-.np-input,.np-select,.np-text{width:100%;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;padding:0 14px;font:inherit;height:44px}
-.np-text{height:auto;padding:12px 14px;resize:vertical;line-height:1.6;min-height:170px}
-.np-list{display:flex;flex-direction:column;gap:12px}
-.np-item{text-align:left;width:100%;padding:16px 18px;border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 10px}
-.np-item:hover{border-color:var(--navy)}.np-item.on{border:2px solid var(--navy-d);padding:15px 17px}
-.np-item b{grid-column:1/-1}.np-item small{color:var(--muted)}
-.np-item .np-pill{grid-row:2/4;grid-column:2;align-self:end}
-.np-pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:13px;font-weight:700}
-.np-pill.Active,.np-pill.Sent.ok{background:var(--green-bg);color:var(--green)}
-.np-pill.Draft{background:var(--amber-bg);color:var(--amber)}
-.np-pill.Sent{background:var(--blue-bg);color:var(--blue)}
-.np-pill.Failed{background:var(--red-bg);color:var(--red)}
-.np-editor{padding:24px}
-.np-editor h2{margin:0 0 2px;font-size:20px}.np-editor .sub{color:var(--muted);margin-bottom:18px}
-.np-editor label{display:block;margin:14px 0 6px;color:var(--muted);font-size:14px}
-.np-edit-grid{display:grid;grid-template-columns:1fr minmax(240px,340px);gap:24px}
-.np-preview{border:1px solid var(--border);border-radius:12px;padding:16px;font-size:14px;align-self:start;margin-top:14px;overflow-wrap:anywhere}
-.np-preview h4{margin:0 0 14px;font-size:13px;color:var(--muted)}
-.np-preview p{margin:0 0 14px;white-space:pre-wrap}.np-preview a{color:var(--blue);text-decoration:none}
-.np-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}
-.np-filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px}.np-filters .np-select{width:200px}
+.np-tabs{display:flex;gap:22px;border-bottom:1px solid var(--border);margin-bottom:22px}
+.np-tab{background:none;border:0;padding:10px 2px;font-size:16px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;gap:8px;align-items:center}
+.np-tab.on{color:var(--text);font-weight:700;border-color:var(--navy)}
+.np-count{min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--icep-rejected);color:#fff;font-size:12px;font-weight:700;display:inline-grid;place-items:center}
+.np-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.np-seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card)}
+.np-seg button{border:0;background:none;padding:9px 16px;font-weight:600;color:var(--muted);cursor:pointer}
+.np-seg button.on{background:var(--navy);color:#fff}
+.np-select{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;padding:0 14px;font:inherit;height:42px;width:220px}
+.np-filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}
 .np-group{margin:0 0 10px;font-size:13px;letter-spacing:.04em;font-weight:700;color:var(--muted);text-transform:uppercase}
-.np-row{display:flex;align-items:center;gap:20px;padding:16px 20px;margin-bottom:12px}
-.np-row .info{flex:1;min-width:0}.np-row b{display:block}.np-row small{color:var(--muted);overflow-wrap:anywhere}
+.np-row{display:flex;align-items:center;gap:16px;padding:16px 20px;margin-bottom:10px;width:100%;text-align:left;color:inherit;font:inherit}
+.np-row .info{flex:1;min-width:0}.np-row b{display:block}.np-row small,.np-row p{color:var(--muted);overflow-wrap:anywhere}
+.np-row p{margin:2px 0 0;line-height:1.5}
+.np-note{cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.np-note:hover{border-color:var(--navy);box-shadow:0 6px 16px rgba(27,58,92,.10)}
+.np-note:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.np-note.unread{background:#F7FAFD;border-left:4px solid var(--navy);padding-left:17px}
+.np-note.unread b{color:var(--navy)}
+.np-dot{width:9px;height:9px;border-radius:50%;background:var(--navy);flex:none}
+.np-dot.read{background:transparent}
+.np-time{color:var(--muted);font-size:13px;white-space:nowrap}
+.np-pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.np-pill.APPLICATION_UPDATE{background:var(--amber-bg);color:var(--amber)}
+.np-pill.PROJECT_ASSIGNED{background:var(--navy-soft);color:var(--navy)}
+.np-pill.TASK_ASSIGNED{background:var(--blue-bg);color:var(--blue)}
+.np-pill.TASK_APPROVED,.np-pill.SENT{background:var(--green-bg);color:var(--green)}
+.np-pill.SYSTEM,.np-pill.PENDING{background:#EDF0F4;color:#4A5568}
+.np-pill.FAILED{background:var(--red-bg);color:var(--red)}
 .np-empty{padding:40px;text-align:center;color:var(--muted)}
+.np-error{padding:14px 18px;margin-bottom:16px;color:var(--red);background:var(--red-bg);border-radius:10px}
 .np-overlay{position:fixed;inset:0;background:rgba(10,20,35,.55);display:grid;place-items:center;padding:20px;z-index:50}
-.np-modal{width:min(560px,100%);padding:24px}.np-modal h3{margin:0 0 4px}
+.np-modal{width:min(560px,100%);padding:24px}.np-modal h3{margin:0 0 6px}
 .np-modal dl{display:grid;grid-template-columns:110px 1fr;gap:10px 12px;margin:18px 0}.np-modal dt{color:var(--muted)}.np-modal dd{margin:0;overflow-wrap:anywhere}
-.np-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy-d);color:#fff;padding:12px 20px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25)}
-@media(max-width:900px){.np-split,.np-edit-grid{grid-template-columns:1fr}.np-stats{grid-template-columns:repeat(2,1fr)}}
-.np-stats.three{grid-template-columns:repeat(3,minmax(0,1fr))}
-@media(max-width:900px){.np-stats.three{grid-template-columns:1fr}}
+.np-actions{display:flex;justify-content:flex-end;gap:12px}
+@media(max-width:900px){.np-stats{grid-template-columns:1fr}}
+@media(max-width:560px){.np-row{flex-wrap:wrap}.np-select{width:100%}}
 `;
 
-/* ------------------------------- Types ------------------------------- */
+/* ------------------------------ Helpers ------------------------------ */
 
-type LogStatus = "Sent" | "Failed";
+const TYPE_LABELS: Record<NotificationType, string> = {
+  APPLICATION_UPDATE: "Application",
+  PROJECT_ASSIGNED: "Project",
+  TASK_ASSIGNED: "Task",
+  TASK_APPROVED: "Approved",
+  SYSTEM: "Update",
+};
 
-interface LogEntry {
-  id: number;
-  template: string;
-  email: string;
-  campus: string;
-  group: string;
-  time: string;
-  status: LogStatus;
+const TEMPLATE_LABELS: Record<string, string> = {
+  APPLICATION_ACCEPTED: "Application accepted + set password",
+  APPLICATION_REJECTED: "Application rejected",
+  INTERVIEW_INVITE: "Interview invitation",
+  PASSWORD_RESET: "Set / reset password",
+};
+const templateLabel = (entry: EmailLogEntry) =>
+  entry.template ? TEMPLATE_LABELS[entry.template.key] ?? entry.template.key.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : "Other email";
+const STATUS_LABELS = { SENT: "Sent", FAILED: "Failed", PENDING: "Pending" } as const;
+
+const TZ = "Africa/Johannesburg";
+const dayKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(date);
+function dayLabel(iso: string) {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  if (dayKey(date) === dayKey(today)) return "Today";
+  if (dayKey(date) === dayKey(yesterday)) return "Yesterday";
+  return new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: TZ }).format(date);
+}
+const timeOf = (iso: string) => new Intl.DateTimeFormat("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(iso));
+
+/** Items grouped under Today / Yesterday / date headings, newest first. */
+function byDay<T>(items: T[], at: (item: T) => string) {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const label = dayLabel(at(item));
+    groups.set(label, [...(groups.get(label) ?? []), item]);
+  }
+  return [...groups];
 }
 
-/* ---------------------------- Sample data ---------------------------- */
-
-// Subjects shown in the "View" popup (keyed by template name).
-const SUBJECTS: Record<string, string> = {
-  "Application Received": "We received your ICEP application, {{first_name}}",
-  "Interview Invitation": "Interview invitation - ICEP WIL placement",
-  "Application Accepted + Set Password": "Welcome to ICEP, {{first_name}} - set your password",
-  "Application Rejected": "Update on your ICEP application",
-  "Intern Welcome": "Welcome aboard, {{first_name}}",
-  "Intake Reminder": "Intake opens soon",
+const SUBTITLES: Record<string, string> = {
+  ADMIN: "New applications, ended internships and system updates for you.",
+  WIL_HANDLER: "New applications and ended internships that need your attention.",
+  MENTOR: "Tasks to review and updates about your interns.",
+  INTERN: "Your tasks, projects and internship updates.",
 };
-const TEMPLATE_NAMES = Object.keys(SUBJECTS);
 
-const INITIAL_LOG: LogEntry[] = [
-  { id: 1, template: "Application Received", email: "thabo.mokoena@tut.ac.za", campus: "Soshanguve", group: "Today", time: "09:15", status: "Sent" },
-  { id: 2, template: "Application Accepted + Set Password", email: "lerato.s@tut.ac.za", campus: "Pretoria", group: "Today", time: "08:30", status: "Sent" },
-  { id: 3, template: "Interview Invitation", email: "sipho.nkosi@tut.ac.za", campus: "Polokwane", group: "Yesterday", time: "16:50", status: "Failed" },
-  { id: 4, template: "Application Rejected", email: "n.khoza@tut.ac.za", campus: "Arcadia", group: "Yesterday", time: "15:15", status: "Sent" },
-  { id: 5, template: "Application Accepted + Set Password", email: "sipho.n@tut.ac.za", campus: "Die Bult", group: "10 Oct 2026", time: "11:45", status: "Sent" },
-  { id: 6, template: "Interview Invitation", email: "a.dube@tut.ac.za", campus: "Soshanguve", group: "10 Oct 2026", time: "09:05", status: "Failed" },
-];
+/* ------------------------- My notifications tab ------------------------- */
 
-const SAMPLE: Record<string, string> = { first_name: "Thabo", last_name: "Mokoena", campus: "Soshanguve" };
-const fill = (s: string) => s.replace(/\{\{\s*(first_name|last_name|campus)\s*\}\}/g, (_, k: string) => SAMPLE[k]);
+function MyNotifications() {
+  const navigate = useNavigate();
+  const { data = [], isLoading, isError, error } = useMyNotifications();
+  const markRead = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
+  const [show, setShow] = useState<"all" | "unread">("all");
 
-/* ------------------------------ Main page ----------------------------- */
+  const unread = data.filter((n) => !n.isRead).length;
+  const visible = show === "unread" ? data.filter((n) => !n.isRead) : data;
 
-export function NotificationsPage() {
-  const [log, setLog] = useState<LogEntry[]>(INITIAL_LOG);
-  const [fTemplate, setFTemplate] = useState("");
-  const [fCampus, setFCampus] = useState("");
-  const [fStatus, setFStatus] = useState("");
-  const [viewing, setViewing] = useState<LogEntry | null>(null);
-  const [outlook, setOutlook] = useState<"connected" | "connecting">("connected");
-  const [toast, setToast] = useState("");
-  const timer = useRef<number | undefined>(undefined);
-
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setToast(""), 2200);
-  };
-
-  const visible = log.filter(
-    (l) => (!fTemplate || l.template === fTemplate) && (!fCampus || l.campus === fCampus) && (!fStatus || l.status === fStatus)
-  );
-  const groups = Array.from(new Set(visible.map((l) => l.group)));
-  const campuses = Array.from(new Set(log.map((l) => l.campus)));
-
-  const stats: [number, string][] = [
-    [log.filter((l) => l.status === "Sent").length, "Sent this month"],
-    [log.filter((l) => l.status === "Failed").length, "Failed to send"],
-    [log.filter((l) => l.group === "Today").length, "Sent today"],
-  ];
-
-  const reconnect = () => {
-    setOutlook("connecting");
-    window.setTimeout(() => {
-      setOutlook("connected");
-      notify("Outlook reconnected");
-    }, 1200);
-  };
-
-  const clearFilters = () => {
-    setFTemplate("");
-    setFCampus("");
-    setFStatus("");
-  };
-
-  const resend = (id: number) => {
-    notify("Resending…");
-    window.setTimeout(() => {
-      setLog((all) => all.map((l) => (l.id === id ? { ...l, status: "Sent" } : l)));
-      notify("Email sent");
-    }, 900);
+  const open = (note: AppNotification) => {
+    if (!note.isRead) markRead.mutate(note.id);
+    if (note.link) navigate(note.link);
   };
 
   return (
-    <div className="np">
-      <style>{CSS}</style>
-
-      <div className="np-head">
-        <div>
-          <h1>Notifications</h1>
-          <p>Track every email sent to applicants and interns.</p>
+    <>
+      <div className="np-toolbar">
+        <div className="np-seg" role="group" aria-label="Show">
+          <button type="button" className={show === "all" ? "on" : ""} aria-pressed={show === "all"} onClick={() => setShow("all")}>All</button>
+          <button type="button" className={show === "unread" ? "on" : ""} aria-pressed={show === "unread"} onClick={() => setShow("unread")}>Unread ({unread})</button>
         </div>
-        <div className="np-card np-outlook">
-          <div>
-            <b>Outlook: {outlook === "connected" ? "Connected" : "Connecting…"}</b>
-            <small>wi.williamson@tut.ac.za</small>
-          </div>
-          <button type="button" className="np-btn line sm" disabled={outlook === "connecting"} onClick={reconnect}>
-            Reconnect
-          </button>
-        </div>
+        <button type="button" className="np-btn" disabled={!unread || markAll.isPending} onClick={() => markAll.mutate()}>Mark all as read</button>
       </div>
 
-      <div className="np-stats three">
-        {stats.map(([n, label]) => (
-          <div key={label} className="np-card np-stat">
-            <b>{n}</b>
-            <span>{label}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="np-filters">
-        <select className="np-select" value={fTemplate} onChange={(e) => setFTemplate(e.target.value)}>
-          <option value="">All templates</option>
-          {TEMPLATE_NAMES.map((n) => <option key={n}>{n}</option>)}
-        </select>
-        <select className="np-select" value={fCampus} onChange={(e) => setFCampus(e.target.value)}>
-          <option value="">All campuses</option>
-          {campuses.map((c) => <option key={c}>{c}</option>)}
-        </select>
-        <select className="np-select" value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          <option>Sent</option>
-          <option>Failed</option>
-        </select>
-        <button type="button" className="np-btn" style={{ height: 44 }} onClick={clearFilters}>
-          Clear filters
-        </button>
-      </div>
-
-      {groups.length === 0 && <div className="np-card np-empty">No emails match these filters.</div>}
-      {groups.map((g) => (
-        <section key={g} style={{ marginBottom: 24 }}>
-          <h3 className="np-group">{g}</h3>
-          {visible.filter((l) => l.group === g).map((l) => (
-            <div key={l.id} className="np-card np-row">
-              <span className={`np-pill ${l.status}`}>{l.status}</span>
+      {isError && <div className="np-error" role="alert">{apiErrorMessage(error, "Your notifications could not be loaded.")}</div>}
+      {isLoading ? <div className="np-card np-empty">Loading your notifications…</div> : visible.length === 0 ? (
+        <div className="np-card np-empty">{show === "unread" ? "You're all caught up: no unread notifications." : "No notifications yet. Updates that concern you will appear here."}</div>
+      ) : byDay(visible, (n) => n.createdAt).map(([day, notes]) => (
+        <section key={day} style={{ marginBottom: 22 }}>
+          <h3 className="np-group">{day}</h3>
+          {notes.map((note) => (
+            <button key={note.id} type="button" className={`np-card np-row np-note${note.isRead ? "" : " unread"}`} onClick={() => open(note)}
+              aria-label={`${note.isRead ? "" : "Unread: "}${note.title}. ${note.message}`}>
+              <span className={`np-dot${note.isRead ? " read" : ""}`} aria-hidden="true" />
               <div className="info">
-                <b>{l.template}</b>
-                <small>{l.email} • {l.campus} - {l.time}</small>
+                <b>{note.title}</b>
+                <p>{note.message}</p>
               </div>
-              {l.status === "Failed" ? (
-                <button type="button" className="np-btn" onClick={() => resend(l.id)}>Resend</button>
-              ) : (
-                <button type="button" className="np-btn" onClick={() => setViewing(l)}>View</button>
-              )}
+              <span className={`np-pill ${note.type}`}>{TYPE_LABELS[note.type] ?? "Update"}</span>
+              <span className="np-time">{timeOf(note.createdAt)}</span>
+            </button>
+          ))}
+        </section>
+      ))}
+    </>
+  );
+}
+
+/* ---------------------------- Email log tab ---------------------------- */
+
+function EmailLog() {
+  const { data = [], isLoading, isError, error } = useEmailLog(true);
+  const [template, setTemplate] = useState("");
+  const [status, setStatus] = useState("");
+  const [viewing, setViewing] = useState<EmailLogEntry | null>(null);
+
+  const templates = useMemo(() => [...new Set(data.map(templateLabel))].sort(), [data]);
+  const visible = data.filter((e) => (!template || templateLabel(e) === template) && (!status || e.status === status));
+  const [thisMonth] = useState(() => dayKey(new Date()).slice(0, 7));
+  const stats: [number, string][] = [
+    [data.filter((e) => e.status === "SENT" && dayKey(new Date(e.createdAt)).startsWith(thisMonth)).length, "Sent this month"],
+    [data.filter((e) => e.status === "FAILED").length, "Failed to send"],
+    [data.filter((e) => e.status === "SENT" && dayLabel(e.createdAt) === "Today").length, "Sent today"],
+  ];
+
+  return (
+    <>
+      <div className="np-stats">
+        {stats.map(([n, label]) => <div key={label} className="np-card np-stat"><b>{n}</b><span>{label}</span></div>)}
+      </div>
+      <div className="np-filters">
+        <select className="np-select" value={template} onChange={(e) => setTemplate(e.target.value)} aria-label="Filter by email">
+          <option value="">All emails</option>
+          {templates.map((t) => <option key={t}>{t}</option>)}
+        </select>
+        <select className="np-select" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option value="SENT">Sent</option>
+          <option value="FAILED">Failed</option>
+          <option value="PENDING">Pending</option>
+        </select>
+        <button type="button" className="np-btn" style={{ height: 42 }} disabled={!template && !status} onClick={() => { setTemplate(""); setStatus(""); }}>Clear filters</button>
+      </div>
+
+      {isError && <div className="np-error" role="alert">{apiErrorMessage(error, "The email log could not be loaded.")}</div>}
+      {isLoading ? <div className="np-card np-empty">Loading the email log…</div> : visible.length === 0 ? (
+        <div className="np-card np-empty">{data.length ? "No emails match these filters." : "No emails have been sent yet."}</div>
+      ) : byDay(visible, (e) => e.createdAt).map(([day, entries]) => (
+        <section key={day} style={{ marginBottom: 22 }}>
+          <h3 className="np-group">{day}</h3>
+          {entries.map((entry) => (
+            <div key={entry.id} className="np-card np-row">
+              <span className={`np-pill ${entry.status}`}>{STATUS_LABELS[entry.status]}</span>
+              <div className="info">
+                <b>{templateLabel(entry)}</b>
+                <small>{entry.toEmail} • {timeOf(entry.createdAt)}</small>
+              </div>
+              <button type="button" className="np-btn" onClick={() => setViewing(entry)}>View</button>
             </div>
           ))}
         </section>
@@ -223,24 +220,57 @@ export function NotificationsPage() {
 
       {viewing && (
         <div className="np-overlay" onClick={() => setViewing(null)}>
-          <div className="np-card np-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h3>{viewing.template}</h3>
-            <span className={`np-pill ${viewing.status}`}>{viewing.status}</span>
+          <div className="np-card np-modal" role="dialog" aria-modal="true" aria-labelledby="np-email-title" onClick={(e) => e.stopPropagation()}>
+            <h3 id="np-email-title">{templateLabel(viewing)}</h3>
+            <span className={`np-pill ${viewing.status}`}>{STATUS_LABELS[viewing.status]}</span>
             <dl>
-              <dt>To</dt><dd>{viewing.email}</dd>
-              <dt>Campus</dt><dd>{viewing.campus}</dd>
-              <dt>Sent</dt><dd>{viewing.group} at {viewing.time}</dd>
-              <dt>Subject</dt><dd>{fill(SUBJECTS[viewing.template] ?? "")}</dd>
-              <dt>Sent from</dt><dd>wi.williamson@tut.ac.za (Outlook)</dd>
+              <dt>To</dt><dd>{viewing.toEmail}</dd>
+              <dt>Subject</dt><dd>{viewing.subject}</dd>
+              <dt>{viewing.status === "SENT" ? "Sent" : "Tried"}</dt><dd>{dayLabel(viewing.sentAt ?? viewing.createdAt)} at {timeOf(viewing.sentAt ?? viewing.createdAt)}</dd>
+              {viewing.error && <><dt>Error</dt><dd>{viewing.error}</dd></>}
             </dl>
-            <div className="np-actions" style={{ marginTop: 0 }}>
-              <button type="button" className="np-btn dark" onClick={() => setViewing(null)}>Close</button>
-            </div>
+            <div className="np-actions"><button type="button" className="np-btn dark" onClick={() => setViewing(null)}>Close</button></div>
           </div>
         </div>
       )}
+    </>
+  );
+}
 
-      {toast && <div className="np-toast" role="status">{toast}</div>}
+/* ------------------------------ Main page ----------------------------- */
+
+/**
+ * Everyone gets their own notifications (only theirs: the API filters by the signed-in user).
+ * Admins and WIL Handlers also get the Email log: every email the system sent to applicants and interns.
+ */
+export function NotificationsPage() {
+  const { user } = useAuth();
+  const role = user?.role ?? "INTERN";
+  const canSeeEmailLog = role === "ADMIN" || role === "WIL_HANDLER";
+  const [tab, setTab] = useState<"mine" | "emails">("mine");
+  const { data = [] } = useMyNotifications();
+  const unread = data.filter((n) => !n.isRead).length;
+
+  return (
+    <div className="np">
+      <style>{CSS}</style>
+      <div className="np-head">
+        <div>
+          <h1>Notifications</h1>
+          <p>{SUBTITLES[role] ?? SUBTITLES.INTERN}</p>
+        </div>
+      </div>
+
+      {canSeeEmailLog && (
+        <div className="np-tabs" role="tablist" aria-label="Notifications">
+          <button type="button" role="tab" aria-selected={tab === "mine"} className={`np-tab${tab === "mine" ? " on" : ""}`} onClick={() => setTab("mine")}>
+            My notifications{unread > 0 && <span className="np-count">{unread}</span>}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "emails"} className={`np-tab${tab === "emails" ? " on" : ""}`} onClick={() => setTab("emails")}>Email log</button>
+        </div>
+      )}
+
+      {canSeeEmailLog && tab === "emails" ? <EmailLog /> : <MyNotifications />}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { ProjectRepository } from "../repositories/ProjectRepository";
+import { notificationService } from "./NotificationService";
 
 const repository = new ProjectRepository();
 const statuses = ["PLANNED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"];
@@ -43,7 +44,9 @@ export class ProjectService {
   async assign(projectId: string, internId: string, projectRole?: string) {
     await this.get(projectId);
     if (!internId?.trim()) throw Object.assign(new Error("internId is required"), { statusCode: 400 });
-    return repository.assign(projectId, internId, projectRole);
+    const assignment = await repository.assign(projectId, internId, projectRole);
+    await notificationService.projectAssigned(projectId, internId);
+    return assignment;
   }
   async removeAssignment(projectId: string, internId: string) {
     await this.get(projectId);
