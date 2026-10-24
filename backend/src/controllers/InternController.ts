@@ -109,6 +109,26 @@ const intern = await internService.getInternById(id);
     }
   }
 
+  /** GET /campuses */
+  async getCampuses(_req: Request, res: Response) {
+    try {
+      return res.status(200).json(await internService.getCampuses());
+    } catch (error) {
+      console.error("Error retrieving campuses:", error);
+      return res.status(500).json({ message: "Failed to retrieve campuses." });
+    }
+  }
+
+  /** GET /intakes */
+  async getIntakes(_req: Request, res: Response) {
+    try {
+      return res.status(200).json(await internService.getIntakes());
+    } catch (error) {
+      console.error("Error retrieving intakes:", error);
+      return res.status(500).json({ message: "Failed to retrieve intakes." });
+    }
+  }
+
   /** GET /past-interns */
   async getPastInterns(_req: Request, res: Response) {
     try {

@@ -91,6 +91,16 @@ export class InternRepository {
     return prisma.document.findFirst({ where: { id: documentId, internId } });
   }
 
+  /** Campuses with how many interns and positions each has. */
+  findCampuses() {
+    return prisma.campus.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { interns: true, positions: true } } } });
+  }
+
+  /** Intakes (newest first) with how many interns and positions each has. */
+  findIntakes() {
+    return prisma.intake.findMany({ orderBy: { startDate: "desc" }, include: { _count: { select: { interns: true, positions: true } } } });
+  }
+
   findByUserId(userId: string) {
     return prisma.intern.findUnique({ where: { userId }, select: { id: true, status: true, endDate: true } });
   }

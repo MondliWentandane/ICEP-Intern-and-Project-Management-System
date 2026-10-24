@@ -3,6 +3,7 @@ import internRepository, {
   type InternshipAction,
 } from "../repositories/InternRepository";
 import { readDocument } from "./DocumentStorage";
+import { notificationService } from "./NotificationService";
 
 /** How the WIL Handler ends an internship. RESIGNED and DISMISSED are both stored as WITHDRAWN. */
 export type InternshipOutcome = "COMPLETED" | "RESIGNED" | "DISMISSED";
@@ -87,7 +88,9 @@ class InternService {
     }
 
     const { status, action } = OUTCOMES[outcome];
-    return internRepository.close(intern, { status, endDate, action, reason: reason || null, actorId });
+    const closed = await internRepository.close(intern, { status, endDate, action, reason: reason || null, actorId });
+    await notificationService.internshipEnded(intern.id, OUTCOME_LABELS[action], reason || null);
+    return closed;
   }
 
   /** Makes an ended internship active again with a new end date (ended by mistake, or extended). */
@@ -97,7 +100,9 @@ class InternService {
     if (intern.status === "ACTIVE") throw new InternshipError("This internship is already active.", 409);
     const endDate = parseDate(input.endDate, "New end date");
     if (!endDate || endDate < today()) throw new InternshipError("Choose a new end date from today onwards.", 400);
-    return internRepository.reinstate(intern, endDate, actorId);
+    const reinstated = await internRepository.reinstate(intern, endDate, actorId);
+    await notificationService.internshipReinstated(intern.id, endDate);
+    return reinstated;
   }
 
   /** File contents of one of the intern's documents (CV, ID copy, academic record, ...). */
@@ -105,6 +110,26 @@ class InternService {
     const document = await internRepository.findDocument(internId, documentId);
     if (!document) throw new InternshipError("Document not found.", 404);
     return { document, content: await readDocument(document.fileUrl) };
+  }
+
+  /** Campuses for the Campuses & Intakes page. */
+  async getCampuses() {
+    const campuses = await internRepository.findCampuses();
+    return campuses.map(({ _count, createdAt: _createdAt, ...campus }) => ({ ...campus, internCount: _count.interns, positionCount: _count.positions }));
+  }
+
+  /** Intakes (the groups of interns who start together) for the Campuses & Intakes page. */
+  async getIntakes() {
+    const intakes = await internRepository.findIntakes();
+    return intakes.map((intake) => ({
+      id: intake.id,
+      name: intake.name,
+      startDate: ymd(intake.startDate),
+      endDate: ymd(intake.endDate),
+      isActive: intake.isActive,
+      internCount: intake._count.interns,
+      positionCount: intake._count.positions,
+    }));
   }
 
   /** Completed and withdrawn internships for the Past Interns page. */
@@ -144,6 +169,7 @@ class InternService {
     const ended = await internRepository.findEndedButActive(today());
     for (const intern of ended) {
       await internRepository.close(intern, { status: "COMPLETED", endDate: intern.endDate!, action: "INTERNSHIP_COMPLETED", reason: PLACEMENT_ENDED, actorId: null });
+      await notificationService.internshipEnded(intern.id, "Completed", PLACEMENT_ENDED);
     }
     return ended.length;
   }
@@ -158,6 +184,7 @@ class InternService {
     if (intern.status !== "ACTIVE") return true;
     if (intern.endDate && intern.endDate < today()) {
       await internRepository.close(intern, { status: "COMPLETED", endDate: intern.endDate, action: "INTERNSHIP_COMPLETED", reason: PLACEMENT_ENDED, actorId: null });
+      await notificationService.internshipEnded(intern.id, "Completed", PLACEMENT_ENDED);
       return true;
     }
     return false;

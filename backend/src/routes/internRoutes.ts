@@ -34,13 +34,13 @@ router.get("/interns/:id/documents/:documentId/download", staff, ownershipCheck,
 router.get("/past-interns", adminOrHandler, (req: Request, res: Response) => internController.getPastInterns(req, res));
 
 // ---- Campuses & intakes ---------------------------------------------------------------
-router.get("/campuses", staff, notImplemented("GET /campuses"));
+router.get("/campuses", staff, (req: Request, res: Response) => internController.getCampuses(req, res));
 router.post("/campuses", adminOnly, notImplemented("POST /campuses"));
 router.get("/campuses/:id", adminOrHandler, notImplemented("GET /campuses/:id"));
 router.put("/campuses/:id", adminOnly, notImplemented("PUT /campuses/:id"));
 router.get("/campuses/:id/interns", adminOrHandler, notImplemented("GET /campuses/:id/interns")); // ?intakeId=
 
-router.get("/intakes", staff, notImplemented("GET /intakes"));
+router.get("/intakes", staff, (req: Request, res: Response) => internController.getIntakes(req, res));
 router.post("/intakes", adminOrHandler, notImplemented("POST /intakes"));
 router.put("/intakes/:id", adminOrHandler, notImplemented("PUT /intakes/:id"));
 
