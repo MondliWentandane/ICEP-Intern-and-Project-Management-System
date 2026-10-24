@@ -130,7 +130,7 @@ export function PastInternsPage() {
                   <TableRow key={record.id} hover sx={rowSx(index)}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 700, bgcolor: '#E4E9F1', color: 'primary.main' }}>{initials(record.name)}</Avatar>
+                        <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 700, bgcolor: '#E2E8F0', color: '#718096' }}>{initials(record.name)}</Avatar>
                         <Box><Typography sx={{ fontSize: 14 }}>{record.name}</Typography><Typography className="muted" sx={{ fontSize: 12, color: 'text.secondary' }}>{record.email}</Typography></Box>
                       </Box>
                     </TableCell>
