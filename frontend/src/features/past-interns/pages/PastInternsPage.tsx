@@ -84,7 +84,7 @@ export function PastInternsPage() {
   return (
     <Box sx={{ display: 'grid', gap: 2.5 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        <Typography sx={{ color: 'text.secondary' }}>Archive of completed internships and final records.</Typography>
+        <Typography sx={{ color: 'text.secondary' }}>Internships that have ended: completed, resigned or terminated. Ended interns can no longer log in.</Typography>
         <Button appearance="secondary" startIcon={<Download size={18} />} onClick={exportCsv} disabled={isLoading || !filtered.length}>Export CSV</Button>
       </Box>
 
@@ -93,7 +93,7 @@ export function PastInternsPage() {
           <StatTile icon={<Archive size={20} />} tint={{ bgcolor: '#DBEAFE', color: '#1D4ED8' }} value={String(stats.completed)} label="Completed internships" />
           <StatTile icon={<CircleCheck size={20} />} tint={{ bgcolor: 'var(--icep-active-tint)', color: '#166534' }} value={`${stats.completionRate}%`} label="Completion rate" />
           <StatTile icon={<Clock size={20} />} tint={{ bgcolor: 'var(--icep-pending-tint)', color: '#B45309' }} value={`${stats.averageMonths} mo`} label="Average duration" />
-          <StatTile icon={<FileX size={20} />} tint={{ bgcolor: 'var(--icep-rejected-tint)', color: '#B91C1C' }} value={String(stats.missingReports)} label="Missing final reports" />
+          <StatTile icon={<FileX size={20} />} tint={{ bgcolor: 'var(--icep-rejected-tint)', color: '#B91C1C' }} value={String(stats.endedEarly)} label="Ended early" />
         </Box>
       )}
 
@@ -126,10 +126,13 @@ export function PastInternsPage() {
                       </Box>
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{record.campus}</TableCell>
-                    <TableCell>{record.project}</TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{record.mentor}</TableCell>
+                    <TableCell>{record.project ?? '—'}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{record.mentor ?? '—'}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatPeriod(record)}</TableCell>
-                    <TableCell><Chip size="small" label={record.outcome} sx={{ fontWeight: 650, ...outcomeColors[record.outcome] }} /></TableCell>
+                    <TableCell>
+                      <Chip size="small" label={record.outcome} sx={{ fontWeight: 650, ...outcomeColors[record.outcome] }} />
+                      {record.reason && <Typography className="muted" sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5, maxWidth: 220 }}>{record.reason}</Typography>}
+                    </TableCell>
                     <TableCell align="right">
                       <IconButton component={RouterLink} to={`../interns/${record.id}`} relative="path" aria-label={`Open ${record.name}'s record`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
                         <ArrowRight size={18} />

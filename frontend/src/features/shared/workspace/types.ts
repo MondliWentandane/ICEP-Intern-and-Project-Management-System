@@ -41,6 +41,8 @@ export interface InternView extends InternProfile {
   endDate?: string
   projects?: InternProject[]
   documents?: InternDocument[]
+  /** How the internship ended (Past Interns only). */
+  ending?: { outcome: 'Completed' | 'Withdrawn' | 'Terminated'; reason: string | null; endedBy: string | null; endedAt: string } | null
 }
 
 export interface IntakeView {

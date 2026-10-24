@@ -7,6 +7,7 @@ export const applicationInclude = {
   skills: { include: { skill: true } },
   documents: true,
   reviewedBy: { select: { id: true, fullName: true, email: true } },
+  intern: { select: { id: true, status: true, startDate: true, endDate: true } },
 } as const;
 
 export type ApplicationProfileUpdate = {

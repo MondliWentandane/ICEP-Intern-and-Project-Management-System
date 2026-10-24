@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiErrorMessage, downloadApplicationDocument, fetchApplications, yearLabel, type ApiApplication } from "@/features/applicants/data/applicationsApi";
+import { apiErrorMessage, downloadApplicationDocument, endInternship, fetchApplications, reinstateInternship, yearLabel, type ApiApplication, type InternshipOutcome } from "@/features/applicants/data/applicationsApi";
 
 /* ------------------------------ Styles ------------------------------ */
 
@@ -101,6 +101,30 @@ const CSS = `
 .interns-page .reveal{animation:intern-rise .45s var(--ease) both}
 @keyframes intern-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media(max-width:560px){.interns-page .kv{grid-template-columns:1fr}}
+/* Ending (or reinstating) an internship */
+.interns-page .end{padding:20px 22px;display:grid;gap:14px}
+.interns-page .end p{margin:0;color:var(--muted);line-height:1.5}
+.interns-page .end p b{color:var(--text)}
+.interns-page .choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media(max-width:560px){.interns-page .choices{grid-template-columns:1fr}}
+.interns-page .choice{position:relative;display:grid;gap:2px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--icep-radius-md);cursor:pointer;transition:border-color .2s,background-color .2s,box-shadow .2s}
+.interns-page .choice input{position:absolute;opacity:0;pointer-events:none}
+.interns-page .choice b{font-weight:600}
+.interns-page .choice small{color:var(--muted);font-size:12px}
+.interns-page .choice:hover{border-color:var(--navy)}
+.interns-page .choice.on{border-color:var(--navy);background:var(--navy-soft);box-shadow:0 0 0 1px var(--navy)}
+.interns-page .choice:focus-within{outline:2px solid var(--navy);outline-offset:2px}
+.interns-page .end label.f{display:grid;gap:6px;font-weight:600;font-size:13px}
+.interns-page .end label.f .field{font-weight:400}
+.interns-page .end textarea.field{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
+.interns-page .end .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.interns-page .btn.solid{background:var(--navy);color:#fff;border-color:var(--navy)}
+.interns-page .btn.solid:hover{background:#12283F}
+.interns-page .btn.danger{background:var(--icep-rejected);color:#fff;border-color:var(--icep-rejected)}
+.interns-page .btn.danger:hover{background:#B91C1C;border-color:#B91C1C}
+.interns-page .btn:disabled{opacity:.6;cursor:default}
+.interns-page .end .err{color:var(--icep-rejected);font-size:13px;margin:0}
+.interns-page .end .done{color:#166534;background:var(--icep-active-tint);border-radius:var(--icep-radius-md);padding:10px 12px;margin:0}
 @media(prefers-reduced-motion:reduce){.interns-page .reveal,.interns-page tbody tr.trow{animation:none}.interns-page tbody tr.trow:hover{transform:none}}
 `;
 
@@ -123,10 +147,14 @@ const STATUS_FROM_API: Partial<Record<ApiApplication["status"], Status>> = {
   ACCEPTED: "Intern",
 };
 
+/** Accepted applicants are interns until their internship ends, then past interns. */
+const statusOf = (a: ApiApplication): Status | undefined =>
+  a.status === "ACCEPTED" && a.intern && a.intern.status !== "ACTIVE" ? "Past Intern" : STATUS_FROM_API[a.status];
+
 /** Everyone who applied through the careers page (rejected applications are left out). */
 function toInterns(applications: ApiApplication[]): Intern[] {
   return applications.flatMap((a) => {
-    const status = STATUS_FROM_API[a.status];
+    const status = statusOf(a);
     return status ? [{ id: a.id, name: a.fullName, studentNo: a.studentNumber, campus: a.position.campus.name, status, application: a }] : [];
   });
 }
@@ -164,14 +192,126 @@ const ICONS = {
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
   download: "M12 4v11M7 10l5 5 5-5M5 20h14",
   back: "M15 18l-6-6 6-6",
+  flag: "M5 21V4M5 4h11l-2 4 2 4H5",
 };
+
+/* ------------------------- Ending an internship ------------------------ */
+
+const OUTCOME_CHOICES: { value: InternshipOutcome; label: string; hint: string }[] = [
+  { value: "COMPLETED", label: "Completed", hint: "Finished the placement" },
+  { value: "RESIGNED", label: "Resigned", hint: "Left before the end" },
+  { value: "DISMISSED", label: "Dismissed", hint: "Placement terminated" },
+];
+const todayYmd = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg" }).format(new Date());
+
+type InternRecord = NonNullable<ApiApplication["intern"]>;
+
+/** The start date, or today when the internship hasn't started yet (withdrawing before day one). */
+const earliestLastDay = (record: InternRecord) => {
+  const start = record.startDate?.slice(0, 10);
+  return start && start < todayYmd() ? start : todayYmd();
+};
+
+/**
+ * Ends an active internship (the intern loses access and moves to Past Interns), or reinstates an
+ * ended one with a new end date. Internships also end on their own the day after the end date.
+ */
+function InternshipStatusCard({ record, name, onUpdated }: { record: InternRecord; name: string; onUpdated: (next: InternRecord) => void }) {
+  const active = record.status === "ACTIVE";
+  const [open, setOpen] = useState(false);
+  const [outcome, setOutcome] = useState<InternshipOutcome>("COMPLETED");
+  const [endDate, setEndDate] = useState(todayYmd());
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+
+  const submit = async () => {
+    setError("");
+    if (active && outcome !== "COMPLETED" && reason.trim().length < 3) {
+      setError("Give a reason for the resignation or dismissal.");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (active) {
+        await endInternship(record.id, outcome, endDate, reason.trim());
+        onUpdated({ ...record, status: outcome === "COMPLETED" ? "COMPLETED" : "WITHDRAWN", endDate });
+        setDone(`${name}'s internship has ended. They can no longer log in and are now on Past Interns.`);
+      } else {
+        await reinstateInternship(record.id, endDate);
+        onUpdated({ ...record, status: "ACTIVE", endDate });
+        setDone(`${name} is an active intern again until ${fmt(endDate)}.`);
+      }
+      setOpen(false);
+    } catch (err) {
+      setError(apiErrorMessage(err, "The internship could not be updated."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="end">
+      {done && <p className="done" role="status">{done}</p>}
+      {active ? (
+        <p>
+          {record.startDate && record.startDate.slice(0, 10) > todayYmd()
+            ? <>Starts on <b>{fmt(record.startDate)}</b> and ends automatically after <b>{fmt(record.endDate)}</b>. If {name} withdraws before starting, end it with today as the last day.</>
+            : <>Ends automatically after <b>{fmt(record.endDate)}</b>. End it early if {name} finished sooner, resigned or was dismissed.</>}
+          {" "}They will no longer be able to log in.
+        </p>
+      ) : (
+        <p>This internship ended on <b>{fmt(record.endDate)}</b>. Reinstate it if it was ended by mistake or has been extended.</p>
+      )}
+      {!open ? (
+        <div className="acts">
+          <button type="button" className="btn" onClick={() => { setOpen(true); setDone(""); setError(""); setEndDate(active ? todayYmd() : ""); }}>
+            {active ? "End internship" : "Reinstate internship"}
+          </button>
+        </div>
+      ) : (
+        <>
+          {active && (
+            <div className="choices" role="radiogroup" aria-label="How the internship ended">
+              {OUTCOME_CHOICES.map((c) => (
+                <label key={c.value} className={`choice${outcome === c.value ? " on" : ""}`}>
+                  <input type="radio" name="outcome" value={c.value} checked={outcome === c.value} onChange={() => setOutcome(c.value)} />
+                  <b>{c.label}</b><small>{c.hint}</small>
+                </label>
+              ))}
+            </div>
+          )}
+          <label className="f">{active ? "Last day" : "New end date"}
+            <input className="field" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+              {...(active ? { max: todayYmd(), min: earliestLastDay(record) } : { min: todayYmd() })} />
+          </label>
+          {active && (
+            <label className="f">Reason{outcome === "COMPLETED" ? " (optional)" : ""}
+              <textarea className="field" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500}
+                placeholder={outcome === "COMPLETED" ? "e.g. Finished the project early" : outcome === "RESIGNED" ? "e.g. Accepted a permanent job offer" : "e.g. Repeated absence without notice"} />
+            </label>
+          )}
+          {error && <p className="err" role="alert">{error}</p>}
+          <div className="acts">
+            <button type="button" className="btn" onClick={() => { setOpen(false); setError(""); }} disabled={saving}>Cancel</button>
+            <button type="button" className={`btn ${active ? "danger" : "solid"}`} onClick={() => void submit()} disabled={saving || !endDate}>
+              {saving ? "Saving…" : active ? "End internship" : "Reinstate"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 interface ProfileProps {
   intern: Intern;
   onBack: () => void;
+  onInternUpdated: (next: InternRecord) => void;
 }
 
-function InternProfile({ intern, onBack }: ProfileProps) {
+function InternProfile({ intern, onBack, onInternUpdated }: ProfileProps) {
   const [downloaded, setDownloaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
@@ -237,12 +377,19 @@ function InternProfile({ intern, onBack }: ProfileProps) {
             <div className="kv">
               <div><small>Position</small><b>{a.position.title}</b></div>
               <div><small>Department</small><b>{a.position.department.name}</b></div>
-              <div><small>Start Date</small><b>{fmt(a.position.intake.startDate)}</b></div>
-              <div><small>Expected End Date</small><b>{fmt(a.position.intake.endDate)}</b></div>
+              <div><small>Start Date</small><b>{fmt(a.intern?.startDate ?? a.position.intake.startDate)}</b></div>
+              <div><small>{intern.status === "Past Intern" ? "End Date" : "Expected End Date"}</small><b>{fmt(a.intern?.endDate ?? a.position.intake.endDate)}</b></div>
             </div>
           </div>
 
-          <div className="card sec reveal" style={{ animationDelay: "240ms" }}>
+          {a.intern && (
+            <div className="card sec reveal" style={{ animationDelay: "240ms" }}>
+              <h3><span className="ic"><Icon d={ICONS.flag} /></span>Internship status</h3>
+              <InternshipStatusCard record={a.intern} name={a.fullName} onUpdated={onInternUpdated} />
+            </div>
+          )}
+
+          <div className="card sec reveal" style={{ animationDelay: "320ms" }}>
             <h3><span className="ic"><Icon d={ICONS.clock} /></span>Recent activity</h3>
             <ul className="act">
               {activity.map((item) => (
@@ -302,13 +449,20 @@ export function InternsPage() {
   };
 
   const selected = INTERNS.find((p) => p.id === selectedId);
+  // After ending or reinstating an internship, update that row without reloading the list.
+  const updateIntern = (next: InternRecord) =>
+    setInterns((list) => list.map((p) => {
+      if (p.application.intern?.id !== next.id) return p;
+      const application = { ...p.application, intern: next };
+      return { ...p, application, status: statusOf(application) ?? p.status };
+    }));
 
   return (
     <div className="interns-page">
       <style>{CSS}</style>
       <div className="wrap">
         {selected ? (
-          <InternProfile intern={selected} onBack={() => setSelectedId(null)} />
+          <InternProfile intern={selected} onBack={() => setSelectedId(null)} onInternUpdated={updateIntern} />
         ) : (
           <section>
             <div className="filters">

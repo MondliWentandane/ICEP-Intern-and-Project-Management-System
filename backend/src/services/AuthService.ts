@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import crypto from "crypto";
 import { authRepository } from "../repositories/AuthRepository";
+import internService from "./InternService";
 
 export class AuthService {
   /**
@@ -21,7 +22,8 @@ export class AuthService {
       throw new Error("Invalid email or password.");
     }
 
-    if (!user.isActive) {
+    // Interns whose internship ended get their own message below, once the password is confirmed.
+    if (!user.isActive && user.role !== "INTERN") {
       throw new Error("This account is inactive.");
     }
 
@@ -32,6 +34,14 @@ export class AuthService {
 
     if (!passwordMatches) {
       throw new Error("Invalid email or password.");
+    }
+
+    if (user.role === "INTERN" && (await internService.hasInternshipEnded(user.id))) {
+      throw new Error("Your internship has ended, so this account can no longer log in.");
+    }
+
+    if (!user.isActive) {
+      throw new Error("This account is inactive.");
     }
 
     return user;
