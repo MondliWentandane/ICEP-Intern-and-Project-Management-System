@@ -17,6 +17,11 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { TagInput } from '@/components/ui/TagInput'
+import {
+  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, PROJECT_STATUS_LABELS, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
+  type ProjectStatus,
+} from '@/features/projects/data/newProject'
 import { IcepLogo } from '@/components/brand/IcepLogo'
 import styles from './MentorDashboardPage.module.css'
 
@@ -25,21 +30,16 @@ interface TeamMember {
   colorClass: string
 }
 
-// Same values as the ProjectStatus enum in the Prisma schema.
-type ProjectStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD'
-
-const statusLabels: Record<ProjectStatus, string> = {
-  PLANNED: 'Planned',
-  IN_PROGRESS: 'In Progress',
-  COMPLETED: 'Completed',
-  ON_HOLD: 'On Hold',
-}
+const statusLabels = PROJECT_STATUS_LABELS
+// A new project can't start as Completed.
+const NEW_PROJECT_STATUSES: ProjectStatus[] = ['PLANNED', 'IN_PROGRESS', 'ON_HOLD']
 
 interface ProjectItem {
   id: string
   name: string
   groupName?: string
   description?: string
+  requiredSkills?: string[]
   team: TeamMember[]
   status: ProjectStatus
   progress: number
@@ -170,7 +170,7 @@ export function MentorDashboardPage() {
   const [status, setStatus] = useState<ProjectStatus>('PLANNED')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [progress, setProgress] = useState(0)
+  const [requiredSkills, setRequiredSkills] = useState<string[]>([])
   const [formError, setFormError] = useState('')
 
   // Feedback toast state
@@ -200,32 +200,33 @@ export function MentorDashboardPage() {
     setStatus('PLANNED')
     setStartDate('')
     setEndDate('')
-    setProgress(0)
+    setRequiredSkills([])
     setFormError('')
   }
 
   const formatShortDate = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
 
-  // The department, supervisor and creator are not asked for here: the backend takes them
-  // from the signed-in mentor.
+  // Department, supervisor and creator aren't asked for: they come from the signed-in mentor.
+  // See features/projects/data/newProject.ts for what the backend hook-up needs.
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!projectName.trim()) { setFormError('Enter a project name.'); return }
-    if (startDate && endDate && endDate < startDate) { setFormError('The end date cannot be before the start date.'); return }
+    const input = toNewProject({ name: projectName, groupName, description, status, startDate, endDate, requiredSkills })
+    const problem = validateNewProject(input)
+    if (problem) { setFormError(problem); return }
 
-    const colorClass =
-      status === 'ON_HOLD' ? styles.barOrange : status === 'COMPLETED' ? styles.barGreen : styles.barBlue
-
+    // TODO (backend hook-up): await Projects.create(input) -> POST /api/projects, and use the saved project below.
+    const colorClass = input.status === 'ON_HOLD' ? styles.barOrange : styles.barBlue
     const newProject: ProjectItem = {
       id: `proj-${Date.now()}`,
-      name: projectName.trim(),
-      groupName: groupName.trim() || undefined,
-      description: description.trim() || undefined,
+      name: input.name,
+      groupName: input.groupName,
+      description: input.description,
+      requiredSkills: input.requiredSkills,
       team: [],
-      status,
-      progress: Math.min(100, Math.max(0, Number(progress) || 0)),
-      dueDate: endDate ? formatShortDate(endDate) : '—',
+      status: input.status,
+      progress: 0, // calculated from tasks once the project has some
+      dueDate: input.endDate ? formatShortDate(input.endDate) : '—',
       colorClass,
     }
 
@@ -396,6 +397,7 @@ export function MentorDashboardPage() {
                         <div className={styles.projectInfo}>
                           <span className={styles.projectName}>{proj.name}</span>
                           {proj.groupName && <span className={styles.projectDepartment}>{proj.groupName}</span>}
+                          {!!proj.requiredSkills?.length && <span className={styles.projectDepartment}>Skills: {proj.requiredSkills.join(', ')}</span>}
                         </div>
                       </td>
                       <td>
@@ -554,6 +556,7 @@ export function MentorDashboardPage() {
                 className={styles.formInput}
                 placeholder="e.g. Cloud Security Pipeline"
                 value={projectName}
+                maxLength={NAME_MAX}
                 onChange={(e) => setProjectName(e.target.value)}
                 required
               />
@@ -568,6 +571,7 @@ export function MentorDashboardPage() {
                 type="text"
                 className={styles.formInput}
                 placeholder="e.g. Group A"
+                maxLength={GROUP_MAX}
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
               />
@@ -582,9 +586,28 @@ export function MentorDashboardPage() {
                 className={styles.formInput}
                 rows={3}
                 placeholder="What is this project about?"
+                maxLength={DESCRIPTION_MAX}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+              <span className={styles.formHint}>{description.length}/{DESCRIPTION_MAX}</span>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} id="skills-label">
+                Required skills (optional)
+              </label>
+              <span className={styles.formHint}>Used to suggest interns in the Team Builder. Type a skill and press Enter, or pick one below.</span>
+              <div role="group" aria-labelledby="skills-label">
+                <TagInput tags={requiredSkills} onChange={setRequiredSkills} placeholder="e.g. React" />
+              </div>
+              <div className={styles.skillSuggestions}>
+                {SKILL_SUGGESTIONS.filter((skill) => !requiredSkills.some((tag) => tag.toLowerCase() === skill.toLowerCase())).map((skill) => (
+                  <button key={skill} type="button" className={styles.skillSuggestion} onClick={() => setRequiredSkills((current) => (current.includes(skill) ? current : [...current, skill]))}>
+                    + {skill}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className={styles.formGroup}>
@@ -597,7 +620,7 @@ export function MentorDashboardPage() {
                 value={status}
                 onChange={(e) => setStatus(e.target.value as ProjectStatus)}
               >
-                {(Object.keys(statusLabels) as ProjectStatus[]).map((value) => (
+                {NEW_PROJECT_STATUSES.map((value) => (
                   <option key={value} value={value}>{statusLabels[value]}</option>
                 ))}
               </select>
@@ -632,21 +655,7 @@ export function MentorDashboardPage() {
               </div>
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="progress-input" className={styles.formLabel}>
-                Progress (%)
-              </label>
-              <input
-                id="progress-input"
-                type="number"
-                min="0"
-                max="100"
-                className={styles.formInput}
-                placeholder="0 - 100"
-                value={progress || ''}
-                onChange={(e) => setProgress(Number(e.target.value))}
-              />
-            </div>
+            <p className={styles.formHint}>Progress starts at 0% and is calculated from the project's tasks. The department and supervisor are taken from your mentor profile.</p>
           </form>
         </DialogContent>
       </Modal>
