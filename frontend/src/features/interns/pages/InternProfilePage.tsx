@@ -56,7 +56,8 @@ export function InternProfilePage() {
 
       {past && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Past intern{intern.endDate ? ` · internship ended ${formatDate(intern.endDate)}` : ''}. This profile is read-only history.
+          Past intern{intern.endDate ? ` · internship ended ${formatDate(intern.endDate)}` : ''}
+          {intern.ending ? ` · ${intern.ending.outcome}${intern.ending.reason ? `: ${intern.ending.reason}` : ''}${intern.ending.endedBy ? ` (ended by ${intern.ending.endedBy})` : ''}` : ''}. This profile is read-only history.
         </Alert>
       )}
 

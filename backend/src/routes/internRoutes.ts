@@ -23,13 +23,13 @@ router.get("/interns/me", authenticated, notImplemented("GET /interns/me")); // 
 router.post("/interns", adminOnly, notImplemented("POST /interns")); // "Add intern"
 router.get("/interns/:id", anyRole, ownershipCheck, (req: Request, res: Response) => internController.getInternById(req, res));
 router.put("/interns/:id", adminOrHandler, notImplemented("PUT /interns/:id"));
-router.put("/interns/:id/status", adminOrHandler, notImplemented("PUT /interns/:id/status")); // ACTIVE / COMPLETED / WITHDRAWN
+router.put("/interns/:id/status", adminOrHandler, (req: Request, res: Response) => internController.updateStatus(req, res)); // end (COMPLETED / RESIGNED / DISMISSED) or REINSTATE
 router.get("/interns/:id/projects", anyRole, ownershipCheck, notImplemented("GET /interns/:id/projects")); // current + previous
 router.get("/interns/:id/cv", staff, notImplemented("GET /interns/:id/cv")); // "View / download CV" button
 router.get("/interns/:id/documents", adminOrHandler, notImplemented("GET /interns/:id/documents"));
 
-// ---- Past interns (archive of COMPLETED internships) ---------------------------------
-router.get("/past-interns", adminOrHandler, notImplemented("GET /past-interns"));
+// ---- Past interns (archive of COMPLETED and WITHDRAWN internships) ------------------------
+router.get("/past-interns", adminOrHandler, (req: Request, res: Response) => internController.getPastInterns(req, res));
 
 // ---- Campuses & intakes ---------------------------------------------------------------
 router.get("/campuses", staff, notImplemented("GET /campuses"));

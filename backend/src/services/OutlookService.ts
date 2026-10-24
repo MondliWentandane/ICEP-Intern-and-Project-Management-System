@@ -5,7 +5,12 @@ dotenv.config();
 
 export class OutlookService {
 
-    public async sendEmail(to: string, subject: string, htmlBody: string): Promise<boolean> {
+    public async sendEmail(
+        to: string,
+        subject: string,
+        htmlBody: string,
+        attachments?: { filename: string; content: Buffer; contentType?: string }[]
+    ): Promise<boolean> {
         try {
 
             const rawFrom = (process.env.OUTLOOK_USER || '').trim();
@@ -16,7 +21,8 @@ export class OutlookService {
                 from: fromAddress,
                 to: to.trim(),
                 subject,
-                html: htmlBody
+                html: htmlBody,
+                ...(attachments?.length ? { attachments } : {})
             });
 
             console.log(`Email successfully sent to ${to}`);

@@ -45,7 +45,7 @@ export class AuthController {
         return;
       }
 
-      if (message === "This account is inactive.") {
+      if (message === "This account is inactive." || message.startsWith("Your internship has ended")) {
         res.status(403).json({ message });
         return;
       }

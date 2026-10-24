@@ -38,5 +38,5 @@ export const toneColor: Record<BadgeTone, ChipProps['color']> = {
 
 export const isPendingApplicant = (status?: string) => ['pending', 'applicant'].includes(statusKey(status))
 export const isInterviewee = (status?: string) => statusKey(status) === 'interviewee'
-export const isPastIntern = (status?: string) => ['past_intern', 'completed'].includes(statusKey(status))
+export const isPastIntern = (status?: string) => ['past_intern', 'completed', 'withdrawn'].includes(statusKey(status))
 export const isActiveIntern = (status?: string) => ['intern', 'active'].includes(statusKey(status))
