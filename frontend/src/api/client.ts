@@ -13,7 +13,7 @@ apiClient.interceptors.request.use((config) => {
 
 // Auth requests own their error handling (a wrong password must stay on the login form),
 // so the 401 redirect below only applies to session expiry on protected endpoints.
-const authRequestUrls = new Set<string>([endpoints.auth.login, endpoints.auth.createPassword, endpoints.auth.forgotPassword])
+const authRequestUrls = new Set<string>([endpoints.auth.login, endpoints.auth.createPassword, endpoints.auth.forgotPassword, endpoints.auth.resetPassword])
 apiClient.interceptors.response.use((response) => response, (error: unknown) => {
   if (axios.isAxiosError(error) && error.response?.status === 401) {
     tokenStorage.clear()
