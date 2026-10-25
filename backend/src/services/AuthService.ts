@@ -166,6 +166,79 @@ export class AuthService {
     const newHashedPassword = await bcrypt.hash(newPassword, 10);
     await authRepository.updatePassword(user.id, newHashedPassword);
   }
+
+    /**
+   * Updates the authenticated user's personal profile.
+   */
+  async updateProfile(
+    userId: string,
+    input: {
+      fullName?: unknown;
+      phone?: unknown;
+    }
+  ) {
+    if (!userId) {
+      throw new Error("Authentication required.");
+    }
+
+    const user = await authRepository.findById(userId);
+
+    if (!user || !user.isActive) {
+      throw new Error("User not found or inactive.");
+    }
+
+    if (
+      !input ||
+      typeof input !== "object" ||
+      Array.isArray(input)
+    ) {
+      throw new Error("Invalid profile information.");
+    }
+
+    const allowedFields = ["fullName", "phone"];
+
+    for (const field of Object.keys(input)) {
+      if (!allowedFields.includes(field)) {
+        throw new Error(`Cannot update field: ${field}`);
+      }
+    }
+
+    const data: {
+      fullName?: string;
+      phone?: string | null;
+    } = {};
+
+    if (input.fullName !== undefined) {
+      if (typeof input.fullName !== "string") {
+        throw new Error("Full name must be a string.");
+      }
+
+      const fullName = input.fullName.trim();
+
+      if (fullName.length < 2) {
+        throw new Error("Full name must contain at least 2 characters.");
+      }
+
+      data.fullName = fullName;
+    }
+
+    if (input.phone !== undefined) {
+      if (input.phone !== null && typeof input.phone !== "string") {
+        throw new Error("Phone number must be a string or null.");
+      }
+
+      data.phone =
+        typeof input.phone === "string"
+          ? input.phone.trim() || null
+          : null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new Error("Provide a full name or phone number to update.");
+    }
+
+    return authRepository.updateProfile(userId, data);
+  }
 }
 
 export const authService = new AuthService();

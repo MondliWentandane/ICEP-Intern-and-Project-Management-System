@@ -41,6 +41,30 @@ export class AuthRepository {
     });
   }
 
+    // Update the authenticated user's profile.
+  async updateProfile(
+    userId: string,
+    data: {
+      fullName?: string;
+      phone?: string | null;
+    }
+  ) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        fullName: data.fullName,
+        phone: data.phone,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        role: true,
+      },
+    });
+  }
+
   // Record a successful login.
   async updateLastLogin(id: string) {
     return prisma.user.update({
