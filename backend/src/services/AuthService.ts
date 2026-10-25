@@ -69,9 +69,9 @@ export class AuthService {
       );
     }
 
-        const expiresIn = (
-  process.env.JWT_EXPIRES_IN || "1h"
-) as SignOptions["expiresIn"];
+    const expiresIn = (
+      process.env.JWT_EXPIRES_IN || "1h"
+    ) as SignOptions["expiresIn"];
 
     const token = jwt.sign(
       { sub: user.id, role: user.role },
@@ -101,12 +101,12 @@ export class AuthService {
   ): Promise<void> {
 
     if (typeof rawToken !== "string" || !rawToken.trim()) {
-  throw new Error("A password setup token is required.");
-}
+      throw new Error("A password setup token is required.");
+    }
 
-if (typeof newPassword !== "string" || newPassword.length < 8) {
-  throw new Error("Password must contain at least 8 characters.");
-}
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      throw new Error("Password must contain at least 8 characters.");
+    }
 
     const tokenHash = crypto
       .createHash("sha256")
@@ -137,6 +137,34 @@ if (typeof newPassword !== "string" || newPassword.length < 8) {
       passwordToken.id,
       hashedPassword,
     );
+  }
+
+  /**
+   * Allows an authenticated user to change their password.
+   */
+  async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
+    if (!oldPassword || !newPassword) {
+      throw new Error("Current password and new password are required.");
+    }
+    if (newPassword.length < 8) {
+      throw new Error("New password must contain at least 8 characters.");
+    }
+
+    // Fetch the user from the database using your existing repository
+    const user = await authRepository.findById(userId);
+    if (!user || !user.passwordHash) {
+      throw new Error("User not found or password not set.");
+    }
+
+    // Verify the current password matches
+    const passwordMatches = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!passwordMatches) {
+      throw new Error("Incorrect current password.");
+    }
+
+    // Hash and save the new password
+    const newHashedPassword = await bcrypt.hash(newPassword, 10);
+    await authRepository.updatePassword(user.id, newHashedPassword);
   }
 }
 

@@ -129,6 +129,28 @@ export class AuthController {
       res.status(400).json({ message });
     }
   }
+
+  /**
+   * Handles authenticated password change requests.
+   */
+  async changePassword(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const { oldPassword, newPassword } = req.body ?? {};
+
+      if (!userId) {
+        res.status(401).json({ message: "Authentication is required." });
+        return;
+      }
+
+      await authService.changePassword(userId, oldPassword, newPassword);
+
+      res.status(200).json({ message: "Password updated successfully." });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to change password.";
+      res.status(400).json({ message });
+    }
+  }
 }
 
 export const authController = new AuthController();

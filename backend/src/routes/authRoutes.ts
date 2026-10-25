@@ -30,8 +30,9 @@ router.post("/auth/logout", authenticated, (req: Request, res: Response) =>
   authController.logout(req, res),
 );
 router.put("/auth/profile", authenticated, notImplemented("PUT /auth/profile"));
-router.put("/auth/change-password", authenticated, notImplemented("PUT /auth/change-password"));
-
+router.put("/auth/change-password", authenticated, (req: Request, res: Response) => 
+  authController.changePassword(req as any, res)
+);
 // ---- User management (Admin only: "Users" page) ----------------------------
 // Staff accounts (Admin / WIL Handler / Mentor) are created without a password and emailed a set-password link.
 router.get("/users", adminOnly, UserController.listUsers);
