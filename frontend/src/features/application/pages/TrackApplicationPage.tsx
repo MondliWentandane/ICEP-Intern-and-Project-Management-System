@@ -13,6 +13,7 @@ import { HelpLine } from '../components/FormBits'
 import { endTrackSession, findApplication, readTrackSession, stageOrder, type ApplicationStage, type TrackedApplication } from '../data/applications'
 
 const longDate = (iso: string) => new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso))
+const dateTime = (iso: string) => new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 const cardSx = { p: { xs: 2.5, md: 3.5 }, borderRadius: 3, boxShadow: '0 2px 10px rgba(26,32,44,.06)' } as const
 
 // Entrance motion, in the same style as the home page (fade-up cards, word-reveal title, steps that build up).
@@ -57,6 +58,13 @@ function stageText(stage: ApplicationStage, application: TrackedApplication) {
     const period = placement.startDate && placement.endDate ? ` from ${longDate(placement.startDate)} to ${longDate(placement.endDate)}` : ''
     return `Your WIL placement letter has been issued. You'll be placed at the ${application.campus} campus${period}; your mentor will be introduced when you start.`
   }
+  if (application.outcome === 'rejected' && stage === 'outcome') {
+    return "Thank you for applying. Unfortunately your application was not successful this time. You're welcome to apply again in a future intake."
+  }
+  if (application.interview && !application.outcome && stage === 'outcome') {
+    const venue = application.interview.venue ? ` at ${application.interview.venue}` : ''
+    return `You've been invited to an interview on ${dateTime(application.interview.at)}${venue}. Please check your email for the details.`
+  }
   switch (stage) {
     case 'submitted': return `We received your application on ${longDate(application.submittedAt)}.`
     case 'under_review': return 'The ICEP placement team is assessing your details, skills and supporting documents.'
@@ -66,18 +74,20 @@ function stageText(stage: ApplicationStage, application: TrackedApplication) {
 }
 
 function Timeline({ application }: { application: TrackedApplication }) {
-  // Once accepted, every step is complete (the placement letter has been issued).
-  const current = application.outcome === 'accepted' ? stageOrder.length : stageOrder.indexOf(application.stage)
+  // Not successful: the process ends at the outcome, so the placement step is not shown.
+  const stages = application.outcome === 'rejected' ? stageOrder.filter((stage) => stage !== 'placement') : stageOrder
+  // Once decided (accepted or not), every remaining step is complete.
+  const current = application.outcome ? stages.length : stages.indexOf(application.stage)
   // The steps build up once the timeline is on screen (after the cards above when it is visible on landing).
   const { ref, delay } = useEntrance<HTMLOListElement>(650)
   const started = delay !== null
   const at = (index: number) => stepDelay(delay ?? 0, index)
   return (
     <Box ref={ref} component="ol" aria-label="Application progress" sx={{ listStyle: 'none', p: 0, m: 0 }}>
-      {stageOrder.map((stage, index) => {
+      {stages.map((stage, index) => {
         const done = index < current
         const active = index === current
-        const last = index === stageOrder.length - 1
+        const last = index === stages.length - 1
         return (
           <Box component="li" key={stage} aria-current={active ? 'step' : undefined} sx={{ display: 'grid', gridTemplateColumns: '32px 1fr', columnGap: 2 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -150,6 +160,9 @@ export function TrackApplicationPage() {
 
   const signOut = () => { endTrackSession(); navigate('/track', { replace: true }) }
   const accepted = application.outcome === 'accepted' && application.placement
+  const rejected = application.outcome === 'rejected'
+  const interviewing = Boolean(application.interview) && !application.outcome
+  const statusTitle = accepted ? 'Accepted' : rejected ? 'Not successful' : interviewing ? 'Interview scheduled' : stageLabels[application.stage]
 
   return (
     <Box sx={{ maxWidth: 880, mx: 'auto', display: 'grid', gap: 2.5 }}>
@@ -173,10 +186,14 @@ export function TrackApplicationPage() {
         <Box>
           <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Current status</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mt: 0.5 }}>
-            <Typography id="status-title" component="h2" sx={{ fontSize: 24, fontWeight: 750 }}>{accepted ? 'Accepted' : stageLabels[application.stage]}</Typography>
+            <Typography id="status-title" component="h2" sx={{ fontSize: 24, fontWeight: 750 }}>{statusTitle}</Typography>
             {accepted
               ? <Chip size="small" label="Placement confirmed" sx={{ bgcolor: 'var(--icep-active-tint)', color: '#166534', fontWeight: 600, animation: `${popIn} .5s ${ease} 700ms both`, ...noMotion }} />
-              : <Chip size="small" label="In progress" sx={{ bgcolor: 'var(--icep-pending-tint)', color: '#92400E', fontWeight: 600 }} />}
+              : rejected
+                ? <Chip size="small" label="Closed" sx={{ bgcolor: 'var(--icep-rejected-tint)', color: '#B91C1C', fontWeight: 600 }} />
+                : interviewing
+                  ? <Chip size="small" label={application.interview ? dateTime(application.interview.at) : 'Interview'} sx={{ bgcolor: 'var(--icep-completed-tint)', color: '#1D4ED8', fontWeight: 600 }} />
+                  : <Chip size="small" label="In progress" sx={{ bgcolor: 'var(--icep-pending-tint)', color: '#92400E', fontWeight: 600 }} />}
           </Box>
           <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>Last updated {longDate(application.updatedAt)}</Typography>
         </Box>

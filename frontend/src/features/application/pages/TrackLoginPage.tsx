@@ -11,7 +11,7 @@ import { findApplication, requestSignInLink, startTrackSession } from '../data/a
 
 const lookupSchema = z.object({
   email: z.string().trim().email('Enter the email address you applied with.'),
-  reference: z.string().trim().regex(/^ICEP-\d{4}-\d{4,6}$/i, 'Enter your reference number, e.g. ICEP-2026-01428.'),
+  reference: z.string().trim().regex(/^ICEP-\d{4}-\d{4,8}$/i, 'Enter your reference number, e.g. ICEP-2026-01428.'),
 })
 const linkSchema = lookupSchema.pick({ email: true })
 type LookupValues = z.infer<typeof lookupSchema>
@@ -23,19 +23,23 @@ function LookupForm({ onLostReference }: { onLostReference: () => void }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [notFound, setNotFound] = useState(false)
+  const [failed, setFailed] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LookupValues>({
     resolver: zodResolver(lookupSchema),
     defaultValues: { email: '', reference: params.get('reference') ?? '' },
   })
   const onSubmit = handleSubmit(async ({ email, reference }) => {
     setNotFound(false)
-    const application = await findApplication(email, reference)
+    setFailed(false)
+    let application
+    try { application = await findApplication(email, reference) } catch { setFailed(true); return }
     if (!application) { setNotFound(true); return }
     startTrackSession({ email: application.email, reference: application.reference })
     navigate(`/track/${application.reference}`)
   })
   return (
     <Box component="form" noValidate onSubmit={onSubmit} sx={{ display: 'grid', gap: 2.5 }}>
+      {failed && <Alert severity="error" role="alert">We couldn't check your application right now. Please try again in a moment.</Alert>}
       {notFound && <Alert severity="error" role="alert">We couldn't find an application with that email address and reference number. Check both and try again.</Alert>}
       <FormField id="track-email" label="Email address" type="email" autoComplete="email" registration={register('email')} errorText={errors.email?.message} />
       <FormField id="track-reference" label="Reference number" placeholder="ICEP-2026-01428" autoComplete="off" registration={register('reference')} errorText={errors.reference?.message}

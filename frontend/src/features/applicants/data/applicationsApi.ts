@@ -13,6 +13,8 @@ export interface ApiApplication {
   fullName: string
   email: string
   phone: string | null
+  /** SA ID number (POPIA-sensitive): only shown masked. */
+  idNumber?: string | null
   studentNumber: string
   institution: string
   qualification: string
@@ -21,6 +23,7 @@ export interface ApiApplication {
   interviewVenue?: string | null
   rejectionReason: string | null
   reviewedAt: string | null
+  reviewedBy?: { id: string; fullName: string; email: string } | null
   createdAt: string
   updatedAt: string
   position: {
@@ -31,7 +34,11 @@ export interface ApiApplication {
     intake: { name: string; startDate: string; endDate: string }
   }
   skills: Array<{ skill: { name: string } }>
-  documents: Array<{ id: string; type: 'CV' | 'ID_COPY' | 'ACADEMIC_RECORD' | string; fileName: string }>
+  documents: Array<{ id: string; type: 'CV' | 'ID_COPY' | 'ACADEMIC_RECORD' | string; fileName: string; mimeType?: string | null; sizeBytes?: number | null; uploadedAt?: string }>
+  /** The intern profile created on acceptance (null before that). ACTIVE until the internship ends. */
+  intern?: { id: string; status: 'ACTIVE' | 'COMPLETED' | 'WITHDRAWN'; startDate: string | null; endDate: string | null } | null
+  /** Returned after an interview or rejection: whether the email to the applicant went out. */
+  emailSent?: boolean
 }
 
 export const fetchApplications = async () => (await apiClient.get<ApiApplication[]>(endpoints.applicants)).data
@@ -45,6 +52,29 @@ export const acceptApplication = async (id: string) => (await apiClient.put<ApiA
 
 export const rejectApplication = async (id: string, rejectionReason: string) =>
   (await apiClient.put<ApiApplication>(url(id, 'reject'), { rejectionReason })).data
+
+/** How an internship ended. RESIGNED and DISMISSED are stored as WITHDRAWN (Past Interns shows Withdrawn / Terminated). */
+export type InternshipOutcome = 'COMPLETED' | 'RESIGNED' | 'DISMISSED'
+const internStatusUrl = (internId: string) => `${endpoints.interns}/${encodeURIComponent(internId)}/status`
+
+/** Ends an active internship: the intern can no longer log in and moves to Past Interns. */
+export const endInternship = async (internId: string, outcome: InternshipOutcome, endDate: string, reason: string) =>
+  (await apiClient.put(internStatusUrl(internId), { outcome, endDate, reason })).data
+
+/** Makes an ended internship active again with a new end date (ended by mistake, or extended). */
+export const reinstateInternship = async (internId: string, endDate: string) =>
+  (await apiClient.put(internStatusUrl(internId), { outcome: 'REINSTATE', endDate })).data
+
+/** Downloads one uploaded document by id and saves it in the browser. */
+export async function downloadDocumentById(applicationId: string, documentId: string, fileName: string) {
+  const { data } = await apiClient.get<Blob>(`${url(applicationId, 'documents')}/${encodeURIComponent(documentId)}/download`, { responseType: 'blob', timeout: 60000 })
+  const href = URL.createObjectURL(data)
+  const link = window.document.createElement('a')
+  link.href = href
+  link.download = fileName
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(href), 1000)
+}
 
 /** Downloads one of the applicant's uploaded PDFs (CV by default) and saves it in the browser. */
 export async function downloadApplicationDocument(application: Pick<ApiApplication, 'id' | 'documents' | 'fullName'>, type = 'CV') {

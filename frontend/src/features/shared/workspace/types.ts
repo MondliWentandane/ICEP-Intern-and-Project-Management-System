@@ -26,6 +26,9 @@ export interface InternDocument {
   type: string
   fileName: string
   fileUrl?: string
+  mimeType?: string | null
+  sizeBytes?: number | null
+  uploadedAt?: string
 }
 
 export interface InternView extends InternProfile {
@@ -41,6 +44,8 @@ export interface InternView extends InternProfile {
   endDate?: string
   projects?: InternProject[]
   documents?: InternDocument[]
+  /** How the internship ended (Past Interns only). */
+  ending?: { outcome: 'Completed' | 'Withdrawn' | 'Terminated'; reason: string | null; endedBy: string | null; endedAt: string } | null
 }
 
 export interface IntakeView {

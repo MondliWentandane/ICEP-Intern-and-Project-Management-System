@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, IconButton, InputAdornment, Link, Stack, TextField, Typography } from '@mui/material'
+import { isAxiosError } from 'axios'
 import { Eye, EyeOff } from 'lucide-react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
@@ -9,6 +10,7 @@ import { Auth } from '@/api/services/auth.service'
 
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/hooks/useAuth'
+import { AuthBackButton } from '../components/AuthBackButton'
 
 const loginSchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -36,13 +38,16 @@ export function LoginPage() {
       const data = await Auth.login(values)
       setSession(data.token, data.user)
       navigate(dashboardPaths[data.user.role.toUpperCase() as keyof typeof dashboardPaths], { replace: true })
-    } catch {
-      setRequestError('Incorrect email or password. Please try again.')
+    } catch (error) {
+      // 403 = right password but the account can't sign in (internship ended, or deactivated): show why.
+      const blocked = isAxiosError<{ message?: string }>(error) && error.response?.status === 403 ? error.response.data?.message : undefined
+      setRequestError(blocked || 'Incorrect email or password. Please try again.')
     }
   })
 
   return (
     <Stack className="auth-form auth-login-form" component="form" spacing={0} onSubmit={onSubmit} noValidate>
+      <AuthBackButton fallback="/" />
       <Stack className="auth-login-main" spacing={0}>
         <Typography className="auth-heading" component="h1">Login</Typography>
         {requestError && <Alert severity="error" role="alert">{requestError}</Alert>}

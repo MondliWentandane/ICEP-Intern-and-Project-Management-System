@@ -57,21 +57,39 @@ export class AuthRepository {
   }
 
   // Update a password and mark its token as used atomically.
-  async updatePasswordAndConsumeToken(
-    userId: string,
-    tokenId: string,
-    passwordHash: string,
-  ) {
-    return prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: { passwordHash },
-      }),
-      prisma.passwordToken.update({
-        where: { id: tokenId },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+ async updatePasswordAndConsumeToken(
+  userId: string,
+  tokenId: string,
+  passwordHash: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    const now = new Date();
+
+    const tokenUpdate = await tx.passwordToken.updateMany({
+      where: {
+        id: tokenId,
+        userId,
+        usedAt: null,
+        expiresAt: {
+          gt: now,
+        },
+      },
+      data: {
+        usedAt: now,
+      },
+    });
+
+    if (tokenUpdate.count !== 1) {
+      throw new Error(
+        "Password setup token is invalid, expired, or already used.",
+      );
+    }
+
+      return tx.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+  });
   }
 }
 

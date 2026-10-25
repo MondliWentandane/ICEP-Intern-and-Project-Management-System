@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import crypto from "crypto";
 import { authRepository } from "../repositories/AuthRepository";
+import internService from "./InternService";
 
 export class AuthService {
   /**
@@ -21,7 +22,8 @@ export class AuthService {
       throw new Error("Invalid email or password.");
     }
 
-    if (!user.isActive) {
+    // Interns whose internship ended get their own message below, once the password is confirmed.
+    if (!user.isActive && user.role !== "INTERN") {
       throw new Error("This account is inactive.");
     }
 
@@ -32,6 +34,14 @@ export class AuthService {
 
     if (!passwordMatches) {
       throw new Error("Invalid email or password.");
+    }
+
+    if (user.role === "INTERN" && (await internService.hasInternshipEnded(user.id))) {
+      throw new Error("Your internship has ended, so this account can no longer log in.");
+    }
+
+    if (!user.isActive) {
+      throw new Error("This account is inactive.");
     }
 
     return user;
@@ -60,8 +70,8 @@ export class AuthService {
     }
 
         const expiresIn = (
-      process.env.JWT_EXPIRES_IN || "1h"
-    ) as SignOptions["expiresIn"];
+  process.env.JWT_EXPIRES_IN || "1h"
+) as SignOptions["expiresIn"];
 
     const token = jwt.sign(
       { sub: user.id, role: user.role },
@@ -89,6 +99,15 @@ export class AuthService {
     rawToken: string,
     newPassword: string,
   ): Promise<void> {
+
+    if (typeof rawToken !== "string" || !rawToken.trim()) {
+  throw new Error("A password setup token is required.");
+}
+
+if (typeof newPassword !== "string" || newPassword.length < 8) {
+  throw new Error("Password must contain at least 8 characters.");
+}
+
     const tokenHash = crypto
       .createHash("sha256")
       .update(rawToken)

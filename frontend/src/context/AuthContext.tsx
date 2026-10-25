@@ -10,9 +10,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (previewRole) {
       return { id: 'local-preview', name: previewRole === 'mentor' ? 'Pat Naidoo' : 'Local preview', email: previewRole === 'mentor' ? 'pat.naidoo@icep.co.za' : 'preview@example.com', role: previewRole }
     }
-    return null
+    // A refresh keeps the signed-in user (an expired token gets a 401, which clears both and goes to /login).
+    return tokenStorage.getUser()
   })
-  const setSession = useCallback((token: string, nextUser: User, remember = true) => { tokenStorage.set(token, remember); setUser(nextUser) }, [])
+  const setSession = useCallback((token: string, nextUser: User, remember = true) => { tokenStorage.set(token, remember, nextUser); setUser(nextUser) }, [])
   const logout = useCallback(() => { tokenStorage.clear(); setUser(null) }, [])
   const value = useMemo(() => ({ user, isAuthenticated: Boolean(user), setSession, logout }), [user, setSession, logout])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

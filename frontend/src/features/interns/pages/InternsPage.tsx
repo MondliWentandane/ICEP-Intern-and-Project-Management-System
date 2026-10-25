@@ -1,76 +1,131 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiErrorMessage, downloadApplicationDocument, fetchApplications, yearLabel, type ApiApplication } from "@/features/applicants/data/applicationsApi";
+import { apiErrorMessage, downloadApplicationDocument, endInternship, fetchApplications, reinstateInternship, yearLabel, type ApiApplication, type InternshipOutcome } from "@/features/applicants/data/applicationsApi";
 
 /* ------------------------------ Styles ------------------------------ */
 
 const CSS = `
+/* ICEP style guide tokens (styles/tokens.css). Light only: no dark theme on this page. */
 .interns-page{
-  --bg:#f4f6f8;--card:#fff;--text:#12263f;--muted:#6b7a90;--border:#e5e9ef;
-  --navy:#16345a;--navy-d:#12263f;--navy-soft:#e8edf4;
-  
+  --text:var(--icep-heading);--muted:var(--icep-secondary);--border:var(--icep-border);--line:#E6EAF0;
+  --navy:var(--icep-primary);--navy-soft:#E8EEF5;--card:var(--icep-card);--page:var(--icep-page);
+  --ease:cubic-bezier(.2,.8,.2,1);
 }
-@media (prefers-color-scheme: dark){
-  .interns-page{--bg:#0e1a2b;--card:#15253b;--text:#e9eef5;--muted:#93a3ba;--border:#24364f;--navy:#3b6aa8;--navy-d:#2f5a94;--navy-soft:#1f3350}
-}
-.interns-page[data-theme="dark"]{--bg:#0e1a2b;--card:#15253b;--text:#e9eef5;--muted:#93a3ba;--border:#24364f;--navy:#3b6aa8;--navy-d:#2f5a94;--navy-soft:#1f3350}
 .interns-page,.interns-page *{box-sizing:border-box}
-.interns-page{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:15px}
-.interns-page .wrap{max-width:1200px;margin:0 auto;padding:24px}
-.interns-page h1{font-size:22px;margin:0 0 20px}
-.interns-page .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
-.interns-page .field{background:var(--card);border:1px solid var(--border);border-radius:10px;height:42px;padding:0 14px;color:var(--text);font:inherit}
+.interns-page{color:var(--text);font-family:Inter,Arial,sans-serif;font-size:14px}
+.interns-page .wrap{width:100%}
+
+/* Filters */
+.interns-page .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--icep-radius-lg)}
+.interns-page .field{background:var(--card);border:1px solid var(--border);border-radius:var(--icep-radius-md);height:40px;padding:0 12px;color:var(--text);font:inherit;transition:border-color .2s,box-shadow .2s}
+.interns-page .field:focus{outline:0;border-color:var(--navy);box-shadow:0 0 0 3px rgba(27,58,92,.12)}
 .interns-page input.field{flex:1;min-width:220px}
-.interns-page .clear{height:42px;background:var(--card);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:0 18px;font:500 15px Inter,sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(18,38,63,.05)}
-.interns-page .clear:hover{color:var(--text);background:var(--bg)}
-.interns-page .clear:active{transform:translateY(1px)}
+.interns-page .clear{height:40px;background:var(--card);color:var(--navy);border:1px solid var(--border);border-radius:var(--icep-radius-md);padding:0 16px;font:600 14px Inter,Arial,sans-serif;cursor:pointer;white-space:nowrap;transition:background-color .2s,border-color .2s}
+.interns-page .clear:hover{background:var(--page);border-color:var(--navy)}
 .interns-page .clear:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
-.interns-page .clear:disabled{opacity:.6;cursor:default}
-.interns-page .card{background:var(--card);border-radius:14px;box-shadow:0 1px 3px rgba(18,38,63,.08);overflow:hidden}
+
+/* Table */
+.interns-page .card{background:var(--card);border:1px solid var(--border);border-radius:var(--icep-radius-lg);box-shadow:0 2px 10px rgba(26,32,44,.05);overflow:hidden}
 .interns-page .scroll{overflow-x:auto}
-.interns-page table{width:100%;border-collapse:collapse;min-width:820px}
-.interns-page th{text-align:left;font-size:12px;letter-spacing:.04em;color:var(--muted);padding:18px 20px;border-bottom:1px solid var(--border);font-weight:600}
-.interns-page td{padding:14px 20px;border-bottom:1px solid var(--border)}
+.interns-page table{width:100%;border-collapse:separate;border-spacing:0;min-width:820px}
+.interns-page th{text-align:left;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:14px 20px;background:#F8FAFC;border-bottom:1px solid var(--line);font-weight:700}
+.interns-page td{padding:14px 20px;border-bottom:1px solid var(--line);color:var(--text)}
+/* Rows rise in one by one, and pop out in ICEP navy on hover (as on Applicants) */
+.interns-page tbody tr.trow{animation:intern-rise .4s var(--ease) backwards;transition:background-color .25s ease,color .25s ease,transform .3s var(--ease),filter .3s ease}
+.interns-page tbody tr.trow:hover{position:relative;z-index:1;background:var(--navy);transform:scale(1.006,1.04);filter:drop-shadow(0 8px 14px rgba(27,58,92,.3))}
+.interns-page tbody tr.trow:hover td{color:#fff;border-bottom-color:transparent;box-shadow:1px 0 0 var(--navy)}
+.interns-page tbody tr.trow:hover td.muted{color:#C8D5E6}
+.interns-page tbody tr.trow:hover .av{background:rgba(255,255,255,.16);color:#fff}
+.interns-page tbody tr.trow:hover .btn{border-color:#fff}
 .interns-page tr:last-child td{border-bottom:0}
-.interns-page .who{display:flex;align-items:center;gap:12px;font-weight:500}
+.interns-page .who{display:flex;align-items:center;gap:12px;font-weight:600}
 .interns-page .av{width:36px;height:36px;border-radius:50%;background:var(--navy-soft);color:var(--navy);font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
-.interns-page .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:13px;font-weight:600}
-.interns-page .Intern{background:#dcf7e6;color:#17713a}
-.interns-page .Interviewee{background:#fdf0c2;color:#8a4b08}
-.interns-page .Applicant{background:#dbe8fd;color:#1d3fa8}
-.interns-page .PastIntern{background:#eceff3;color:#4a586b}
-.interns-page .btn{background:var(--navy-d);color:#fff;border:0;border-radius:8px;padding:10px 14px;font:600 14px Inter,sans-serif;cursor:pointer;white-space:nowrap}
-.interns-page .btn:hover{background:var(--navy)}
-.interns-page .foot{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-top:1px solid var(--border);color:var(--muted);flex-wrap:wrap;gap:12px}
-.interns-page .pager{display:flex;gap:8px;align-items:center}
-.interns-page .pg{min-width:38px;height:38px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font:600 14px Inter,sans-serif;cursor:pointer;padding:0 12px}
-.interns-page .pg.on{background:var(--navy-d);color:#fff;border-color:var(--navy-d)}
-.interns-page .pg:disabled{color:var(--muted);cursor:default}
-.interns-page .back{display:inline-flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 16px;font:600 14px Inter,sans-serif;cursor:pointer;margin-bottom:24px}
-.interns-page .grid{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start}
-@media(max-width:860px){.interns-page .grid{grid-template-columns:1fr}}
-.interns-page .side{padding:32px 28px;text-align:center}
-.interns-page .big{width:108px;height:108px;border-radius:50%;background:var(--navy);color:#fff;font-size:36px;font-weight:700;display:grid;place-items:center;margin:0 auto 14px}
-.interns-page .side h2{margin:0;font-size:20px}
-.interns-page .sid{color:var(--muted);margin:4px 0 12px}
-.interns-page .info{text-align:left;border-top:1px solid var(--border);margin-top:24px;padding-top:20px}
-.interns-page .lbl{font-size:12px;letter-spacing:.04em;color:var(--muted);font-weight:600;text-transform:uppercase;margin-top:18px}
-.interns-page .lbl:first-child{margin-top:0}
-.interns-page .val{margin-top:4px}
-.interns-page .dl{width:100%;margin-top:36px;background:var(--card);border:1.5px solid var(--navy);color:var(--navy);border-radius:10px;padding:13px;font:600 15px Inter,sans-serif;cursor:pointer}
-.interns-page .dl:hover{background:var(--navy-soft)}
+.interns-page .muted{color:var(--muted)}
+
+/* Status pills: style guide colours */
+.interns-page .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.interns-page .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.interns-page .Intern{background:var(--icep-active-tint);color:#166534}
+.interns-page .Interviewee{background:var(--icep-completed-tint);color:#1E40AF}
+.interns-page .Applicant{background:var(--icep-pending-tint);color:#92400E}
+.interns-page .PastIntern{background:#EDF0F4;color:#4A5568}
+
+.interns-page .btn{display:inline-flex;align-items:center;gap:6px;background:var(--card);color:var(--navy);border:1px solid var(--border);border-radius:var(--icep-radius-md);padding:8px 14px;font:600 13px Inter,Arial,sans-serif;cursor:pointer;white-space:nowrap;transition:background-color .2s,color .2s,border-color .2s}
+.interns-page .btn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.interns-page .btn:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+
+/* Footer / pagination */
+.interns-page .foot{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--line);color:var(--muted);flex-wrap:wrap;gap:12px}
+.interns-page .pager{display:flex;gap:6px;align-items:center}
+.interns-page .pg{min-width:34px;height:34px;border-radius:var(--icep-radius-md);border:1px solid var(--border);background:var(--card);color:var(--text);font:600 13px Inter,Arial,sans-serif;cursor:pointer;padding:0 10px}
+.interns-page .pg:hover:not(:disabled){border-color:var(--navy)}
+.interns-page .pg.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.interns-page .pg:disabled{color:#A0AEC0;cursor:default}
+
+/* Profile view */
+.interns-page .back{display:inline-flex;gap:8px;align-items:center;background:none;border:0;color:var(--navy);padding:6px 0;font:600 14px Inter,Arial,sans-serif;cursor:pointer;margin-bottom:16px}
+.interns-page .back:hover{text-decoration:underline}
+.interns-page .grid{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start}
+@media(max-width:900px){.interns-page .grid{grid-template-columns:1fr}}
+.interns-page .side{padding:28px 24px;text-align:center}
+.interns-page .big{width:96px;height:96px;border-radius:50%;background:var(--navy-soft);color:var(--navy);font-size:32px;font-weight:700;display:grid;place-items:center;margin:0 auto 14px;border:3px solid #fff;box-shadow:0 0 0 2px var(--navy-soft)}
+.interns-page .side h2{margin:0;font-size:20px;font-weight:700;color:var(--text)}
+.interns-page .sid{color:var(--muted);margin:4px 0 12px;font-size:13px}
+.interns-page .info{text-align:left;border-top:1px solid var(--line);margin-top:22px;padding-top:6px}
+.interns-page .row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.interns-page .row:last-child{border-bottom:0}
+.interns-page .row svg{flex:none;color:var(--muted);margin-top:2px}
+.interns-page .lbl{font-size:12px;color:var(--muted);font-weight:500}
+.interns-page .val{margin-top:2px;font-weight:600;overflow-wrap:anywhere}
+.interns-page .dl{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:20px;background:var(--navy);border:1px solid var(--navy);color:#fff;border-radius:var(--icep-radius-md);padding:11px;font:600 14px Inter,Arial,sans-serif;cursor:pointer;transition:background-color .2s}
+.interns-page .dl:hover{background:#12283F}
 .interns-page .dl:disabled{opacity:.7;cursor:default}
-.interns-page .dl.ok{background:#dcf7e6;border-color:#17713a;color:#17713a}
-.interns-page .dl-msg{font-size:13px;color:var(--muted);margin-top:8px;min-height:18px}
-.interns-page .sec{margin-bottom:24px}
-.interns-page .sec h3{margin:0;padding:20px 24px;font-size:17px;border-bottom:1px solid var(--border)}
-.interns-page .kv{display:grid;grid-template-columns:1fr 1fr;gap:22px 24px;padding:22px 24px}
-.interns-page .kv small{display:block;color:var(--muted);font-size:13px;margin-bottom:4px}
+.interns-page .dl.ok{background:var(--icep-active-tint);border-color:var(--icep-active);color:#166534}
+.interns-page .dl-msg{font-size:13px;color:var(--icep-rejected);margin-top:8px;min-height:18px}
+.interns-page .sec{margin-bottom:20px}
+.interns-page .sec h3{display:flex;align-items:center;gap:10px;margin:0;padding:16px 22px;font-size:16px;font-weight:700;border-bottom:1px solid var(--line)}
+.interns-page .sec h3 .ic{width:32px;height:32px;border-radius:var(--icep-radius-md);background:var(--navy-soft);color:var(--navy);display:grid;place-items:center}
+.interns-page .kv{display:grid;grid-template-columns:1fr 1fr;gap:18px 24px;padding:20px 22px}
+.interns-page .kv small{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
 .interns-page .kv b{font-weight:600}
-.interns-page .act{padding:20px 24px;display:flex;flex-direction:column;gap:22px}
-.interns-page .act div{display:flex;align-items:center;gap:14px}
-.interns-page .act i{width:12px;height:12px;border-radius:50%;background:var(--navy);flex:none}
-.interns-page .act span{margin-left:auto;color:var(--muted);font-size:14px}
+.interns-page .chips{display:flex;flex-wrap:wrap;gap:6px}
+.interns-page .chip{padding:3px 10px;border-radius:999px;background:var(--navy-soft);color:var(--navy);font-size:12px;font-weight:600}
+/* Recent activity as a small timeline */
+.interns-page .act{list-style:none;margin:0;padding:18px 22px}
+.interns-page .act li{position:relative;display:flex;align-items:center;gap:14px;padding:0 0 18px 0}
+.interns-page .act li:last-child{padding-bottom:0}
+.interns-page .act li:not(:last-child)::after{content:"";position:absolute;left:5px;top:16px;bottom:2px;width:2px;background:var(--line)}
+.interns-page .act i{width:12px;height:12px;border-radius:50%;background:var(--navy);flex:none;box-shadow:0 0 0 3px var(--navy-soft)}
+.interns-page .act i.ok{background:var(--icep-active);box-shadow:0 0 0 3px var(--icep-active-tint)}
+.interns-page .act i.iv{background:var(--icep-completed);box-shadow:0 0 0 3px var(--icep-completed-tint)}
+.interns-page .act span{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+.interns-page .reveal{animation:intern-rise .45s var(--ease) both}
+@keyframes intern-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media(max-width:560px){.interns-page .kv{grid-template-columns:1fr}}
+/* Ending (or reinstating) an internship */
+.interns-page .end{padding:20px 22px;display:grid;gap:14px}
+.interns-page .end p{margin:0;color:var(--muted);line-height:1.5}
+.interns-page .end p b{color:var(--text)}
+.interns-page .choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media(max-width:560px){.interns-page .choices{grid-template-columns:1fr}}
+.interns-page .choice{position:relative;display:grid;gap:2px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--icep-radius-md);cursor:pointer;transition:border-color .2s,background-color .2s,box-shadow .2s}
+.interns-page .choice input{position:absolute;opacity:0;pointer-events:none}
+.interns-page .choice b{font-weight:600}
+.interns-page .choice small{color:var(--muted);font-size:12px}
+.interns-page .choice:hover{border-color:var(--navy)}
+.interns-page .choice.on{border-color:var(--navy);background:var(--navy-soft);box-shadow:0 0 0 1px var(--navy)}
+.interns-page .choice:focus-within{outline:2px solid var(--navy);outline-offset:2px}
+.interns-page .end label.f{display:grid;gap:6px;font-weight:600;font-size:13px}
+.interns-page .end label.f .field{font-weight:400}
+.interns-page .end textarea.field{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
+.interns-page .end .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.interns-page .btn.solid{background:var(--navy);color:#fff;border-color:var(--navy)}
+.interns-page .btn.solid:hover{background:#12283F}
+.interns-page .btn.danger{background:var(--icep-rejected);color:#fff;border-color:var(--icep-rejected)}
+.interns-page .btn.danger:hover{background:#B91C1C;border-color:#B91C1C}
+.interns-page .btn:disabled{opacity:.6;cursor:default}
+.interns-page .end .err{color:var(--icep-rejected);font-size:13px;margin:0}
+.interns-page .end .done{color:#166534;background:var(--icep-active-tint);border-radius:var(--icep-radius-md);padding:10px 12px;margin:0}
+@media(prefers-reduced-motion:reduce){.interns-page .reveal,.interns-page tbody tr.trow{animation:none}.interns-page tbody tr.trow:hover{transform:none}}
 `;
 
 type Status = "Intern" | "Interviewee" | "Applicant" | "Past Intern";
@@ -85,17 +140,22 @@ interface Intern {
   application: ApiApplication;
 }
 
-const STATUSES: Status[] = ["Intern", "Interviewee", "Applicant", "Past Intern"];
+// Past interns live on their own page (Past Interns), so the list and its filter leave them out.
+const STATUSES: Status[] = ["Intern", "Interviewee", "Applicant"];
 const STATUS_FROM_API: Partial<Record<ApiApplication["status"], Status>> = {
   PENDING: "Applicant",
   INTERVIEWEE: "Interviewee",
   ACCEPTED: "Intern",
 };
 
+/** Accepted applicants are interns until their internship ends, then past interns. */
+const statusOf = (a: ApiApplication): Status | undefined =>
+  a.status === "ACCEPTED" && a.intern && a.intern.status !== "ACTIVE" ? "Past Intern" : STATUS_FROM_API[a.status];
+
 /** Everyone who applied through the careers page (rejected applications are left out). */
 function toInterns(applications: ApiApplication[]): Intern[] {
   return applications.flatMap((a) => {
-    const status = STATUS_FROM_API[a.status];
+    const status = statusOf(a);
     return status ? [{ id: a.id, name: a.fullName, studentNo: a.studentNumber, campus: a.position.campus.name, status, application: a }] : [];
   });
 }
@@ -121,20 +181,146 @@ function downloadCv(p: Intern) {
 
 /* ---------------------------- Profile view ---------------------------- */
 
+const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
+);
+const ICONS = {
+  mail: "M4 6h16v12H4zM4 7l8 6 8-6",
+  phone: "M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2",
+  pin: "M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4",
+  cap: "M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5",
+  brief: "M4 8h16v11H4zM9 8V5h6v3",
+  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
+  download: "M12 4v11M7 10l5 5 5-5M5 20h14",
+  back: "M15 18l-6-6 6-6",
+  flag: "M5 21V4M5 4h11l-2 4 2 4H5",
+};
+
+/* ------------------------- Ending an internship ------------------------ */
+
+const OUTCOME_CHOICES: { value: InternshipOutcome; label: string; hint: string }[] = [
+  { value: "COMPLETED", label: "Completed", hint: "Finished the placement" },
+  { value: "RESIGNED", label: "Resigned", hint: "Left before the end" },
+  { value: "DISMISSED", label: "Dismissed", hint: "Placement terminated" },
+];
+const todayYmd = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg" }).format(new Date());
+
+type InternRecord = NonNullable<ApiApplication["intern"]>;
+
+/** The start date, or today when the internship hasn't started yet (withdrawing before day one). */
+const earliestLastDay = (record: InternRecord) => {
+  const start = record.startDate?.slice(0, 10);
+  return start && start < todayYmd() ? start : todayYmd();
+};
+
+/**
+ * Ends an active internship (the intern loses access and moves to Past Interns), or reinstates an
+ * ended one with a new end date. Internships also end on their own the day after the end date.
+ */
+function InternshipStatusCard({ record, name, onUpdated }: { record: InternRecord; name: string; onUpdated: (next: InternRecord) => void }) {
+  const active = record.status === "ACTIVE";
+  const [open, setOpen] = useState(false);
+  const [outcome, setOutcome] = useState<InternshipOutcome>("COMPLETED");
+  const [endDate, setEndDate] = useState(todayYmd());
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+
+  const submit = async () => {
+    setError("");
+    if (active && outcome !== "COMPLETED" && reason.trim().length < 3) {
+      setError("Give a reason for the resignation or dismissal.");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (active) {
+        await endInternship(record.id, outcome, endDate, reason.trim());
+        onUpdated({ ...record, status: outcome === "COMPLETED" ? "COMPLETED" : "WITHDRAWN", endDate });
+        setDone(`${name}'s internship has ended. They can no longer log in and have moved to Past Interns (off this list).`);
+      } else {
+        await reinstateInternship(record.id, endDate);
+        onUpdated({ ...record, status: "ACTIVE", endDate });
+        setDone(`${name} is an active intern again until ${fmt(endDate)}.`);
+      }
+      setOpen(false);
+    } catch (err) {
+      setError(apiErrorMessage(err, "The internship could not be updated."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="end">
+      {done && <p className="done" role="status">{done}</p>}
+      {active ? (
+        <p>
+          {record.startDate && record.startDate.slice(0, 10) > todayYmd()
+            ? <>Starts on <b>{fmt(record.startDate)}</b> and ends automatically after <b>{fmt(record.endDate)}</b>. If {name} withdraws before starting, end it with today as the last day.</>
+            : <>Ends automatically after <b>{fmt(record.endDate)}</b>. End it early if {name} finished sooner, resigned or was dismissed.</>}
+          {" "}They will no longer be able to log in.
+        </p>
+      ) : (
+        <p>This internship ended on <b>{fmt(record.endDate)}</b>. Reinstate it if it was ended by mistake or has been extended.</p>
+      )}
+      {!open ? (
+        <div className="acts">
+          <button type="button" className="btn" onClick={() => { setOpen(true); setDone(""); setError(""); setEndDate(active ? todayYmd() : ""); }}>
+            {active ? "End internship" : "Reinstate internship"}
+          </button>
+        </div>
+      ) : (
+        <>
+          {active && (
+            <div className="choices" role="radiogroup" aria-label="How the internship ended">
+              {OUTCOME_CHOICES.map((c) => (
+                <label key={c.value} className={`choice${outcome === c.value ? " on" : ""}`}>
+                  <input type="radio" name="outcome" value={c.value} checked={outcome === c.value} onChange={() => setOutcome(c.value)} />
+                  <b>{c.label}</b><small>{c.hint}</small>
+                </label>
+              ))}
+            </div>
+          )}
+          <label className="f">{active ? "Last day" : "New end date"}
+            <input className="field" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+              {...(active ? { max: todayYmd(), min: earliestLastDay(record) } : { min: todayYmd() })} />
+          </label>
+          {active && (
+            <label className="f">Reason{outcome === "COMPLETED" ? " (optional)" : ""}
+              <textarea className="field" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500}
+                placeholder={outcome === "COMPLETED" ? "e.g. Finished the project early" : outcome === "RESIGNED" ? "e.g. Accepted a permanent job offer" : "e.g. Repeated absence without notice"} />
+            </label>
+          )}
+          {error && <p className="err" role="alert">{error}</p>}
+          <div className="acts">
+            <button type="button" className="btn" onClick={() => { setOpen(false); setError(""); }} disabled={saving}>Cancel</button>
+            <button type="button" className={`btn ${active ? "danger" : "solid"}`} onClick={() => void submit()} disabled={saving || !endDate}>
+              {saving ? "Saving…" : active ? "End internship" : "Reinstate"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 interface ProfileProps {
   intern: Intern;
   onBack: () => void;
+  onInternUpdated: (next: InternRecord) => void;
 }
 
-function InternProfile({ intern, onBack }: ProfileProps) {
+function InternProfile({ intern, onBack, onInternUpdated }: ProfileProps) {
   const [downloaded, setDownloaded] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const a = intern.application;
   const activity = [
-    { text: "Application submitted", at: a.createdAt },
-    ...(a.interviewAt ? [{ text: `Interview scheduled for ${fmt(a.interviewAt)}`, at: a.reviewedAt ?? a.updatedAt }] : []),
-    ...(a.status === "ACCEPTED" ? [{ text: "Application accepted", at: a.reviewedAt ?? a.updatedAt }] : []),
+    { text: "Application submitted", at: a.createdAt, tone: "" },
+    ...(a.interviewAt ? [{ text: `Interview scheduled for ${fmt(a.interviewAt)}`, at: a.reviewedAt ?? a.updatedAt, tone: "iv" }] : []),
+    ...(a.status === "ACCEPTED" ? [{ text: "Application accepted", at: a.reviewedAt ?? a.updatedAt, tone: "ok" }] : []),
   ].reverse();
 
   const handleDownload = async () => {
@@ -154,59 +340,63 @@ function InternProfile({ intern, onBack }: ProfileProps) {
   return (
     <section>
       <button type="button" className="back" onClick={onBack}>
-        ← Back to Interns List
+        <Icon d={ICONS.back} /> Back to interns
       </button>
 
       <div className="grid">
-        <div className="card side">
+        <div className="card side reveal">
           <div className="big">{initials(intern.name)}</div>
           <h2>{intern.name}</h2>
           <div className="sid">{intern.studentNo}</div>
           <span className={pillClass(intern.status)}>{intern.status}</span>
 
           <div className="info">
-            <div className="lbl">Email address</div>
-            <div className="val">{a.email}</div>
-            <div className="lbl">Phone number</div>
-            <div className="val">{a.phone || "—"}</div>
-            <div className="lbl">Campus</div>
-            <div className="val">{intern.campus}</div>
+            <div className="row"><Icon d={ICONS.mail} /><div><div className="lbl">Email address</div><div className="val">{a.email}</div></div></div>
+            <div className="row"><Icon d={ICONS.phone} /><div><div className="lbl">Phone number</div><div className="val">{a.phone || "—"}</div></div></div>
+            <div className="row"><Icon d={ICONS.pin} /><div><div className="lbl">Campus</div><div className="val">{intern.campus}</div></div></div>
           </div>
 
           <button type="button" className={`dl${downloaded ? " ok" : ""}`} onClick={() => void handleDownload()} disabled={downloading}>
-            {downloaded ? "✓ CV downloaded" : downloading ? "Downloading…" : "⬇ Download CV"}
+            {downloaded ? "✓ CV downloaded" : downloading ? "Downloading…" : <><Icon d={ICONS.download} /> Download CV</>}
           </button>
           <div className="dl-msg">{downloadError}</div>
         </div>
 
         <div>
-          <div className="card sec">
-            <h3>Academic Background</h3>
+          <div className="card sec reveal" style={{ animationDelay: "80ms" }}>
+            <h3><span className="ic"><Icon d={ICONS.cap} /></span>Academic background</h3>
             <div className="kv">
               <div><small>Qualification</small><b>{a.qualification}</b></div>
               <div><small>Year of Study</small><b>{yearLabel(a.yearOfStudy) || "—"}</b></div>
               <div><small>Institution</small><b>{a.institution}</b></div>
-              <div><small>Skills</small><b>{a.skills.map((s) => s.skill.name).join(", ") || "—"}</b></div>
+              <div><small>Skills</small>{a.skills.length ? <div className="chips">{a.skills.map((s) => <span key={s.skill.name} className="chip">{s.skill.name}</span>)}</div> : <b>—</b>}</div>
             </div>
           </div>
 
-          <div className="card sec">
-            <h3>Internship Details</h3>
+          <div className="card sec reveal" style={{ animationDelay: "160ms" }}>
+            <h3><span className="ic"><Icon d={ICONS.brief} /></span>Internship details</h3>
             <div className="kv">
               <div><small>Position</small><b>{a.position.title}</b></div>
               <div><small>Department</small><b>{a.position.department.name}</b></div>
-              <div><small>Start Date</small><b>{fmt(a.position.intake.startDate)}</b></div>
-              <div><small>Expected End Date</small><b>{fmt(a.position.intake.endDate)}</b></div>
+              <div><small>Start Date</small><b>{fmt(a.intern?.startDate ?? a.position.intake.startDate)}</b></div>
+              <div><small>{intern.status === "Past Intern" ? "End Date" : "Expected End Date"}</small><b>{fmt(a.intern?.endDate ?? a.position.intake.endDate)}</b></div>
             </div>
           </div>
 
-          <div className="card sec">
-            <h3>Recent Activity</h3>
-            <div className="act">
-              {activity.map((item) => (
-                <div key={item.text}><i />{item.text}<span>{ago(item.at)}</span></div>
-              ))}
+          {a.intern && (
+            <div className="card sec reveal" style={{ animationDelay: "240ms" }}>
+              <h3><span className="ic"><Icon d={ICONS.flag} /></span>Internship status</h3>
+              <InternshipStatusCard record={a.intern} name={a.fullName} onUpdated={onInternUpdated} />
             </div>
+          )}
+
+          <div className="card sec reveal" style={{ animationDelay: "320ms" }}>
+            <h3><span className="ic"><Icon d={ICONS.clock} /></span>Recent activity</h3>
+            <ul className="act">
+              {activity.map((item) => (
+                <li key={item.text}><i className={item.tone} />{item.text}<span>{ago(item.at)}</span></li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
@@ -241,6 +431,7 @@ export function InternsPage() {
     const q = query.trim().toLowerCase();
     return INTERNS.filter(
       (p) =>
+        p.status !== "Past Intern" &&
         (!q || p.name.toLowerCase().includes(q) || p.studentNo.includes(q)) &&
         (!campus || p.campus === campus) &&
         (!status || p.status === status)
@@ -260,13 +451,20 @@ export function InternsPage() {
   };
 
   const selected = INTERNS.find((p) => p.id === selectedId);
+  // After ending or reinstating an internship, update that row without reloading the list.
+  const updateIntern = (next: InternRecord) =>
+    setInterns((list) => list.map((p) => {
+      if (p.application.intern?.id !== next.id) return p;
+      const application = { ...p.application, intern: next };
+      return { ...p, application, status: statusOf(application) ?? p.status };
+    }));
 
   return (
     <div className="interns-page">
       <style>{CSS}</style>
       <div className="wrap">
         {selected ? (
-          <InternProfile intern={selected} onBack={() => setSelectedId(null)} />
+          <InternProfile intern={selected} onBack={() => setSelectedId(null)} onInternUpdated={updateIntern} />
         ) : (
           <section>
             <div className="filters">
@@ -329,21 +527,21 @@ export function InternsPage() {
                         <td colSpan={6} style={{ color: "var(--muted)" }}>{loading ? "Loading interns…" : loadError || "No interns found."}</td>
                       </tr>
                     )}
-                    {rows.map((p) => (
-                      <tr key={p.id}>
+                    {rows.map((p, i) => (
+                      <tr key={p.id} className="trow" style={{ animationDelay: `${i * 45}ms` }}>
                         <td>
                           <div className="who">
                             <span className="av">{initials(p.name)}</span>
                             {p.name}
                           </div>
                         </td>
-                        <td>{p.studentNo}</td>
-                        <td>{p.application.email}</td>
+                        <td className="muted">{p.studentNo}</td>
+                        <td className="muted">{p.application.email}</td>
                         <td>{p.campus}</td>
                         <td><span className={pillClass(p.status)}>{p.status}</span></td>
                         <td>
                           <button type="button" className="btn" onClick={() => setSelectedId(p.id)}>
-                            View profile →
+                            View profile
                           </button>
                         </td>
                       </tr>

@@ -45,7 +45,7 @@ export class AuthController {
         return;
       }
 
-      if (message === "This account is inactive.") {
+      if (message === "This account is inactive." || message.startsWith("Your internship has ended")) {
         res.status(403).json({ message });
         return;
       }
@@ -79,9 +79,9 @@ export class AuthController {
   }
 
   /**
-   * Returns the authenticated user's information.
-   * Requires authenticateToken middleware to run first.
-   */
+ * Returns the authenticated user's information.
+ * Requires AuthMiddleware.verifyToken to run first.
+ */
   async verifyToken(
     req: AuthenticatedRequest,
     res: Response,

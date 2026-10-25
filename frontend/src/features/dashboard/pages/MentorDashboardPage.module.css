@@ -535,3 +535,36 @@
     justify-content: space-between;
   }
 }
+
+/* Create project form: hints and skill suggestions */
+.formHint {
+  display: block;
+  font-size: 12px;
+  color: #718096;
+  margin: 2px 0 6px;
+}
+.skillSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.skillSuggestion {
+  border: 1px dashed #D1D9E2;
+  background: #fff;
+  color: #1B3A5C;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: 600 12px Inter, Arial, sans-serif;
+  cursor: pointer;
+  transition: border-color .2s, background-color .2s;
+}
+.skillSuggestion:hover {
+  border-style: solid;
+  border-color: #1B3A5C;
+  background: #E8EEF5;
+}
+.skillSuggestion:focus-visible {
+  outline: 2px solid #1B3A5C;
+  outline-offset: 2px;
+}

@@ -17,6 +17,12 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { TagInput } from '@/components/ui/TagInput'
+import {
+  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, PROJECT_STATUS_LABELS, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
+  type ProjectStatus,
+} from '@/features/projects/data/newProject'
+import { IcepLogo } from '@/components/brand/IcepLogo'
 import styles from './MentorDashboardPage.module.css'
 
 interface TeamMember {
@@ -24,12 +30,18 @@ interface TeamMember {
   colorClass: string
 }
 
+const statusLabels = PROJECT_STATUS_LABELS
+// A new project can't start as Completed.
+const NEW_PROJECT_STATUSES: ProjectStatus[] = ['PLANNED', 'IN_PROGRESS', 'ON_HOLD']
+
 interface ProjectItem {
   id: string
   name: string
-  department: string
+  groupName?: string
+  description?: string
+  requiredSkills?: string[]
   team: TeamMember[]
-  status: 'On Track' | 'At Risk' | 'Pending Review'
+  status: ProjectStatus
   progress: number
   dueDate: string
   colorClass: string
@@ -48,13 +60,13 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-1',
     name: 'Software Dev Alpha',
-    department: 'Software Engineering',
+    groupName: 'Group A',
     team: [
       { initials: 'MS', colorClass: styles.avatarMS },
       { initials: 'TM', colorClass: styles.avatarTM },
       { initials: 'JS', colorClass: styles.avatarJS },
     ],
-    status: 'On Track',
+    status: 'IN_PROGRESS',
     progress: 75,
     dueDate: 'Nov 15',
     colorClass: styles.barBlue,
@@ -62,12 +74,12 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-2',
     name: 'Network Security Audit',
-    department: 'Cybersecurity',
+    groupName: 'Group B',
     team: [
       { initials: 'RJ', colorClass: styles.avatarRJ },
       { initials: 'MS', colorClass: styles.avatarMS },
     ],
-    status: 'At Risk',
+    status: 'ON_HOLD',
     progress: 30,
     dueDate: 'Oct 28',
     colorClass: styles.barOrange,
@@ -75,12 +87,12 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-3',
     name: 'Data Migration Phase 2',
-    department: 'Informatics',
+    groupName: 'Group C',
     team: [
       { initials: 'TN', colorClass: styles.avatarTN },
       { initials: 'AB', colorClass: styles.avatarAB },
     ],
-    status: 'Pending Review',
+    status: 'IN_PROGRESS',
     progress: 95,
     dueDate: 'Oct 12',
     colorClass: styles.barGreen,
@@ -88,13 +100,13 @@ const initialProjects: ProjectItem[] = [
   {
     id: 'proj-4',
     name: 'Mobile App Beta',
-    department: 'Software Engineering',
+    groupName: 'Group D',
     team: [
       { initials: 'JS', colorClass: styles.avatarJS },
       { initials: 'MS', colorClass: styles.avatarMS },
       { initials: 'TM', colorClass: styles.avatarTM },
     ],
-    status: 'On Track',
+    status: 'IN_PROGRESS',
     progress: 45,
     dueDate: 'Dec 01',
     colorClass: styles.barBlue,
@@ -153,10 +165,13 @@ export function MentorDashboardPage() {
   // New Project modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [projectName, setProjectName] = useState('')
-  const [department, setDepartment] = useState('Software Engineering')
-  const [status, setStatus] = useState<'On Track' | 'At Risk' | 'Pending Review'>('On Track')
-  const [dueDate, setDueDate] = useState('')
-  const [progress, setProgress] = useState(0)
+  const [groupName, setGroupName] = useState('')
+  const [description, setDescription] = useState('')
+  const [status, setStatus] = useState<ProjectStatus>('PLANNED')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [requiredSkills, setRequiredSkills] = useState<string[]>([])
+  const [formError, setFormError] = useState('')
 
   // Feedback toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -178,37 +193,47 @@ export function MentorDashboardPage() {
     setMenuAnchorEl(null)
   }
 
+  const resetForm = () => {
+    setProjectName('')
+    setGroupName('')
+    setDescription('')
+    setStatus('PLANNED')
+    setStartDate('')
+    setEndDate('')
+    setRequiredSkills([])
+    setFormError('')
+  }
+
+  const formatShortDate = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+
+  // Department, supervisor and creator aren't asked for: they come from the signed-in mentor.
+  // See features/projects/data/newProject.ts for what the backend hook-up needs.
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!projectName.trim()) return
+    const input = toNewProject({ name: projectName, groupName, description, status, startDate, endDate, requiredSkills })
+    const problem = validateNewProject(input)
+    if (problem) { setFormError(problem); return }
 
-    const colorClass =
-      status === 'At Risk'
-        ? styles.barOrange
-        : status === 'Pending Review'
-        ? styles.barGreen
-        : styles.barBlue
-
+    // TODO (backend hook-up): await Projects.create(input) -> POST /api/projects, and use the saved project below.
+    const colorClass = input.status === 'ON_HOLD' ? styles.barOrange : styles.barBlue
     const newProject: ProjectItem = {
       id: `proj-${Date.now()}`,
-      name: projectName.trim(),
-      department,
-      team: [
-        { initials: 'PN', colorClass: styles.avatarMS },
-        { initials: 'MS', colorClass: styles.avatarJS },
-      ],
-      status,
-      progress: Number(progress) || 10,
-      dueDate: dueDate || 'Dec 15',
+      name: input.name,
+      groupName: input.groupName,
+      description: input.description,
+      requiredSkills: input.requiredSkills,
+      team: [],
+      status: input.status,
+      progress: 0, // calculated from tasks once the project has some
+      dueDate: input.endDate ? formatShortDate(input.endDate) : '—',
       colorClass,
     }
 
     setProjects([newProject, ...projects])
     setActiveProjectsCount((prev) => prev + 1)
     setIsModalOpen(false)
-    setProjectName('')
-    setProgress(0)
-    setDueDate('')
+    resetForm()
     setToastMessage(`Project "${newProject.name}" successfully created!`)
   }
 
@@ -219,6 +244,10 @@ export function MentorDashboardPage() {
 
   return (
     <main className={styles.page}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <IcepLogo />
+      </div>
+
       {/* Top Bar Actions */}
       <section className={styles.topBar} aria-label="Dashboard controls">
         <button
@@ -356,9 +385,9 @@ export function MentorDashboardPage() {
               <tbody>
                 {projects.map((proj) => {
                   const statusClass =
-                    proj.status === 'On Track'
+                    proj.status === 'IN_PROGRESS' || proj.status === 'COMPLETED'
                       ? styles.statusOnTrack
-                      : proj.status === 'At Risk'
+                      : proj.status === 'ON_HOLD'
                       ? styles.statusAtRisk
                       : styles.statusPendingReview
 
@@ -367,7 +396,8 @@ export function MentorDashboardPage() {
                       <td>
                         <div className={styles.projectInfo}>
                           <span className={styles.projectName}>{proj.name}</span>
-                          <span className={styles.projectDepartment}>{proj.department}</span>
+                          {proj.groupName && <span className={styles.projectDepartment}>{proj.groupName}</span>}
+                          {!!proj.requiredSkills?.length && <span className={styles.projectDepartment}>Skills: {proj.requiredSkills.join(', ')}</span>}
                         </div>
                       </td>
                       <td>
@@ -385,7 +415,7 @@ export function MentorDashboardPage() {
                       </td>
                       <td>
                         <span className={`${styles.statusBadge} ${statusClass}`}>
-                          {proj.status}
+                          {statusLabels[proj.status]}
                         </span>
                       </td>
                       <td>
@@ -498,13 +528,13 @@ export function MentorDashboardPage() {
       {/* New Project Modal */}
       <Modal
         open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); resetForm() }}
         title="Create New Project"
         maxWidth="sm"
         fullWidth
         actions={
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
-            <Button appearance="secondary" onClick={() => setIsModalOpen(false)}>
+            <Button appearance="secondary" onClick={() => { setIsModalOpen(false); resetForm() }}>
               Cancel
             </Button>
             <Button appearance="primary" onClick={handleCreateProject}>
@@ -515,6 +545,7 @@ export function MentorDashboardPage() {
       >
         <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
           <form className={styles.modalForm} onSubmit={handleCreateProject} id="new-project-form">
+            {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
             <div className={styles.formGroup}>
               <label htmlFor="project-name-input" className={styles.formLabel}>
                 Project Name
@@ -525,76 +556,106 @@ export function MentorDashboardPage() {
                 className={styles.formInput}
                 placeholder="e.g. Cloud Security Pipeline"
                 value={projectName}
+                maxLength={NAME_MAX}
                 onChange={(e) => setProjectName(e.target.value)}
                 required
               />
             </div>
 
             <div className={styles.formGroup}>
-              <label htmlFor="department-select" className={styles.formLabel}>
-                Department
+              <label htmlFor="group-name-input" className={styles.formLabel}>
+                Group Name (optional)
               </label>
-              <select
-                id="department-select"
-                className={styles.formSelect}
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-              >
-                <option value="Software Engineering">Software Engineering</option>
-                <option value="Cybersecurity">Cybersecurity</option>
-                <option value="Informatics">Informatics</option>
-                <option value="Multimedia Computing">Multimedia Computing</option>
-                <option value="Computer Science">Computer Science</option>
-              </select>
+              <input
+                id="group-name-input"
+                type="text"
+                className={styles.formInput}
+                placeholder="e.g. Group A"
+                maxLength={GROUP_MAX}
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="description-input" className={styles.formLabel}>
+                Description (optional)
+              </label>
+              <textarea
+                id="description-input"
+                className={styles.formInput}
+                rows={3}
+                placeholder="What is this project about?"
+                maxLength={DESCRIPTION_MAX}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <span className={styles.formHint}>{description.length}/{DESCRIPTION_MAX}</span>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} id="skills-label">
+                Required skills (optional)
+              </label>
+              <span className={styles.formHint}>Used to suggest interns in the Team Builder. Type a skill and press Enter, or pick one below.</span>
+              <div role="group" aria-labelledby="skills-label">
+                <TagInput tags={requiredSkills} onChange={setRequiredSkills} placeholder="e.g. React" />
+              </div>
+              <div className={styles.skillSuggestions}>
+                {SKILL_SUGGESTIONS.filter((skill) => !requiredSkills.some((tag) => tag.toLowerCase() === skill.toLowerCase())).map((skill) => (
+                  <button key={skill} type="button" className={styles.skillSuggestion} onClick={() => setRequiredSkills((current) => (current.includes(skill) ? current : [...current, skill]))}>
+                    + {skill}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className={styles.formGroup}>
               <label htmlFor="status-select" className={styles.formLabel}>
-                Initial Status
+                Status
               </label>
               <select
                 id="status-select"
                 className={styles.formSelect}
                 value={status}
-                onChange={(e) => setStatus(e.target.value as 'On Track' | 'At Risk' | 'Pending Review')}
+                onChange={(e) => setStatus(e.target.value as ProjectStatus)}
               >
-                <option value="On Track">On Track</option>
-                <option value="Pending Review">Pending Review</option>
-                <option value="At Risk">At Risk</option>
+                {NEW_PROJECT_STATUSES.map((value) => (
+                  <option key={value} value={value}>{statusLabels[value]}</option>
+                ))}
               </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className={styles.formGroup}>
-                <label htmlFor="due-date-input" className={styles.formLabel}>
-                  Target Due Date
+                <label htmlFor="start-date-input" className={styles.formLabel}>
+                  Start Date
                 </label>
                 <input
-                  id="due-date-input"
-                  type="text"
+                  id="start-date-input"
+                  type="date"
                   className={styles.formInput}
-                  placeholder="e.g. Nov 30"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                 />
               </div>
 
               <div className={styles.formGroup}>
-                <label htmlFor="progress-input" className={styles.formLabel}>
-                  Initial Progress (%)
+                <label htmlFor="end-date-input" className={styles.formLabel}>
+                  End Date
                 </label>
                 <input
-                  id="progress-input"
-                  type="number"
-                  min="0"
-                  max="100"
+                  id="end-date-input"
+                  type="date"
                   className={styles.formInput}
-                  placeholder="0 - 100"
-                  value={progress || ''}
-                  onChange={(e) => setProgress(Number(e.target.value))}
+                  min={startDate || undefined}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
             </div>
+
+            <p className={styles.formHint}>Progress starts at 0% and is calculated from the project's tasks. The department and supervisor are taken from your mentor profile.</p>
           </form>
         </DialogContent>
       </Modal>

@@ -6,6 +6,8 @@ import {
   type ApplicationStatusValue,
 } from "../repositories/ApplicationRepository";
 import { prisma } from "../config/prisma";
+import { EmailService } from "./EmailService";
+import { notificationService } from "./NotificationService";
 import { readDocument, removeDocument, storeDocument, type StoredFile } from "./DocumentStorage";
 
 type UploadedFiles = Record<string, Express.Multer.File[] | undefined> | undefined;
@@ -41,6 +43,7 @@ const isAcceptingApplications = (position: { status: string; closingDate: Date }
   Boolean(position && position.status === "OPEN" && position.closingDate.getTime() + DAY_MS > Date.now());
 
 const repository = new ApplicationRepository();
+const emailService = new EmailService();
 const transitions: Record<ApplicationStatusValue, ApplicationStatusValue[]> = {
   PENDING: ["INTERVIEWEE", "ACCEPTED", "REJECTED"],
   INTERVIEWEE: ["ACCEPTED", "REJECTED", "PENDING"],
@@ -64,6 +67,35 @@ export class ApplicationService {
     const application = await repository.findByReference(referenceCode);
     if (!application) throw Object.assign(new Error("Application not found"), { statusCode: 404 });
     return application;
+  }
+
+  /**
+   * Public "Track application": the applicant proves it is theirs with the email they applied with
+   * plus the reference number. A wrong email and an unknown reference give the same answer, so the
+   * lookup cannot be used to find out who has applied.
+   */
+  async track(email: unknown, reference: unknown) {
+    const normalisedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const referenceCode = typeof reference === "string" ? reference.trim().toUpperCase() : "";
+    if (!normalisedEmail || !referenceCode) {
+      throw Object.assign(new Error("Enter the email address and reference number you applied with."), { statusCode: 400 });
+    }
+    const application = await repository.findForTracking(referenceCode);
+    if (!application || application.email.toLowerCase() !== normalisedEmail) {
+      throw Object.assign(new Error("No application matches that email address and reference number."), { statusCode: 404 });
+    }
+    const { position, documents, reviewedBy, interviewAt, interviewVenue, ...rest } = application;
+    return {
+      ...rest,
+      positionTitle: position.title,
+      campus: position.campus.name,
+      department: position.department.name,
+      intake: position.intake,
+      interview: interviewAt ? { at: interviewAt, venue: interviewVenue } : null,
+      documents: documents.map((document) => document.type),
+      // Signs the WIL placement letter once accepted.
+      reviewerName: reviewedBy?.fullName ?? null,
+    };
   }
 
   createApplication(input: Parameters<ApplicationRepository["create"]>[0]) { return this.create(input); }
@@ -138,12 +170,14 @@ export class ApplicationService {
       stored.push({ type: "ID_COPY", ...(await storeDocument(referenceCode, idDocument)) });
       stored.push({ type: "ACADEMIC_RECORD", ...(await storeDocument(referenceCode, academicRecord)) });
 
-      return await repository.create({
+      const application = await repository.create({
         referenceCode, positionId, fullName, email,
         phone: phone || undefined, idNumber: idNumber || undefined,
         studentNumber, institution, qualification, yearOfStudy,
         skillIds, documents: stored,
       });
+      await notificationService.applicationSubmitted(application.id);
+      return application;
     } catch (error) {
       await Promise.all(stored.map((file) => removeDocument(file.fileUrl)));
       throw error;
@@ -234,13 +268,32 @@ export class ApplicationService {
     if (data.status === "REJECTED" && !data.rejectionReason?.trim()) {
       throw Object.assign(new Error("rejectionReason is required when rejecting an application"), { statusCode: 400 });
     }
-    return repository.updateStatus(id, {
+    // Accepting creates the intern account first, so a problem (e.g. the email belongs to a staff
+    // member) stops the acceptance instead of leaving an accepted applicant without an account.
+    if (data.status === "ACCEPTED") await repository.createInternFromApplication(id);
+
+    const updated = await repository.updateStatus(id, {
       status: data.status,
       ...(data.interviewAt ? { interviewAt: new Date(data.interviewAt) } : {}),
       ...(data.interviewVenue?.trim() ? { interviewVenue: data.interviewVenue.trim() } : {}),
       ...(data.status === "REJECTED" ? { rejectionReason: data.rejectionReason!.trim() } : {}),
       ...(data.reviewedById ? { reviewedById: data.reviewedById } : {}),
     });
+
+    if (data.status === "ACCEPTED") await notificationService.applicationAccepted(id);
+
+    // Tell the applicant. The decision is already saved, so a failed email doesn't undo it:
+    // the response says emailSent: false and the page can warn the reviewer.
+    if (data.status === "PENDING") return updated;
+    try {
+      if (data.status === "INTERVIEWEE") await emailService.sendInterviewInvite(id);
+      else if (data.status === "ACCEPTED") await emailService.sendAcceptanceEmail(id); // includes the set-password link
+      else await emailService.sendRejectionEmail(id);
+      return { ...updated, emailSent: true };
+    } catch (error) {
+      console.error(`${data.status} email failed for application ${id}:`, error);
+      return { ...updated, emailSent: false };
+    }
   }
 
   acceptApplication(id: string, reviewedById?: string) { return this.acceptApplicant(id, reviewedById); }

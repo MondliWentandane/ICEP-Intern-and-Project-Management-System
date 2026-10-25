@@ -1,6 +1,8 @@
-// Demo application store for tracking. Submitted applications are kept in this browser's localStorage
-// so "Track application" still works after a refresh or a later visit.
-// TODO: replace with API calls (look up by email + reference, magic sign-in link) once the backend exists.
+// "Track application": the applicant looks up their application with the email they applied with
+// plus their reference number (POST /api/applications/track). No account is needed.
+// TODO: the "email me a sign-in link" option is still a demo until POST /applications/track/link exists.
+import axios from 'axios'
+import { apiClient } from '@/api'
 
 export type ApplicationStage = 'submitted' | 'under_review' | 'outcome' | 'placement'
 export const stageOrder: ApplicationStage[] = ['submitted', 'under_review', 'outcome', 'placement']
@@ -17,9 +19,11 @@ export interface TrackedApplication {
   /** The stage currently in progress. Earlier stages are complete. */
   stage: ApplicationStage
   documents: string[]
+  /** Interview booked by the WIL Handler (status INTERVIEWEE). */
+  interview?: { at: string; venue?: string }
   /** Set once the placement team has decided. Accepted applicants receive a WIL placement letter. */
   outcome?: 'accepted' | 'rejected'
-  /** Placement details shown on the WIL placement letter (filled in on acceptance). */
+  /** Placement details shown on the WIL placement letter. */
   placement?: {
     acceptedAt: string
     studentNumber?: string
@@ -33,66 +37,84 @@ export interface TrackedApplication {
   }
 }
 
-const STORE_KEY = 'icep.demo.applications'
-const SESSION_KEY = 'icep.track.session'
-
-// One example so the tracking pages can be tried without submitting first.
-const demoApplication: TrackedApplication = {
-  reference: 'ICEP-2026-01428', email: 'applicant@example.com', firstName: 'Demo', surname: 'Applicant',
-  positionTitle: 'Web Developer Intern', campus: 'Polokwane', submittedAt: '2026-10-05T09:30:00', updatedAt: '2026-10-07T14:00:00',
-  stage: 'under_review', documents: ['Curriculum vitae', 'ID document', 'Academic record'],
+/** What POST /api/applications/track answers with. */
+interface TrackResponse {
+  referenceCode: string
+  email: string
+  fullName: string
+  status: 'PENDING' | 'INTERVIEWEE' | 'ACCEPTED' | 'REJECTED'
+  studentNumber: string
+  institution: string
+  qualification: string
+  reviewedAt: string | null
+  createdAt: string
+  updatedAt: string
+  positionTitle: string
+  campus: string
+  department: string
+  intake: { name: string; startDate: string; endDate: string }
+  interview: { at: string; venue: string | null } | null
+  documents: string[]
+  reviewerName: string | null
 }
 
-// An accepted example, to try the WIL placement letter: accepted@example.com + ICEP-2026-00977.
-const demoAcceptedApplication: TrackedApplication = {
-  reference: 'ICEP-2026-00977', email: 'accepted@example.com', firstName: 'Thabo', surname: 'Mokoena',
-  positionTitle: 'Web Developer Intern', campus: 'Polokwane', submittedAt: '2026-09-02T10:15:00', updatedAt: '2026-10-12T11:00:00',
-  stage: 'placement', documents: ['Curriculum vitae', 'ID document', 'Academic record'], outcome: 'accepted',
-  placement: {
-    acceptedAt: '2026-10-12T11:00:00', studentNumber: '221045873', institution: 'Tshwane University of Technology',
-    qualification: 'Diploma in Informatics', department: 'Software Development', intake: 'January 2027',
-    startDate: '2027-01-11', endDate: '2027-06-30', signatory: 'WIL Coordinator',
-  },
-}
+const documentNames: Record<string, string> = { CV: 'Curriculum vitae', ID_COPY: 'ID document', ACADEMIC_RECORD: 'Academic record' }
 
-function readStore(): TrackedApplication[] {
-  try {
-    const raw = localStorage.getItem(STORE_KEY)
-    const saved = raw ? (JSON.parse(raw) as TrackedApplication[]) : []
-    return Array.isArray(saved) ? saved : []
-  } catch {
-    return []
+function toTracked(data: TrackResponse): TrackedApplication {
+  const [firstName = data.fullName, ...rest] = data.fullName.trim().split(/\s+/)
+  const base = {
+    reference: data.referenceCode,
+    email: data.email,
+    firstName,
+    surname: rest.join(' '),
+    positionTitle: data.positionTitle,
+    campus: data.campus,
+    submittedAt: data.createdAt,
+    updatedAt: data.updatedAt,
+    documents: data.documents.map((type) => documentNames[type] ?? type),
+    ...(data.interview ? { interview: { at: data.interview.at, venue: data.interview.venue ?? undefined } } : {}),
+  }
+  switch (data.status) {
+    case 'PENDING': return { ...base, stage: 'under_review' }
+    case 'INTERVIEWEE': return { ...base, stage: 'outcome' }
+    case 'REJECTED': return { ...base, stage: 'outcome', outcome: 'rejected' }
+    case 'ACCEPTED': return {
+      ...base,
+      stage: 'placement',
+      outcome: 'accepted',
+      placement: {
+        acceptedAt: data.reviewedAt ?? data.updatedAt,
+        studentNumber: data.studentNumber,
+        institution: data.institution,
+        qualification: data.qualification,
+        department: data.department,
+        intake: data.intake.name,
+        startDate: data.intake.startDate,
+        endDate: data.intake.endDate,
+        signatory: data.reviewerName ?? undefined,
+      },
+    }
   }
 }
 
-function writeStore(applications: TrackedApplication[]) {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(applications)) } catch { /* storage unavailable: tracking lasts for this visit only */ }
-}
-
-const memory: TrackedApplication[] = []
-function allApplications() {
-  const stored = readStore()
-  return [demoApplication, demoAcceptedApplication, ...stored, ...memory.filter((item) => !stored.some((saved) => saved.reference === item.reference))]
-}
-const normalise = (value: string) => value.trim().toLowerCase()
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-export function saveApplication(application: TrackedApplication) {
-  memory.push(application)
-  const stored = readStore()
-  writeStore([...stored.filter((item) => item.reference !== application.reference), application])
-}
-
+/** Null when no application matches that email and reference (the server does not say which one is wrong). */
 export async function findApplication(email: string, reference: string): Promise<TrackedApplication | null> {
-  await wait(400)
-  return allApplications().find((item) => normalise(item.email) === normalise(email) && normalise(item.reference) === normalise(reference)) ?? null
+  try {
+    const { data } = await apiClient.post<TrackResponse>('/applications/track', { email: email.trim(), reference: reference.trim() })
+    return toTracked(data)
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return null
+    throw error
+  }
 }
 
 /** Demo only: a real backend would email a one-time sign-in link. Always resolves so it never reveals whether an email has applied. */
 export async function requestSignInLink(email: string): Promise<void> {
-  await wait(500)
+  await new Promise((resolve) => setTimeout(resolve, 500))
   void email
 }
+
+const SESSION_KEY = 'icep.track.session'
 
 // The "signed in" tracking session for this browser tab.
 export interface TrackSession { email: string; reference: string }

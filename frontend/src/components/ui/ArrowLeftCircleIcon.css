@@ -1,0 +1,16 @@
+.alc-icon { display: block; flex: none; }
+.alc-icon:hover .alc-arrow,
+.alc-trigger:hover .alc-arrow,
+.alc-trigger:focus-visible .alc-arrow { animation: alc-nudge .5s ease; }
+
+@keyframes alc-nudge {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alc-icon:hover .alc-arrow,
+  .alc-trigger:hover .alc-arrow,
+  .alc-trigger:focus-visible .alc-arrow { animation: none; }
+}

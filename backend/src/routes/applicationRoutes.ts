@@ -62,7 +62,7 @@ router.post("/applications", applicationUploads, ApplicationController.registerA
 router.post("/register", applicationUploads, ApplicationController.registerApplicant);
 
 // "View Application Status": applicant looks up with email + reference (no account needed).
-router.post("/applications/track", notImplemented("POST /applications/track"));
+router.post("/applications/track", ApplicationController.trackApplication); // body: { email, reference }
 router.post("/applications/track/link", notImplemented("POST /applications/track/link"));
 
 // ---- Careers management (Admin / WIL Handler) ---------------------------------
@@ -103,6 +103,6 @@ router.put("/email-templates/:id", adminOrHandler, EmailController.updateEmailTe
 router.post("/emails/acceptance/:applicationId", adminOrHandler, EmailController.sendAcceptanceEmail); // includes set-password link
 router.post("/emails/rejection/:applicationId", adminOrHandler, EmailController.sendRejectionEmail);
 router.post("/emails/password-link", adminOrHandler, EmailController.sendPasswordLink); // body: { email }
-router.get("/emails/logs", adminOnly, EmailController.getEmailLogs);
+router.get("/emails/logs", adminOrHandler, EmailController.getEmailLogs); // the Email log tab on Notifications
 
 export default router;

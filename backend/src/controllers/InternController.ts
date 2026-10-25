@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
-import internService from "../services/InternService";
+import internService, { InternshipError } from "../services/InternService";
+import type { AuthenticatedRequest } from "../middlewares/AuthMiddleware";
 import { InternFilters } from "../repositories/InternRepository";
 
 class InternController {
@@ -72,6 +73,70 @@ const intern = await internService.getInternById(id);
       return res.status(500).json({
         message: "Failed to retrieve intern.",
       });
+    }
+  }
+
+  /** PUT /interns/:id/status  { outcome: COMPLETED | RESIGNED | DISMISSED, reason?, endDate? }  or  { outcome: REINSTATE, endDate } */
+  async updateStatus(req: Request, res: Response) {
+    const id = typeof req.params.id === "string" ? req.params.id : "";
+    const actorId = (req as AuthenticatedRequest).user?.id ?? null;
+    const body = req.body ?? {};
+    try {
+      const intern = body.outcome === "REINSTATE"
+        ? await internService.reinstate(id, body, actorId)
+        : await internService.endInternship(id, body, actorId);
+      return res.status(200).json({ message: "Internship updated.", data: intern });
+    } catch (error) {
+      if (error instanceof InternshipError) return res.status(error.status).json({ message: error.message });
+      console.error("Error updating internship status:", error);
+      return res.status(500).json({ message: "Failed to update the internship." });
+    }
+  }
+
+  /** GET /interns/:id/documents/:documentId/download */
+  async downloadDocument(req: Request, res: Response) {
+    const id = typeof req.params.id === "string" ? req.params.id : "";
+    const documentId = typeof req.params.documentId === "string" ? req.params.documentId : "";
+    try {
+      const { document, content } = await internService.downloadDocument(id, documentId);
+      res.setHeader("Content-Type", document.mimeType || "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${document.fileName.replace(/"/g, "")}"`);
+      return res.send(content);
+    } catch (error) {
+      if (error instanceof InternshipError) return res.status(error.status).json({ message: error.message });
+      console.error("Error downloading intern document:", error);
+      return res.status(500).json({ message: "The document could not be downloaded." });
+    }
+  }
+
+  /** GET /campuses */
+  async getCampuses(_req: Request, res: Response) {
+    try {
+      return res.status(200).json(await internService.getCampuses());
+    } catch (error) {
+      console.error("Error retrieving campuses:", error);
+      return res.status(500).json({ message: "Failed to retrieve campuses." });
+    }
+  }
+
+  /** GET /intakes */
+  async getIntakes(_req: Request, res: Response) {
+    try {
+      return res.status(200).json(await internService.getIntakes());
+    } catch (error) {
+      console.error("Error retrieving intakes:", error);
+      return res.status(500).json({ message: "Failed to retrieve intakes." });
+    }
+  }
+
+  /** GET /past-interns */
+  async getPastInterns(_req: Request, res: Response) {
+    try {
+      const interns = await internService.getPastInterns();
+      return res.status(200).json({ message: "Past interns retrieved successfully.", count: interns.length, data: interns });
+    } catch (error) {
+      console.error("Error retrieving past interns:", error);
+      return res.status(500).json({ message: "Failed to retrieve past interns." });
     }
   }
 }
