@@ -70,8 +70,8 @@ export class AuthService {
     }
 
         const expiresIn = (
-      process.env.JWT_EXPIRES_IN || "1h"
-    ) as SignOptions["expiresIn"];
+  process.env.JWT_EXPIRES_IN || "1h"
+) as SignOptions["expiresIn"];
 
     const token = jwt.sign(
       { sub: user.id, role: user.role },
@@ -99,6 +99,15 @@ export class AuthService {
     rawToken: string,
     newPassword: string,
   ): Promise<void> {
+
+    if (typeof rawToken !== "string" || !rawToken.trim()) {
+  throw new Error("A password setup token is required.");
+}
+
+if (typeof newPassword !== "string" || newPassword.length < 8) {
+  throw new Error("Password must contain at least 8 characters.");
+}
+
     const tokenHash = crypto
       .createHash("sha256")
       .update(rawToken)

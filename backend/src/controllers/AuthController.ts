@@ -79,9 +79,9 @@ export class AuthController {
   }
 
   /**
-   * Returns the authenticated user's information.
-   * Requires authenticateToken middleware to run first.
-   */
+ * Returns the authenticated user's information.
+ * Requires AuthMiddleware.verifyToken to run first.
+ */
   async verifyToken(
     req: AuthenticatedRequest,
     res: Response,
