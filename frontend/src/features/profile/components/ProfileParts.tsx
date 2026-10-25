@@ -10,7 +10,8 @@ import { LinkButton } from '@/features/public-site/components/LinkButton'
 import type { UserRole } from '@/types'
 import { initials } from '@/utils/format'
 import { cardSx } from './styles'
-import { changePassword, passwordSchema, profileStatusLabel, type PasswordValues, type Profile } from '../data/profile'
+import { passwordSchema, profileStatusLabel, type PasswordValues, type Profile } from '../data/profile'
+import { Auth } from '@/api/services/auth.service'
 
 
 export function PageHeading({ current, title, subtitle }: { current: string; title: string; subtitle: string }) {
@@ -68,11 +69,13 @@ export function SecurityCard() {
   const onSubmit = handleSubmit(async ({ currentPassword, newPassword }) => {
     setMessage(null)
     try {
-      await changePassword(currentPassword, newPassword)
+      await Auth.changePassword(currentPassword, newPassword)
       reset()
-      setMessage({ tone: 'success', text: 'Your password has been updated.' })
-    } catch (error) {
-      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'We could not update your password. Try again.' })
+      setMessage({ tone: 'success', text: 'Your password has been updated successfully.' })
+    } catch (error: any) {
+      // Extracts the error message directly from your backend AuthController
+      const backendMessage = error.response?.data?.message || 'We could not update your password. Try again.'
+      setMessage({ tone: 'error', text: backendMessage })
     }
   })
   return (
