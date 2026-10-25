@@ -5,6 +5,7 @@ import { authController } from "../controllers/AuthController";
 import { ApplicationController } from "../controllers/ApplicationController";
 import { UserController } from "../controllers/UserController";
 import { AuthMiddleware, notImplemented } from "./guards";
+import { EmailController } from "../controllers/EmailController";
 
 // Access guards (roles match the Prisma Role enum): verifyToken first, then the role check.
 const authenticated = [AuthMiddleware.verifyToken];
@@ -14,17 +15,18 @@ const router = Router();
 
 // ---- Public ----------------------------------------------------------------
 router.post("/auth/login", (req, res) => authController.login(req, res));
-router.post("/auth/forgot-password", notImplemented("POST /auth/forgot-password")); // AuthController.forgotPassword not written yet
+router.post("/auth/forgot-password", (req, res) => EmailController.sendForgotPasswordOTP(req, res));
+router.post("/auth/reset-password", (req, res) => authController.resetPasswordWithOTP(req, res));
 // Set / reset password via the emailed one-time link. Body: { token, password }.
 // /create-password is what the frontend calls; /set-password is the path in the sequence diagram.
 router.post("/auth/create-password", ApplicationController.setPassword);
 router.post("/auth/set-password", ApplicationController.setPassword);
 
 // ---- Any logged-in user ----------------------------------------------------
-router.get("/auth/me", authenticated, (req:Request, res:Response) =>
+router.get("/auth/me", authenticated, (req: Request, res: Response) =>
   authController.verifyToken(req, res),
 ); // AuthController.verifyToken not written yet
-router.post("/auth/logout", authenticated, (req:Request, res:Response) =>
+router.post("/auth/logout", authenticated, (req: Request, res: Response) =>
   authController.logout(req, res),
 );
 router.put("/auth/profile", authenticated, notImplemented("PUT /auth/profile"));

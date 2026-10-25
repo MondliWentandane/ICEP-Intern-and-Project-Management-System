@@ -101,6 +101,34 @@ export class AuthController {
       },
     });
   }
+
+  /**
+   * Verifies the 6-digit OTP and saves the new password.
+   */
+  async resetPasswordWithOTP(req: Request, res: Response): Promise<void> {
+    try {
+      const { otp, newPassword } = req.body;
+
+      if (typeof otp !== "string" || !otp.trim()) {
+        res.status(400).json({ message: "The 6-digit OTP is required." });
+        return;
+      }
+
+      if (typeof newPassword !== "string" || newPassword.length < 8) {
+        res.status(400).json({ message: "New password must be at least 8 characters long." });
+        return;
+      }
+
+      // We reuse your existing, highly secure confirmPasswordSetup method!
+      await authService.confirmPasswordSetup(otp, newPassword);
+
+      res.status(200).json({ message: "Your password has been successfully reset. You can now log in." });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to reset password.";
+      // If the OTP is expired or invalid, your authService will throw the correct error message here
+      res.status(400).json({ message });
+    }
+  }
 }
 
 export const authController = new AuthController();
