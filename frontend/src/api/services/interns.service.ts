@@ -21,7 +21,7 @@ interface ApiIntern {
   mentor?: { user: { fullName: string } } | null
   skills?: Array<{ skill: { name: string } }>
   documents?: InternDocument[]
-  assignments?: Array<{ projectRole: string | null; leftAt: string | null; project: { id: string; name: string; status: string } }>
+  assignments?: Array<{ projectRole: string | null; leftAt: string | null; project: { id: string; name: string; status: string; groupName?: string | null } }>
   ending?: InternView['ending']
 }
 
@@ -47,7 +47,7 @@ function toInternView(intern: ApiIntern): InternView {
     endDate: intern.endDate ?? undefined,
     skills: intern.skills?.map((item) => item.skill.name),
     documents: intern.documents,
-    projects: intern.assignments?.map((item) => ({ id: item.project.id, name: item.project.name, role: item.projectRole ?? undefined, status: item.project.status, current: !item.leftAt })),
+    projects: intern.assignments?.map((item) => ({ id: item.project.id, name: item.project.name, role: item.projectRole ?? undefined, status: item.project.status, current: !item.leftAt, groupName: item.project.groupName ?? undefined })),
     ending: intern.ending ?? null,
   }
 }
