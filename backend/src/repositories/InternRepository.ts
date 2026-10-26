@@ -56,6 +56,15 @@ export class InternRepository {
             skill: true,
           },
         },
+        // Current project groups (an intern can be in several), shown when a mentor builds a team.
+        assignments: {
+          where: { leftAt: null },
+          select: {
+            projectRole: true,
+            leftAt: true,
+            project: { select: { id: true, name: true, groupName: true, status: true } },
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",

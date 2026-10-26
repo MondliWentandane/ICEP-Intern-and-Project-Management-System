@@ -12,9 +12,10 @@ export const projectInclude = {
 } as const;
 
 export class ProjectRepository {
-  list(filters: { status?: string; departmentId?: string; supervisorId?: string } = {}) {
+  list(filters: { status?: string; departmentId?: string; supervisorId?: string; internUserId?: string } = {}) {
     return prisma.project.findMany({
       where: {
+        ...(filters.internUserId ? { assignments: { some: { leftAt: null, intern: { userId: filters.internUserId } } } } : {}),
         ...(filters.status ? { status: filters.status as never } : {}),
         ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
         ...(filters.supervisorId ? { supervisorId: filters.supervisorId } : {}),
@@ -55,20 +56,31 @@ export class ProjectRepository {
     });
   }
   delete(id: string) { return prisma.project.delete({ where: { id } }); }
-  async assign(projectId: string, internId: string, projectRole?: string) {
+  async assign(projectId: string, internId: string, projectRole?: string | null, assignedById?: string) {
     const existing = await prisma.projectAssignment.findUnique({
       where: { projectId_internId: { projectId, internId } },
     });
     if (existing?.leftAt) {
       return prisma.projectAssignment.update({
-        where: { id: existing.id }, data: { leftAt: null, projectRole, assignedAt: new Date() },
+        where: { id: existing.id }, data: { leftAt: null, projectRole, assignedAt: new Date(), ...(assignedById ? { assignedById } : {}) },
         include: { intern: { include: { user: true } } },
       });
     }
     return prisma.projectAssignment.upsert({
       where: { projectId_internId: { projectId, internId } },
-      create: { projectId, internId, projectRole },
+      create: { projectId, internId, projectRole, ...(assignedById ? { assignedById } : {}) },
       update: { projectRole },
+      include: { intern: { include: { user: true } } },
+    });
+  }
+  /** Current (not left) members of a project, with their roles. */
+  activeMembers(projectId: string) {
+    return prisma.projectAssignment.findMany({ where: { projectId, leftAt: null }, select: { internId: true, projectRole: true } });
+  }
+  updateRole(projectId: string, internId: string, projectRole: string | null) {
+    return prisma.projectAssignment.update({
+      where: { projectId_internId: { projectId, internId } },
+      data: { projectRole },
       include: { intern: { include: { user: true } } },
     });
   }
