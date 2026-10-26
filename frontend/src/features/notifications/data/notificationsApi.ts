@@ -64,6 +64,16 @@ export function useMarkAllNotificationsRead() {
   })
 }
 
+/** Deletes one of the signed-in user's notifications (removed from the bell and the page straight away). */
+export function useDeleteNotification() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`${endpoints.notifications}/${encodeURIComponent(id)}`),
+    onMutate: (id) => queryClient.setQueryData<AppNotification[]>(NOTIFICATIONS_KEY, (list) => list?.filter((n) => n.id !== id)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
+  })
+}
+
 export function useEmailLog(enabled: boolean) {
   return useQuery({
     queryKey: ['notifications', 'email-log'],

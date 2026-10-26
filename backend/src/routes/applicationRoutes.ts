@@ -93,6 +93,7 @@ router.post("/contact", EmailController.sendContactMessage); // public contact f
 router.get("/notifications", authenticated, EmailController.getNotifications); // the caller's own
 router.put("/notifications/read-all", authenticated, EmailController.markAllNotificationsRead);
 router.put("/notifications/:id/read", authenticated, EmailController.markNotificationRead);
+router.delete("/notifications/:id", authenticated, EmailController.deleteNotification); // the caller's own only
 
 // Email templates ("Notifications / Emails" page)
 router.get("/email-templates", staff, EmailController.getEmailTemplates);

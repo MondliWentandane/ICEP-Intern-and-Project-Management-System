@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { apiErrorMessage } from "@/features/applicants/data/applicationsApi";
 import {
-  useEmailLog, useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications,
+  useDeleteNotification, useEmailLog, useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications,
   type AppNotification, type EmailLogEntry, type NotificationType,
 } from "../data/notificationsApi";
 
@@ -41,9 +41,14 @@ const CSS = `
 .np-note{cursor:pointer;transition:border-color .2s,box-shadow .2s}
 .np-note:hover{border-color:var(--navy);box-shadow:0 6px 16px rgba(27,58,92,.10)}
 .np-note:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
-.np-note.unread{background:#F7FAFD;border-left:4px solid var(--navy);padding-left:17px}
-.np-note.unread b{color:var(--navy)}
-.np-dot{width:9px;height:9px;border-radius:50%;background:var(--navy);flex:none}
+.np-note.unread{background:#FEF2F2;border-left:4px solid var(--red);padding-left:17px}
+.np-note.unread b{color:var(--red)}
+.np-dot{width:9px;height:9px;border-radius:50%;background:var(--red);flex:none}
+.np-acts{display:flex;gap:8px;flex:none}
+.np-act{height:34px;padding:0 12px;border-radius:9px;border:1px solid var(--border);background:var(--card);color:var(--navy);font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
+.np-act:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.np-act.del{color:var(--red)}.np-act.del:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.np-act:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
 .np-dot.read{background:transparent}
 .np-time{color:var(--muted);font-size:13px;white-space:nowrap}
 .np-pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
@@ -119,6 +124,7 @@ function MyNotifications() {
   const { data = [], isLoading, isError, error } = useMyNotifications();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
+  const remove = useDeleteNotification();
   const [show, setShow] = useState<"all" | "unread">("all");
 
   const unread = data.filter((n) => !n.isRead).length;
@@ -146,7 +152,8 @@ function MyNotifications() {
         <section key={day} style={{ marginBottom: 22 }}>
           <h3 className="np-group">{day}</h3>
           {notes.map((note) => (
-            <button key={note.id} type="button" className={`np-card np-row np-note${note.isRead ? "" : " unread"}`} onClick={() => open(note)}
+            <div key={note.id} role="button" tabIndex={0} className={`np-card np-row np-note${note.isRead ? "" : " unread"}`} onClick={() => open(note)}
+              onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(note); } }}
               aria-label={`${note.isRead ? "" : "Unread: "}${note.title}. ${note.message}`}>
               <span className={`np-dot${note.isRead ? " read" : ""}`} aria-hidden="true" />
               <div className="info">
@@ -155,7 +162,15 @@ function MyNotifications() {
               </div>
               <span className={`np-pill ${note.type}`}>{TYPE_LABELS[note.type] ?? "Update"}</span>
               <span className="np-time">{timeOf(note.createdAt)}</span>
-            </button>
+              <span className="np-acts">
+                {!note.isRead && (
+                  <button type="button" className="np-act" aria-label={`Mark "${note.title}" as read`}
+                    onClick={(e) => { e.stopPropagation(); markRead.mutate(note.id); }}>Mark as read</button>
+                )}
+                <button type="button" className="np-act del" aria-label={`Delete "${note.title}"`}
+                  onClick={(e) => { e.stopPropagation(); remove.mutate(note.id); }}>Delete</button>
+              </span>
+            </div>
           ))}
         </section>
       ))}

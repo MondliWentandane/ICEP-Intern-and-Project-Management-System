@@ -104,17 +104,86 @@ export const notificationService = {
     await send([user], { type: "SYSTEM", title: "Welcome to ICEP", message: `Your account is ready. You can ${what}.`, link: (base) => `${base}/dashboard` });
   }),
 
-  /** The intern: they were added to a project team. */
-  projectAssigned: (projectId: string, internId: string) => safely("project assigned", async () => {
-    const [project, intern] = await Promise.all([
-      prisma.project.findUnique({ where: { id: projectId }, select: { id: true, name: true } }),
+  /** Admins: a mentor (or another admin) created a project, with who will supervise it and the team size. */
+  projectCreated: (projectId: string, actorUserId?: string) => safely("project created", async () => {
+    const [project, actor] = await Promise.all([
+      prisma.project.findUnique({
+        where: { id: projectId },
+        select: {
+          id: true, name: true, groupName: true, endDate: true,
+          department: { select: { name: true } },
+          _count: { select: { assignments: { where: { leftAt: null } } } },
+        },
+      }),
+      actorUserId ? prisma.user.findUnique({ where: { id: actorUserId }, select: { id: true, fullName: true } }) : null,
+    ]);
+    if (!project) return;
+    const due = longDate(project.endDate);
+    const members = project._count.assignments;
+    const admins = (await staffWithRoles(["ADMIN"])).filter((admin) => admin.id !== actor?.id);
+    await send(admins, {
+      type: "PROJECT_ASSIGNED", title: "New project created",
+      message: `${actor?.fullName ?? "A mentor"} created "${project.name}"${project.groupName ? ` for ${project.groupName}` : ""} (${project.department.name})`
+        + `${members ? `, with ${members} member${members === 1 ? "" : "s"}` : ""}${due ? `, due ${due}` : ""}.`,
+      link: (base) => `${base}/projects`,
+    });
+  }),
+
+  /** The intern: they were added to a project team, with their role, group and who assigned them. */
+  projectAssigned: (projectId: string, internId: string, projectRole?: string | null, actorUserId?: string) => safely("project assigned", async () => {
+    const [project, intern, actor] = await Promise.all([
+      prisma.project.findUnique({ where: { id: projectId }, select: { id: true, name: true, groupName: true, endDate: true } }),
+      prisma.intern.findUnique({
+        where: { id: internId },
+        select: {
+          user: { select: { id: true, role: true } },
+          assignments: { where: { leftAt: null, projectId: { not: projectId } }, select: { project: { select: { name: true } } } },
+        },
+      }),
+      actorUserId ? prisma.user.findUnique({ where: { id: actorUserId }, select: { fullName: true } }) : null,
+    ]);
+    if (!project || !intern) return;
+    const due = longDate(project.endDate);
+    const others = intern.assignments.map((a) => a.project.name);
+    await send([intern.user], {
+      type: "PROJECT_ASSIGNED",
+      title: projectRole ? `New role: ${projectRole}` : "Added to a project",
+      message: `${actor?.fullName ?? "Your mentor"} added you to ${project.groupName ? `${project.groupName} on ` : ""}"${project.name}"`
+        + `${projectRole ? ` as ${projectRole}` : ""}${due ? `. Due ${due}` : ""}.`
+        + `${others.length ? ` You are also on: ${others.join(", ")}.` : ""}`,
+      link: (base) => `${base}/projects/${project.id}`,
+    });
+  }),
+
+  /** The intern: their role on a project changed. */
+  projectRoleChanged: (projectId: string, internId: string, from: string | null, to: string | null, actorUserId?: string) => safely("project role changed", async () => {
+    const [project, intern, actor] = await Promise.all([
+      prisma.project.findUnique({ where: { id: projectId }, select: { id: true, name: true, groupName: true } }),
       prisma.intern.findUnique({ where: { id: internId }, select: { user: { select: { id: true, role: true } } } }),
+      actorUserId ? prisma.user.findUnique({ where: { id: actorUserId }, select: { fullName: true } }) : null,
     ]);
     if (!project || !intern) return;
     await send([intern.user], {
-      type: "PROJECT_ASSIGNED", title: "Added to a project",
-      message: `You've been added to the project "${project.name}".`,
+      type: "PROJECT_ASSIGNED",
+      title: to ? `Role changed: ${to}` : "Role removed",
+      message: `${actor?.fullName ?? "Your mentor"} changed your role on ${project.groupName ? `${project.groupName} / ` : ""}"${project.name}"`
+        + ` from ${from ?? "no role"} to ${to ?? "no role"}.`,
       link: (base) => `${base}/projects/${project.id}`,
+    });
+  }),
+
+  /** The intern: they were taken off a project team. */
+  projectRemoved: (projectId: string, internId: string, actorUserId?: string) => safely("project removed", async () => {
+    const [project, intern, actor] = await Promise.all([
+      prisma.project.findUnique({ where: { id: projectId }, select: { name: true, groupName: true } }),
+      prisma.intern.findUnique({ where: { id: internId }, select: { user: { select: { id: true, role: true } } } }),
+      actorUserId ? prisma.user.findUnique({ where: { id: actorUserId }, select: { fullName: true } }) : null,
+    ]);
+    if (!project || !intern) return;
+    await send([intern.user], {
+      type: "PROJECT_ASSIGNED", title: "Removed from a project",
+      message: `${actor?.fullName ?? "Your mentor"} removed you from ${project.groupName ? `${project.groupName} on ` : ""}"${project.name}".`,
+      link: (base) => `${base}/project`,
     });
   }),
 
