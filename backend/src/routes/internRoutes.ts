@@ -27,18 +27,20 @@ router.put("/interns/:id/status", adminOrHandler, (req: Request, res: Response) 
 router.get("/interns/:id/projects", anyRole, ownershipCheck, notImplemented("GET /interns/:id/projects")); // current + previous
 router.get("/interns/:id/cv", staff, notImplemented("GET /interns/:id/cv")); // "View / download CV" button
 router.get("/interns/:id/documents", adminOrHandler, notImplemented("GET /interns/:id/documents"));
+// Staff can download an intern's documents; mentors only for interns they supervise (ownershipCheck).
+router.get("/interns/:id/documents/:documentId/download", staff, ownershipCheck, (req: Request, res: Response) => internController.downloadDocument(req, res));
 
 // ---- Past interns (archive of COMPLETED and WITHDRAWN internships) ------------------------
 router.get("/past-interns", adminOrHandler, (req: Request, res: Response) => internController.getPastInterns(req, res));
 
 // ---- Campuses & intakes ---------------------------------------------------------------
-router.get("/campuses", staff, notImplemented("GET /campuses"));
+router.get("/campuses", staff, (req: Request, res: Response) => internController.getCampuses(req, res));
 router.post("/campuses", adminOnly, notImplemented("POST /campuses"));
 router.get("/campuses/:id", adminOrHandler, notImplemented("GET /campuses/:id"));
 router.put("/campuses/:id", adminOnly, notImplemented("PUT /campuses/:id"));
 router.get("/campuses/:id/interns", adminOrHandler, notImplemented("GET /campuses/:id/interns")); // ?intakeId=
 
-router.get("/intakes", staff, notImplemented("GET /intakes"));
+router.get("/intakes", staff, (req: Request, res: Response) => internController.getIntakes(req, res));
 router.post("/intakes", adminOrHandler, notImplemented("POST /intakes"));
 router.put("/intakes/:id", adminOrHandler, notImplemented("PUT /intakes/:id"));
 

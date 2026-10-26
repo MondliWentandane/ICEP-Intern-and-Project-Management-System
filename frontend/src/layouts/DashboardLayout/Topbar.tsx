@@ -2,6 +2,7 @@ import { AppBar, Avatar, Badge, Box, IconButton, InputBase, Toolbar, Typography 
 import { Bell, Search } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useMyNotifications } from '@/features/notifications/data/notificationsApi'
 import { rolePrefix } from '@/routes/paths'
 import styles from './DashboardLayout.module.css'
 
@@ -14,6 +15,8 @@ const titles: Record<string, string> = {
 export function Topbar({ menuOpen, phone, onMenuClick }: { menuOpen: boolean; phone: boolean; onMenuClick: () => void }) {
   const { user } = useAuth()
   const location = useLocation()
+  // The red dot only shows when this user has unread notifications of their own.
+  const unread = (useMyNotifications().data ?? []).filter((n) => !n.isRead).length
   const pageKey = location.pathname.split('/').filter(Boolean).at(-1) ?? 'dashboard'
   const title = titles[pageKey] ?? 'ICEP Workspace'
   const profilePath = user ? `${rolePrefix[user.role]}/profile` : '/login'
@@ -30,7 +33,7 @@ export function Topbar({ menuOpen, phone, onMenuClick }: { menuOpen: boolean; ph
       <Typography component="h1" className={styles['page-title']}>{title}</Typography>
       <Box className={styles['topbar-actions']}>
         <Box className={styles['topbar-search']}><Search size={19} aria-hidden="true" /><InputBase placeholder="Search" inputProps={{ 'aria-label': 'Search this workspace' }} /></Box>
-        <IconButton component={Link} to={notificationsPath} aria-label="Notifications" className={styles['topbar-icon']}><Badge variant="dot" color="error"><Bell size={21} /></Badge></IconButton>
+        <IconButton component={Link} to={notificationsPath} aria-label={unread ? `Notifications: ${unread} unread` : 'Notifications'} className={styles['topbar-icon']}><Badge variant="dot" color="error" invisible={!unread}><Bell size={21} /></Badge></IconButton>
         <IconButton component={Link} to={profilePath} aria-label="Open profile" className={styles['profile-link']}><Avatar className={styles['topbar-avatar']}>{initials}</Avatar></IconButton>
       </Box>
     </Toolbar>

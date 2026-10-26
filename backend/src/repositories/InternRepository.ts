@@ -77,13 +77,28 @@ export class InternRepository {
             skill: true,
           },
         },
-        documents: { select: { id: true, type: true, fileName: true } },
+        documents: { select: { id: true, type: true, fileName: true, mimeType: true, sizeBytes: true, uploadedAt: true }, orderBy: { uploadedAt: "asc" } },
         assignments: {
           include: { project: { select: { id: true, name: true, status: true } } },
           orderBy: { assignedAt: "desc" },
         },
       },
     });
+  }
+
+  /** One of the intern's documents (they keep the files uploaded with their application). */
+  findDocument(internId: string, documentId: string) {
+    return prisma.document.findFirst({ where: { id: documentId, internId } });
+  }
+
+  /** Campuses with how many interns and positions each has. */
+  findCampuses() {
+    return prisma.campus.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { interns: true, positions: true } } } });
+  }
+
+  /** Intakes (newest first) with how many interns and positions each has. */
+  findIntakes() {
+    return prisma.intake.findMany({ orderBy: { startDate: "desc" }, include: { _count: { select: { interns: true, positions: true } } } });
   }
 
   findByUserId(userId: string) {

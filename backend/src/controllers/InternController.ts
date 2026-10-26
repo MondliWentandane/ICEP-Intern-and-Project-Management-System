@@ -93,6 +93,42 @@ const intern = await internService.getInternById(id);
     }
   }
 
+  /** GET /interns/:id/documents/:documentId/download */
+  async downloadDocument(req: Request, res: Response) {
+    const id = typeof req.params.id === "string" ? req.params.id : "";
+    const documentId = typeof req.params.documentId === "string" ? req.params.documentId : "";
+    try {
+      const { document, content } = await internService.downloadDocument(id, documentId);
+      res.setHeader("Content-Type", document.mimeType || "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${document.fileName.replace(/"/g, "")}"`);
+      return res.send(content);
+    } catch (error) {
+      if (error instanceof InternshipError) return res.status(error.status).json({ message: error.message });
+      console.error("Error downloading intern document:", error);
+      return res.status(500).json({ message: "The document could not be downloaded." });
+    }
+  }
+
+  /** GET /campuses */
+  async getCampuses(_req: Request, res: Response) {
+    try {
+      return res.status(200).json(await internService.getCampuses());
+    } catch (error) {
+      console.error("Error retrieving campuses:", error);
+      return res.status(500).json({ message: "Failed to retrieve campuses." });
+    }
+  }
+
+  /** GET /intakes */
+  async getIntakes(_req: Request, res: Response) {
+    try {
+      return res.status(200).json(await internService.getIntakes());
+    } catch (error) {
+      console.error("Error retrieving intakes:", error);
+      return res.status(500).json({ message: "Failed to retrieve intakes." });
+    }
+  }
+
   /** GET /past-interns */
   async getPastInterns(_req: Request, res: Response) {
     try {

@@ -140,7 +140,8 @@ interface Intern {
   application: ApiApplication;
 }
 
-const STATUSES: Status[] = ["Intern", "Interviewee", "Applicant", "Past Intern"];
+// Past interns live on their own page (Past Interns), so the list and its filter leave them out.
+const STATUSES: Status[] = ["Intern", "Interviewee", "Applicant"];
 const STATUS_FROM_API: Partial<Record<ApiApplication["status"], Status>> = {
   PENDING: "Applicant",
   INTERVIEWEE: "Interviewee",
@@ -237,7 +238,7 @@ function InternshipStatusCard({ record, name, onUpdated }: { record: InternRecor
       if (active) {
         await endInternship(record.id, outcome, endDate, reason.trim());
         onUpdated({ ...record, status: outcome === "COMPLETED" ? "COMPLETED" : "WITHDRAWN", endDate });
-        setDone(`${name}'s internship has ended. They can no longer log in and are now on Past Interns.`);
+        setDone(`${name}'s internship has ended. They can no longer log in and have moved to Past Interns (off this list).`);
       } else {
         await reinstateInternship(record.id, endDate);
         onUpdated({ ...record, status: "ACTIVE", endDate });
@@ -430,6 +431,7 @@ export function InternsPage() {
     const q = query.trim().toLowerCase();
     return INTERNS.filter(
       (p) =>
+        p.status !== "Past Intern" &&
         (!q || p.name.toLowerCase().includes(q) || p.studentNo.includes(q)) &&
         (!campus || p.campus === campus) &&
         (!status || p.status === status)

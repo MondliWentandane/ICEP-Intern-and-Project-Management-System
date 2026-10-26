@@ -2,6 +2,7 @@
 // Not added here: the admin is created once by the seed script (prisma/seed.ts), and interns get their account when an application is accepted.
 // New staff get no password; they are emailed a one-time link to set one (EmailService.sendPasswordSetupLink).
 import { userRepository, type StaffRole } from "../repositories/UserRepository";
+import { notificationService } from "./NotificationService";
 import { EmailService } from "./EmailService";
 
 const emailService = new EmailService();
@@ -48,6 +49,7 @@ export class UserService {
     if (await userRepository.findByEmail(email)) throw httpError(409, "An account with this email already exists.");
 
     const user = await userRepository.createStaffUser({ fullName, email, phone, role, departmentId });
+    await notificationService.staffAccountCreated(user.id);
 
     let emailSent = true;
     try {

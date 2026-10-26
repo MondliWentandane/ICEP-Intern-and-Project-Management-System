@@ -7,6 +7,7 @@ import {
 } from "../repositories/ApplicationRepository";
 import { prisma } from "../config/prisma";
 import { EmailService } from "./EmailService";
+import { notificationService } from "./NotificationService";
 import { readDocument, removeDocument, storeDocument, type StoredFile } from "./DocumentStorage";
 
 type UploadedFiles = Record<string, Express.Multer.File[] | undefined> | undefined;
@@ -169,12 +170,14 @@ export class ApplicationService {
       stored.push({ type: "ID_COPY", ...(await storeDocument(referenceCode, idDocument)) });
       stored.push({ type: "ACADEMIC_RECORD", ...(await storeDocument(referenceCode, academicRecord)) });
 
-      return await repository.create({
+      const application = await repository.create({
         referenceCode, positionId, fullName, email,
         phone: phone || undefined, idNumber: idNumber || undefined,
         studentNumber, institution, qualification, yearOfStudy,
         skillIds, documents: stored,
       });
+      await notificationService.applicationSubmitted(application.id);
+      return application;
     } catch (error) {
       await Promise.all(stored.map((file) => removeDocument(file.fileUrl)));
       throw error;
@@ -276,6 +279,8 @@ export class ApplicationService {
       ...(data.status === "REJECTED" ? { rejectionReason: data.rejectionReason!.trim() } : {}),
       ...(data.reviewedById ? { reviewedById: data.reviewedById } : {}),
     });
+
+    if (data.status === "ACCEPTED") await notificationService.applicationAccepted(id);
 
     // Tell the applicant. The decision is already saved, so a failed email doesn't undo it:
     // the response says emailSent: false and the page can warn the reviewer.

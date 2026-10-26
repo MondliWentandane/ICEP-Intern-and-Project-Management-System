@@ -180,4 +180,45 @@ export class EmailService {
         );
         if (!sent) throw new Error(`Failed to send the password setup email to ${email}.`);
     }
+
+    public async sendForgotPasswordOTP(email: string): Promise<void> {
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user) return;
+
+        const otp = crypto.randomInt(100000, 1000000).toString();
+
+        await prisma.passwordToken.create({
+            data: {
+                userId: user.id,
+                tokenHash: crypto.createHash('sha256').update(otp).digest('hex'),
+                purpose: 'SET_PASSWORD',
+                expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+            }
+        });
+
+        const subject = "Your ICEP Password Reset Code";
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2>Password Reset Request</h2>
+                <p>Hi ${user.fullName},</p>
+                <p>We received a request to reset the password for your ICEP account. Enter the following One-Time Password (OTP) to proceed:</p>
+                <div style="margin: 20px 0; padding: 15px; background-color: #f3f4f6; border-radius: 8px; text-align: center;">
+                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #1E40AF;">${otp}</span>
+                </div>
+                <p>This code will expire in 15 minutes.</p>
+                <p>If you did not request this, please ignore this email.</p>
+            </div>
+        `;
+
+        const sent = await this.outlookService.sendEmail(
+  email,
+  subject,
+  htmlContent
+);
+
+if (!sent) {
+  throw new Error("Failed to send password reset OTP email.");
+}
+    }
 }

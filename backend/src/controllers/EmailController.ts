@@ -51,6 +51,22 @@ export class EmailController {
         }
     };
 
+    public static sendForgotPasswordOTP = async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                res.status(400).json({ error: 'Email address is required in body.' });
+                return;
+            }
+
+            await EmailController.emailService.sendForgotPasswordOTP(email);
+
+            res.status(200).json({ message: `If that email is in our system, an OTP has been sent.` });
+        } catch (error: any) {
+            res.status(500).json({ error: error.message || 'Failed to send OTP.' });
+        }
+    }
+
     public static getNotifications = async (req: Request, res: Response): Promise<void> => {
         try {
             const userId = (req as any).user?.id;
@@ -206,4 +222,6 @@ export class EmailController {
             res.status(500).json({ error: error.message || 'Failed to fetch email logs.' });
         }
     };
+
+
 }

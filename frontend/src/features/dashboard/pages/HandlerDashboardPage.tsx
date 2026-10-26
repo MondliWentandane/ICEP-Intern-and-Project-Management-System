@@ -77,7 +77,7 @@ export function HandlerDashboardPage() {
             <StatTile label="Pending applications" value={stats.pending} hint="Waiting for your review" icon={ClipboardList} accent="pending" />
             <StatTile label="Interviewees" value={stats.interviewees} hint="Shortlisted for interviews" icon={CalendarClock} accent="completed" />
             <StatTile label="Active interns" value={stats.active} hint="Currently on placement" icon={UserCheck} accent="active" />
-            <StatTile label="Past interns" value={stats.past} hint="Completed their internship" icon={GraduationCap} />
+            <StatTile label="Past interns" value={stats.past} hint="Internship ended" icon={GraduationCap} accent="past" />
           </Box>
 
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>
@@ -117,7 +117,7 @@ export function HandlerDashboardPage() {
             <Panel title="Quick links">
               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
                 <Button variant="outlined" component={RouterLink} to={`${BASE}/interns`}>Interns</Button>
-                <Button variant="outlined" component={RouterLink} to={`${BASE}/past-interns`}>Past interns</Button>
+                <Button variant="outlined" component={RouterLink} to={`${BASE}/past-interns`} sx={{ color: '#718096', borderColor: '#CBD5E0', bgcolor: '#F1F3F6', '&:hover': { borderColor: '#A0AEC0', bgcolor: '#E2E8F0' } }}>Past interns</Button>
                 <Button variant="outlined" component={RouterLink} to={`${BASE}/campuses`}>Campuses & intakes</Button>
                 <Button variant="outlined" component={RouterLink} to={`${BASE}/notifications`}>Notifications</Button>
               </Stack>

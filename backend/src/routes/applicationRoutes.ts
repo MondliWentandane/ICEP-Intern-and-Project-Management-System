@@ -103,6 +103,6 @@ router.put("/email-templates/:id", adminOrHandler, EmailController.updateEmailTe
 router.post("/emails/acceptance/:applicationId", adminOrHandler, EmailController.sendAcceptanceEmail); // includes set-password link
 router.post("/emails/rejection/:applicationId", adminOrHandler, EmailController.sendRejectionEmail);
 router.post("/emails/password-link", adminOrHandler, EmailController.sendPasswordLink); // body: { email }
-router.get("/emails/logs", adminOnly, EmailController.getEmailLogs);
+router.get("/emails/logs", adminOrHandler, EmailController.getEmailLogs); // the Email log tab on Notifications
 
 export default router;

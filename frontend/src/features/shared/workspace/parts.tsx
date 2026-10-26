@@ -17,19 +17,22 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   )
 }
 
-export type Accent = 'primary' | 'pending' | 'active' | 'completed' | 'rejected'
+// 'past' is the grey used for past interns everywhere (current interns stay navy).
+export type Accent = 'primary' | 'pending' | 'active' | 'completed' | 'rejected' | 'past'
 const accentVar: Record<Accent, string> = {
   primary: 'var(--icep-primary)',
   pending: 'var(--icep-pending)',
   active: 'var(--icep-active)',
   completed: 'var(--icep-completed)',
   rejected: 'var(--icep-rejected)',
+  past: '#718096',
 }
 
 export function StatTile({ label, value, hint, icon: Icon, accent = 'primary' }: { label: string; value: string | number; hint?: string; icon: LucideIcon; accent?: Accent }) {
   const color = accentVar[accent]
+  const past = accent === 'past'
   return (
-    <Card variant="outlined">
+    <Card variant="outlined" sx={past ? { bgcolor: '#F1F3F6', borderColor: '#E2E8F0' } : undefined}>
       <CardContent>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
           <Box sx={{ width: 44, height: 44, borderRadius: 2, display: 'grid', placeItems: 'center', color, bgcolor: `color-mix(in srgb, ${color} 12%, white)`, flexShrink: 0 }}>

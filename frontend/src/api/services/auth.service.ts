@@ -8,6 +8,11 @@ export const Auth = {
   },
   me: () => apiClient.get<User>(endpoints.auth.me),
   forgotPassword: (email: string) => apiClient.post(endpoints.auth.forgotPassword, { email }),
-  // Backend: POST /api/auth/confirm-password { token, newPassword } -> 200, or 400 { error } (invalid / used / expired link).
+
+  // Backend: POST /api/auth/reset-password { otp, newPassword } -> 200, or 400 { error } (invalid / expired).
+  resetPassword: (otp: string, newPassword: string) => apiClient.post(endpoints.auth.resetPassword, { otp, newPassword }),
+
+  changePassword: (oldPassword: string, newPassword: string) => apiClient.put(endpoints.auth.changePassword, { oldPassword, newPassword }),
+  
   createPassword: (token: string, newPassword: string) => apiClient.post(endpoints.auth.createPassword, { token, newPassword }),
 }

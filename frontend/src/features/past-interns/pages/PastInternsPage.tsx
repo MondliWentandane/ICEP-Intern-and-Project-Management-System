@@ -1,8 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Avatar, Box, Button as MuiButton, Chip, IconButton, InputAdornment, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
+import { Avatar, Box, Button as MuiButton, Chip, InputAdornment, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
 import { keyframes } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Archive, CircleCheck, Clock, Download, FileX, Search } from 'lucide-react'
+import { Archive, CircleCheck, Clock, Download, FileX, Search } from 'lucide-react'
 import { Link as RouterLink } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { TableEmpty, TableError, TableLoading } from '@/components/data/TableStates'
@@ -50,9 +50,18 @@ const rowSx = (index: number) => ({
   '&:hover .MuiTableCell-root, &:hover .MuiTypography-root': { color: '#fff', borderBottomColor: 'transparent' },
   '&:hover .muted': { color: '#C8D5E6' },
   '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,.16)', color: '#fff' },
-  '&:hover .MuiIconButton-root': { color: '#fff', borderColor: 'rgba(255,255,255,.6)' },
+  '&:hover .view-profile': { borderColor: '#fff' },
   '@media (prefers-reduced-motion: reduce)': { animation: 'none', '&.MuiTableRow-hover:hover': { transform: 'none' } },
 })
+
+/** Same "View profile" button as the Interns page: white, navy text, navy fill on hover. */
+const viewProfileSx = {
+  textTransform: 'none', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 13, px: 1.75, py: 1, lineHeight: 1.2,
+  bgcolor: '#fff', color: 'primary.main', border: '1px solid', borderColor: 'var(--icep-border)', borderRadius: 'var(--icep-radius-md)',
+  transition: 'background-color .2s, color .2s, border-color .2s',
+  '&:hover': { bgcolor: 'primary.main', color: '#fff', borderColor: 'primary.main' },
+  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+} as const
 
 export function PastInternsPage() {
   const { data: records = [], isLoading, isError, refetch } = useQuery({ queryKey: ['past-interns'], queryFn: fetchPastInterns })
@@ -114,14 +123,14 @@ export function PastInternsPage() {
             <Table aria-label="Past interns">
               <TableHead><TableRow>
                 {['Intern', 'Campus', 'Project', 'Mentor', 'Period', 'Outcome'].map((heading) => <TableCell key={heading} sx={headCellSx}>{heading}</TableCell>)}
-                <TableCell sx={headCellSx}><Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>Open</Box></TableCell>
+                <TableCell sx={headCellSx}>Profile</TableCell>
               </TableRow></TableHead>
               <TableBody>
                 {pageRows.map((record, index) => (
                   <TableRow key={record.id} hover sx={rowSx(index)}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 700, bgcolor: '#E4E9F1', color: 'primary.main' }}>{initials(record.name)}</Avatar>
+                        <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 700, bgcolor: '#E2E8F0', color: '#718096' }}>{initials(record.name)}</Avatar>
                         <Box><Typography sx={{ fontSize: 14 }}>{record.name}</Typography><Typography className="muted" sx={{ fontSize: 12, color: 'text.secondary' }}>{record.email}</Typography></Box>
                       </Box>
                     </TableCell>
@@ -133,10 +142,10 @@ export function PastInternsPage() {
                       <Chip size="small" label={record.outcome} sx={{ fontWeight: 650, ...outcomeColors[record.outcome] }} />
                       {record.reason && <Typography className="muted" sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5, maxWidth: 220 }}>{record.reason}</Typography>}
                     </TableCell>
-                    <TableCell align="right">
-                      <IconButton component={RouterLink} to={`../interns/${record.id}`} relative="path" aria-label={`Open ${record.name}'s record`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                        <ArrowRight size={18} />
-                      </IconButton>
+                    <TableCell>
+                      <MuiButton component={RouterLink} to={`../interns/${record.id}`} relative="path" className="view-profile" aria-label={`View ${record.name}'s profile`} sx={viewProfileSx}>
+                        View profile
+                      </MuiButton>
                     </TableCell>
                   </TableRow>
                 ))}
