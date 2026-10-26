@@ -186,7 +186,7 @@ export class EmailService {
 
         if (!user) return;
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = crypto.randomInt(100000, 1000000).toString();
 
         await prisma.passwordToken.create({
             data: {
@@ -211,6 +211,14 @@ export class EmailService {
             </div>
         `;
 
-        await this.outlookService.sendEmail(email, subject, htmlContent);
+        const sent = await this.outlookService.sendEmail(
+  email,
+  subject,
+  htmlContent
+);
+
+if (!sent) {
+  throw new Error("Failed to send password reset OTP email.");
+}
     }
 }

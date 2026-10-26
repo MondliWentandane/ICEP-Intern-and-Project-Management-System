@@ -1,7 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Paper, Typography } from '@mui/material'
 import { CursorFollower } from '../story/CursorFollower'
-import { HeroWaves } from '../story/HeroMotion'
 import { RevealTitle } from '../story/Reveal'
 import { riseSx, useReveal } from '../story/useScrollProgress'
 import { introSx } from '../story/motion'
@@ -24,19 +23,15 @@ const CSS = `
 .cp-w{max-width:1200px;margin:0 auto;display:grid;gap:32px}
 .cp-c,.cp-mc{background:var(--b);border:1px solid var(--l);border-radius:16px;padding:12px}
 .cp-cols{display:grid;gap:24px}
-.cp-i{position:relative;overflow:hidden;background:var(--p);color:#fff;border-radius:12px;padding:24px;min-height:440px}
-.cp-i h2{margin:0 0 32px;font-size:26px;position:relative;z-index:1}
+.cp-i{position:relative;overflow:hidden;background:${navy};color:#fff;border-radius:12px;padding:24px;min-height:440px}
+.cp-i h2{margin:0 0 32px;font-size:26px}
 .cp-rows{display:grid;gap:32px;position:relative;z-index:1}
 .cp-r{display:flex;gap:20px;align-items:flex-start}
 .cp-ic{width:44px;height:44px;flex:none;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center}
 .cp-r b{display:block;font-weight:600}
 .cp-r div div{color:rgba(255,255,255,.85);line-height:1.6}
 .cp-o{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);right:-60px;bottom:-150px;width:300px;height:300px}
-.cp-o+.cp-o{right:90px;width:190px;height:190px;background:rgba(255,255,255,.06);animation-duration:22s;animation-delay:-6s}
-/* Same slow drift as the circles in the home page hero */
-.cp-o{animation:cp-float 18s ease-in-out infinite}
-@keyframes cp-float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-24px,18px) scale(1.05)}}
-@media(prefers-reduced-motion:reduce){.cp-o{animation:none}}
+.cp-o+.cp-o{right:90px;width:190px;height:190px;background:rgba(255,255,255,.06)}
 .cp-f{display:grid;gap:20px;align-content:start;padding:12px}
 .cp-2{display:grid;gap:20px}
 .cp label{display:block;margin-bottom:8px}
@@ -210,8 +205,6 @@ export function ContactPage({ onSendMessage }: { onSendMessage?: (m: ContactMess
         <div className="cp-c">
           <div className="cp-cols">
             <div className="cp-i">
-              {/* Smoky waves drifting behind the panel, as in the home page hero */}
-              <HeroWaves />
               <h2>Contact information</h2>
               <div className="cp-rows">
                 {ROWS.map(([icon, title, text]) => (
