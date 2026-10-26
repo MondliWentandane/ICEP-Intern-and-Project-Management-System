@@ -45,13 +45,51 @@ function LookupForm({ onLostReference }: { onLostReference: () => void }) {
   })
   
   return (
-    <Box component="form" noValidate onSubmit={onSubmit} sx={{ display: 'grid', gap: 2.5 }}>
-      {notFound && <Alert severity="error" role="alert">We couldn't find an application with that email address and reference number. Check both and try again.</Alert>}
-      <FormField id="track-email" label="Email address" type="email" autoComplete="email" registration={register('email')} errorText={errors.email?.message} />
-      <FormField id="track-reference" label="Reference number" placeholder="ICEP-2026-01428" autoComplete="off" registration={register('reference')} errorText={errors.reference?.message}
-        hint="You'll find it in your confirmation email and on the page shown after you applied." />
-      <Button type="submit" fullWidth disabled={isSubmitting} sx={{ minHeight: 48 }}>{isSubmitting ? 'Checking…' : 'Track application'}</Button>
-      <Link component="button" type="button" onClick={onLostReference} underline="hover" sx={{ justifySelf: 'center', fontSize: 14 }}>Lost your reference number? Email me a sign-in link</Link>
+    <Box component="form" noValidate onSubmit={onSubmit} sx={{ display: 'grid', gap: 3 }}>
+      {failed && <Alert severity="error" role="alert">We couldn't check your application right now. Please try again in a moment.</Alert>}
+      {notFound && <Alert severity="error" role="alert" sx={introSx(450)}>We couldn't find an application with that email address and reference number. Check both and try again.</Alert>}
+      
+      <Box sx={introSx(500)}>
+        <FormField 
+          id="track-email" 
+          label="Email address" 
+          placeholder="name@example.com" 
+          type="email" 
+          autoComplete="email" 
+          registration={register('email')} 
+          errorText={errors.email?.message} 
+        />
+      </Box>
+      <Box sx={introSx(600)}>
+        <FormField 
+          id="track-reference" 
+          label={
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+              Reference number
+              <Tooltip title="You'll find it in your confirmation email and on the page shown after you applied." placement="top" arrow>
+                <Box component="span" sx={{ display: 'inline-flex', color: 'text.secondary', cursor: 'help' }}>
+                  <CircleHelp size={15} aria-label="Help with reference number" />
+                </Box>
+              </Tooltip>
+            </Box>
+          } 
+          placeholder="ICEP-2026-01428" 
+          autoComplete="off" 
+          registration={register('reference')} 
+          errorText={errors.reference?.message}
+        />
+        <Box sx={{ textAlign: 'right', mt: 1 }}>
+          <Typography component="span" sx={{ fontSize: 13, color: 'text.secondary', mr: 0.5 }}>
+            Lost your reference number?
+          </Typography>
+          <Link component="button" type="button" onClick={onLostReference} underline="hover" sx={{ fontSize: 13, fontWeight: 600 }}>
+            Email me a sign-in link
+          </Link>
+        </Box>
+      </Box>
+      <Box sx={introSx(700)}>
+        <Button type="submit" fullWidth disabled={isSubmitting} sx={{ minHeight: 48 }}>{isSubmitting ? 'Checking…' : 'Track'}</Button>
+      </Box>
     </Box>
   )
 }
