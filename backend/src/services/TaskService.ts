@@ -43,8 +43,10 @@ export class TaskService {
     static async createTask(data: {
         title: string;
         projectId: string;
-        description?: string;
-        assignedToId?: string;
+        description?: string | null;
+        priority?: "LOW" | "MEDIUM" | "HIGH";
+        dueDate?: string | Date | null;
+        assignedToId?: string | null;
         createdById: string;
     }, user: TaskUser) {
 
@@ -54,6 +56,21 @@ export class TaskService {
 
         if (typeof data.projectId !== "string" || !data.projectId.trim()) {
             throw new Error("Project ID is required");
+        }
+
+        if (data.priority !== undefined &&
+            !["LOW", "MEDIUM", "HIGH"].includes(data.priority)) {
+            throw new Error("Invalid task priority");
+        }
+
+        const dueDate = data.dueDate == null || data.dueDate === ""
+            ? null
+            : data.dueDate instanceof Date
+                ? data.dueDate
+                : new Date(data.dueDate);
+
+        if (dueDate && Number.isNaN(dueDate.getTime())) {
+            throw new Error("Due date must be a valid date");
         }
 
         await this.checkProjectAccess(data.projectId, user);
@@ -80,7 +97,9 @@ export class TaskService {
             title: data.title.trim(),
             projectId: data.projectId,
             description: data.description,
-            assignedToId: data.assignedToId,
+            priority: data.priority,
+            dueDate,
+            assignedToId: data.assignedToId || null,
             createdById: user.id
         });
         if (data.assignedToId) await notificationService.taskAssigned(task.id);
@@ -150,9 +169,14 @@ export class TaskService {
                 throw new Error("Permission denied");
             }
 
-            return TaskRepository.getTasks({
-                assignedToId: intern.id
-            });
+            const tasks = await TaskRepository.getInternBoardTasks(intern.id);
+            return tasks.map(task => ({
+                ...task,
+                canUpdateStatus:
+                    task.assignedToId === intern.id &&
+                    task.project.status !== "COMPLETED" &&
+                    task.status !== "COMPLETED"
+            }));
         }
 
         throw new Error("Permission denied");
@@ -223,9 +247,11 @@ export class TaskService {
         id: string,
         data: {
             title?: string;
-            description?: string;
+            description?: string | null;
             priority?: "LOW" | "MEDIUM" | "HIGH";
             progress?: number;
+            dueDate?: string | Date | null;
+            assignedToId?: string | null;
         },
         user: TaskUser
     ) {
@@ -249,7 +275,39 @@ export class TaskService {
             throw new Error("Progress must be between 0 and 100");
         }
 
-        return TaskRepository.updateTask(id, {
+        if (data.priority !== undefined &&
+            !["LOW", "MEDIUM", "HIGH"].includes(data.priority)) {
+            throw new Error("Invalid task priority");
+        }
+
+        const dueDate = data.dueDate === undefined
+            ? undefined
+            : data.dueDate === null || data.dueDate === ""
+                ? null
+                : data.dueDate instanceof Date
+                    ? data.dueDate
+                    : new Date(data.dueDate);
+
+        if (dueDate && Number.isNaN(dueDate.getTime())) {
+            throw new Error("Due date must be a valid date");
+        }
+
+        if (data.assignedToId !== undefined && data.assignedToId !== null) {
+            if (typeof data.assignedToId !== "string" || !data.assignedToId.trim()) {
+                throw new Error("Invalid intern ID");
+            }
+
+            const intern = await TaskRepository.getIntern(data.assignedToId);
+            const assignment = intern
+                ? await TaskRepository.getProjectAssignment(task.projectId, intern.id)
+                : null;
+
+            if (!assignment || assignment.leftAt !== null) {
+                throw new Error("Intern is not actively assigned to this project");
+            }
+        }
+
+        const updatedTask = await TaskRepository.updateTask(id, {
             ...(data.title !== undefined && {
                 title: data.title.trim()
             }),
@@ -261,8 +319,20 @@ export class TaskService {
             }),
             ...(data.progress !== undefined && {
                 progress: data.progress
+            }),
+            ...(dueDate !== undefined && {
+                dueDate
+            }),
+            ...(data.assignedToId !== undefined && {
+                assignedToId: data.assignedToId
             })
         });
+
+        if (data.assignedToId && data.assignedToId !== task.assignedToId) {
+            await notificationService.taskAssigned(id);
+        }
+
+        return updatedTask;
     }
 
     static async deleteTask(id: string, user: TaskUser) {
@@ -288,10 +358,38 @@ export class TaskService {
             throw new Error("Task not found");
         }
 
-        await this.checkProjectAccess(task.projectId, user);
-
         if (!["TODO", "IN_PROGRESS", "COMPLETED"].includes(status)) {
             throw new Error("Invalid task status");
+        }
+
+        if (user.role === "INTERN") {
+            const intern = await TaskRepository.getInternByUserId(user.id);
+            const assignment = intern
+                ? await TaskRepository.getProjectAssignment(task.projectId, intern.id)
+                : null;
+
+            if (
+                !intern ||
+                task.assignedToId !== intern.id ||
+                !assignment ||
+                assignment.leftAt !== null
+            ) {
+                throw new Error("Permission denied");
+            }
+
+            if (task.project.status === "COMPLETED") {
+                throw new Error("Tasks in completed projects cannot be changed");
+            }
+
+            const nextStatus =
+                task.status === "TODO" ? "IN_PROGRESS" :
+                task.status === "IN_PROGRESS" ? "COMPLETED" : null;
+
+            if (status !== nextStatus) {
+                throw new Error("Interns can only advance their own tasks from TODO to IN_PROGRESS to COMPLETED");
+            }
+        } else {
+            await this.checkProjectAccess(task.projectId, user);
         }
 
         const updated = await TaskRepository.updateTaskStatus(id, status);

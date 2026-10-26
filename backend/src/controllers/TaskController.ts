@@ -48,7 +48,9 @@ export class TaskController {
                 title,
                 projectId,
                 description,
-                assignedToId
+                assignedToId,
+                priority,
+                dueDate
             } = req.body;
 
             // Ask TaskService to create the task
@@ -57,6 +59,8 @@ export class TaskController {
     projectId,
     description,
     assignedToId,
+    priority,
+    dueDate,
     createdById: userId
 }, req.user!);
 
@@ -443,6 +447,37 @@ const task = await TaskService.getTask(
 
             res.status(200).json({
                 message: "Task approved successfully",
+                task
+            });
+        } catch (error) {
+            handleTaskError(res, error);
+        }
+    }
+
+    static async requestTaskChanges(
+        req: AuthenticatedRequest,
+        res: Response
+    ): Promise<void> {
+        try {
+            if (!req.user) {
+                res.status(401).json({ message: "Authentication required" });
+                return;
+            }
+
+            const id = req.params.id;
+            if (typeof id !== "string" || !id.trim()) {
+                res.status(400).json({ message: "Invalid task ID" });
+                return;
+            }
+
+            const task = await TaskService.requestTaskChanges(
+                id,
+                req.body?.feedback,
+                req.user
+            );
+
+            res.status(200).json({
+                message: "Task returned with feedback",
                 task
             });
         } catch (error) {
