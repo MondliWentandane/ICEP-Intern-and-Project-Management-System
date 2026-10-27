@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { useAuth } from '@/hooks/useAuth'
 import styles from './GanttPage.module.css'
 
 // Updated statuses based on workflow document
@@ -129,11 +130,16 @@ const timelineColumns = [
 ]
 
 export function GanttPage() {
+  const { user } = useAuth()
+  const isIntern = user?.role === 'INTERN'
   const [tasks, setTasks] = useState<GanttTaskItem[]>(initialTasks)
   const [activeView, setActiveView] = useState<'Days' | 'Weeks' | 'Months'>('Weeks')
   
   // Simulated Authentication / Role State to demonstrate workflow restrictions
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('Scrum Master')
+
+  // A signed-in intern always sees the chart in view-only mode, regardless of the simulator.
+  const effectiveUserRole: UserRole = isIntern ? 'Intern' : currentUserRole
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
@@ -180,7 +186,7 @@ export function GanttPage() {
   const blockedCount = tasks.filter((t) => t.status === 'Blocked').length + (tasks.length === 6 ? 3 : 0)
 
   // Role Permissions
-  const canManageTasks = currentUserRole === 'Scrum Master' || currentUserRole === 'Mentor'
+  const canManageTasks = effectiveUserRole === 'Scrum Master' || effectiveUserRole === 'Mentor'
 
   const handleExport = () => {
     setToastMessage(`Timeline for ${selectedProject} exported successfully.`)
@@ -232,13 +238,19 @@ export function GanttPage() {
   return (
     <main className={styles.page}>
       
-      {/* Simulation Banner for testing roles */}
-      <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
-        <strong>Workflow Simulator:</strong> You are currently viewing this page as a <strong>{currentUserRole}</strong>. 
-        {currentUserRole === 'Intern' 
-          ? " The Gantt chart is read-only. You cannot add or delete tasks." 
-          : " You have permission to add, edit, and plan tasks."}
-      </Alert>
+      {/* Interns get a view-only notice; the role simulator stays available for demos */}
+      {isIntern ? (
+        <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
+          You have <strong>view-only</strong> access to the Gantt chart. Contact your mentor or an administrator to make changes.
+        </Alert>
+      ) : (
+        <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
+          <strong>Workflow Simulator:</strong> You are currently viewing this page as a <strong>{effectiveUserRole}</strong>.{' '}
+          {effectiveUserRole === 'Intern'
+            ? 'The Gantt chart is read-only. You cannot add or delete tasks.'
+            : 'You have permission to add, edit, and plan tasks.'}
+        </Alert>
+      )}
 
       {/* 4 Summary / Metric Cards */}
       <section className={styles.metricsGrid} aria-label="Task metrics summary">
@@ -374,28 +386,32 @@ export function GanttPage() {
         {/* Action Buttons */}
         <div className={styles.actionsGroup}>
           
-          {/* Mock Role Switcher (For demonstration purposes) */}
-          <button type="button" className={styles.exportButton} onClick={(e) => setRoleAnchorEl(e.currentTarget)}>
-            <UserCircle2 size={16} strokeWidth={2} aria-hidden="true" />
-            <span>View As: {currentUserRole}</span>
-          </button>
-          <Menu
-            anchorEl={roleAnchorEl}
-            open={Boolean(roleAnchorEl)}
-            onClose={() => setRoleAnchorEl(null)}
-            slotProps={{ paper: { sx: { borderRadius: '10px', minWidth: 150 } } }}
-          >
-            {(['Intern', 'Scrum Master', 'Mentor'] as UserRole[]).map((role) => (
-              <MenuItem
-                key={role}
-                selected={role === currentUserRole}
-                onClick={() => { setCurrentUserRole(role); setRoleAnchorEl(null); }}
-                sx={{ fontSize: 13.5 }}
+          {/* Mock Role Switcher (for demonstration purposes; hidden from real interns so view-only cannot be bypassed) */}
+          {!isIntern && (
+            <>
+              <button type="button" className={styles.exportButton} onClick={(e) => setRoleAnchorEl(e.currentTarget)}>
+                <UserCircle2 size={16} strokeWidth={2} aria-hidden="true" />
+                <span>View As: {currentUserRole}</span>
+              </button>
+              <Menu
+                anchorEl={roleAnchorEl}
+                open={Boolean(roleAnchorEl)}
+                onClose={() => setRoleAnchorEl(null)}
+                slotProps={{ paper: { sx: { borderRadius: '10px', minWidth: 150 } } }}
               >
-                {role}
-              </MenuItem>
-            ))}
-          </Menu>
+                {(['Intern', 'Scrum Master', 'Mentor'] as UserRole[]).map((role) => (
+                  <MenuItem
+                    key={role}
+                    selected={role === currentUserRole}
+                    onClick={() => { setCurrentUserRole(role); setRoleAnchorEl(null); }}
+                    sx={{ fontSize: 13.5 }}
+                  >
+                    {role}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </>
+          )}
 
           <button
             type="button"
