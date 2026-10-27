@@ -54,11 +54,7 @@ router.get(
 );
 
 // Create task
-router.post(
-    "/tasks",
-    adminOrMentor,
-    TaskController.createTask
-);
+router.post("/tasks", anyRole, TaskController.createTask);
 
 // Completed tasks waiting for approval
 router.get(
@@ -75,39 +71,19 @@ router.get(
 );
 
 // Update task
-router.put(
-    "/tasks/:id",
-    adminOrMentor,
-    TaskController.updateTask
-);
+router.put("/tasks/:id", anyRole, TaskController.updateTask);
 
 // Delete task
-router.delete(
-    "/tasks/:id",
-    adminOrMentor,
-    TaskController.deleteTask
-);
+router.delete("/tasks/:id", anyRole, TaskController.deleteTask);
 
 // Update task status
-router.put(
-    "/tasks/:id/status",
-    adminOrMentor,
-    TaskController.updateTaskStatus
-);
+router.put("/tasks/:id/status", anyRole, TaskController.updateTaskStatus);
 
 // Assign task to an intern
-router.put(
-    "/tasks/:id/assign",
-    adminOrMentor,
-    TaskController.assignTo
-);
+router.put("/tasks/:id/assign", anyRole, TaskController.assignTo);
 
 // Approve completed task
-router.put(
-    "/tasks/:id/approve",
-    adminOrMentor,
-    TaskController.approveTask
-);
+router.put("/tasks/:id/approve", anyRole, TaskController.approveTask);
 
 // ================= SUBTASKS =================
 
@@ -119,11 +95,7 @@ router.get(
 );
 
 // Create subtask
-router.post(
-    "/tasks/:id/subtasks",
-    adminOrMentor,
-    TaskController.createSubtask
-);
+router.post("/tasks/:id/subtasks", anyRole, TaskController.createSubtask);
 
 // ================= COMMENTS =================
 
