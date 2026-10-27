@@ -1,5 +1,0 @@
-import { Box, Button, Stack, Typography } from '@mui/material'
-import { Link, useLocation } from 'react-router-dom'
-import { getNavigation } from '@/config/navigation'
-import { useAuth } from '@/hooks/useAuth'
-export function Sidebar() { const { user } = useAuth(); const location = useLocation(); if (!user) return null; const links = getNavigation(user.role); return <Box component="aside" sx={{ width: 250, p: 2, bgcolor: '#12283F', color: 'white' }}><Typography variant="h5" sx={{ mb: 3 }}>ICEP.</Typography>{(['MAIN','PROJECTS','ADMIN'] as const).filter(section => links.some(item => item.section === section)).map(section => <Stack key={section} spacing={0.5} sx={{ mb: 2 }}><Typography variant="overline" sx={{ opacity: .7 }}>{section}</Typography>{links.filter(item => item.section === section).map(item => <Button key={item.path} component={Link} to={item.path} color="inherit" sx={{ justifyContent: 'flex-start', bgcolor: location.pathname === item.path ? 'rgba(255,255,255,.12)' : undefined }}>{item.label}{item.readOnly ? ' · View only' : ''}</Button>)}</Stack>)}</Box> }

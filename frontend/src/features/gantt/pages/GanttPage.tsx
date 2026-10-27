@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react'
+import { Tasks } from '@/api/services/tasks.service'
+import { Projects } from '@/api/services/projects.service'
+import { useEffect } from 'react'
 import {
   Alert,
   DialogContent,
@@ -43,82 +46,6 @@ export interface GanttTaskItem {
   barColor?: 'blue' | 'green'
 }
 
-const initialTasks: GanttTaskItem[] = [
-  {
-    id: 'task-1',
-    name: 'Project Kickoff',
-    phase: 'Phase 1',
-    assigneeName: 'Moeez S.',
-    assigneeInitials: 'MS',
-    status: 'Completed',
-    project: 'Software Dev Alpha',
-    startCol: 0,
-    endCol: 1,
-    barLabel: 'Kickoff Meeting',
-    barProgress: '100%',
-    barColor: 'blue',
-  },
-  {
-    id: 'task-2',
-    name: 'Requirements Gathering',
-    phase: 'Phase 1',
-    assigneeName: 'Thabo M.',
-    assigneeInitials: 'TM',
-    status: 'Completed',
-    project: 'Software Dev Alpha',
-    startCol: 2,
-    endCol: 4,
-    barLabel: 'Gather Specs',
-    barProgress: '100%',
-    barColor: 'blue',
-  },
-  {
-    id: 'task-3',
-    name: 'Database Schema Design',
-    phase: 'Phase 2',
-    assigneeName: 'Moeez S.',
-    assigneeInitials: 'MS',
-    status: 'In Progress',
-    project: 'Software Dev Alpha',
-    startCol: 5,
-    endCol: 5,
-    barLabel: 'Schema V1',
-    barColor: 'green',
-  },
-  {
-    id: 'task-4',
-    name: 'Develop API Endpoints',
-    phase: 'Phase 2',
-    assigneeName: 'Jane S.',
-    assigneeInitials: 'JS',
-    assigneeAvatarColor: 'blue',
-    status: 'In Progress',
-    project: 'Software Dev Alpha',
-    startCol: 5,
-    endCol: 5,
-    barLabel: 'Core APIs',
-    barColor: 'green',
-  },
-  {
-    id: 'task-5',
-    name: 'Frontend UI Integration',
-    phase: 'Phase 3',
-    assigneeName: 'Thabo M.',
-    assigneeInitials: 'TM',
-    status: 'To Do',
-    project: 'Software Dev Alpha',
-  },
-  {
-    id: 'task-6',
-    name: 'Security Audit',
-    phase: 'Reviews',
-    assigneeName: 'Ron J.',
-    assigneeInitials: 'RJ',
-    assigneeAvatarColor: 'slate',
-    status: 'Blocked',
-    project: 'Software Dev Alpha',
-  },
-]
 
 const timelineColumns = [
   { key: 'col-0', label: 'Mon 05', isToday: false },
@@ -132,9 +59,9 @@ const timelineColumns = [
 export function GanttPage() {
   const { user } = useAuth()
   const isIntern = user?.role === 'INTERN'
-  const [tasks, setTasks] = useState<GanttTaskItem[]>(initialTasks)
+  const [tasks, setTasks] = useState<GanttTaskItem[]>([])
   const [activeView, setActiveView] = useState<'Days' | 'Weeks' | 'Months'>('Weeks')
-  
+
   // Simulated Authentication / Role State to demonstrate workflow restrictions
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('Scrum Master')
 
@@ -143,7 +70,8 @@ export function GanttPage() {
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedProject, setSelectedProject] = useState('Software Dev Alpha')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [projectsList, setProjectsList] = useState<{ id: string, name: string }[]>([])
   const [selectedStatus, setSelectedStatus] = useState('All statuses')
   const [selectedDate, setSelectedDate] = useState('Select date')
   const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
@@ -235,9 +163,31 @@ export function GanttPage() {
     setToastMessage('Task deleted.')
   }
 
+  useEffect(() => {
+    if (selectedProject === 'All Projects') return;
+
+    // Note: You will need the actual projectId here, not just the name. 
+    // For now, if your API expects an ID, pass the ID instead of the string 'Software Dev Alpha'.
+    Tasks.getGanttData(selectedProject)
+      .then(data => setTasks(data))
+      .catch(err => console.error("Failed to load Gantt data:", err))
+  }, [selectedProject])
+
+  useEffect(() => {
+    Projects.list()
+      .then((response) => {
+        const data = Array.isArray(response) ? response : (response as any).data;
+        setProjectsList(data)
+        if (data.length > 0) {
+          setSelectedProject(data[0].id)
+        }
+      })
+      .catch(err => console.error("Failed to load projects:", err))
+  }, [])
+
   return (
     <main className={styles.page}>
-      
+
       {/* Interns get a view-only notice; the role simulator stays available for demos */}
       {isIntern ? (
         <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
@@ -323,11 +273,11 @@ export function GanttPage() {
               onChange={(e) => setSelectedProject(e.target.value)}
               aria-label="Filter by project"
             >
-              <option value="Software Dev Alpha">Software Dev Alpha</option>
-              <option value="Network Security Audit">Network Security Audit</option>
-              <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-              <option value="Mobile App Beta">Mobile App Beta</option>
-              <option value="All Projects">All Projects</option>
+              {projectsList.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
             <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
           </div>
@@ -385,7 +335,7 @@ export function GanttPage() {
 
         {/* Action Buttons */}
         <div className={styles.actionsGroup}>
-          
+
           {/* Mock Role Switcher (for demonstration purposes; hidden from real interns so view-only cannot be bypassed) */}
           {!isIntern && (
             <>
@@ -490,17 +440,17 @@ export function GanttPage() {
                   task.status === 'Completed' || task.status === 'Submitted'
                     ? styles.statusCompleted
                     : task.status === 'In Progress'
-                    ? styles.statusActive
-                    : task.status === 'To Do'
-                    ? styles.statusPending
-                    : styles.statusRejected
+                      ? styles.statusActive
+                      : task.status === 'To Do'
+                        ? styles.statusPending
+                        : styles.statusRejected
 
                 const avatarColorClass =
                   task.assigneeAvatarColor === 'blue'
                     ? styles.avatarBlue
                     : task.assigneeAvatarColor === 'slate'
-                    ? styles.avatarSlate
-                    : ''
+                      ? styles.avatarSlate
+                      : ''
 
                 const hasBar = task.startCol !== undefined && task.endCol !== undefined
 
@@ -539,9 +489,8 @@ export function GanttPage() {
                         <td key={col.key} className={styles.timelineCell}>
                           {isBarStart && (
                             <div
-                              className={`${styles.timelineBar} ${
-                                task.barColor === 'green' ? styles.barGreen : styles.barBlue
-                              }`}
+                              className={`${styles.timelineBar} ${task.barColor === 'green' ? styles.barGreen : styles.barBlue
+                                }`}
                               style={{ width: barWidth }}
                               onClick={() => setSelectedTask(task)}
                               title={`${task.name}: ${task.barLabel ?? ''}`}

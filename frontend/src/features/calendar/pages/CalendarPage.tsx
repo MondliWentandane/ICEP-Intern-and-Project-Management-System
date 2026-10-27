@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react'
+import { Tasks } from '@/api/services/tasks.service'
+import { Projects } from '@/api/services/projects.service'
+import { useEffect } from 'react'
 import {
   Alert,
   DialogContent,
@@ -32,90 +35,6 @@ export interface CalendarEventItem {
   color: EventColor
 }
 
-const initialEvents: CalendarEventItem[] = [
-  {
-    id: 'ev-1',
-    title: 'Kickoff Meeting',
-    date: '2026-09-28',
-    time: '09:00',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'Completed',
-    color: 'blue-meeting',
-  },
-  {
-    id: 'ev-2',
-    title: 'Schema V1',
-    date: '2026-09-30',
-    project: 'Software Dev Alpha',
-    assignee: 'Sarah Johnson',
-    status: 'Completed',
-    color: 'green',
-  },
-  {
-    id: 'ev-3',
-    title: 'Core APIs',
-    date: '2026-09-30',
-    project: 'Software Dev Alpha',
-    assignee: 'Thabo Molefe',
-    status: 'Completed',
-    color: 'green',
-  },
-  {
-    id: 'ev-4',
-    title: 'Gather Specs',
-    date: '2026-10-01',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'Completed',
-    color: 'blue',
-  },
-  {
-    id: 'ev-5',
-    title: 'Schema Review',
-    date: '2026-10-05',
-    project: 'Software Dev Alpha',
-    assignee: 'Morgan Mentor',
-    status: 'In Progress',
-    color: 'green',
-  },
-  {
-    id: 'ev-6',
-    title: 'Build UI',
-    date: '2026-10-08',
-    project: 'Software Dev Alpha',
-    assignee: 'Sarah Johnson',
-    status: 'In Progress',
-    color: 'amber',
-  },
-  {
-    id: 'ev-7',
-    title: 'Build UI',
-    date: '2026-10-09',
-    project: 'Software Dev Alpha',
-    assignee: 'Sarah Johnson',
-    status: 'In Progress',
-    color: 'amber',
-  },
-  {
-    id: 'ev-8',
-    title: 'Security Check',
-    date: '2026-10-10',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'Blocked',
-    color: 'red',
-  },
-  {
-    id: 'ev-9',
-    title: 'Beta Launch',
-    date: '2026-10-14',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'Submitted',
-    color: 'amber',
-  },
-]
 
 interface CalendarCell {
   dateString: string
@@ -174,7 +93,7 @@ const october2026Cells: CalendarCell[] = [
 ]
 
 export function CalendarPage() {
-  const [events, setEvents] = useState<CalendarEventItem[]>(initialEvents)
+  const [events, setEvents] = useState<CalendarEventItem[]>([])
   const [currentMonthName, setCurrentMonthName] = useState('October 2026')
   const [currentView, setCurrentView] = useState<'Month' | 'Week' | 'Day'>('Month')
 
@@ -183,7 +102,8 @@ export function CalendarPage() {
   const [roleAnchorEl, setRoleAnchorEl] = useState<null | HTMLElement>(null)
 
   // Top Filters
-  const [selectedProject, setSelectedProject] = useState('Software Dev Alpha')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [projectsList, setProjectsList] = useState<{ id: string, name: string }[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState('All Assignees')
   const [selectedStatus, setSelectedStatus] = useState('All Statuses')
 
@@ -246,14 +166,31 @@ export function CalendarPage() {
     setToastMessage('Event removed.')
   }
 
+  useEffect(() => {
+    Projects.list()
+      .then((response) => {
+        const data = Array.isArray(response) ? response : (response as any).data;
+        setProjectsList(data)
+        if (data.length > 0) {
+          setSelectedProject(data[0].id)
+        }
+      })
+      .catch(err => console.error("Failed to load projects:", err))
+  }, [])
+
+  useEffect(() => {
+    Tasks.getCalendarEvents()
+      .then(data => setEvents(data))
+      .catch(err => console.error("Failed to load calendar events:", err))
+  }, [])
   return (
     <main className={styles.page}>
-      
+
       {/* Simulation Banner for testing roles */}
       <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
-        <strong>Workflow Simulator:</strong> You are currently viewing this page as a <strong>{currentUserRole}</strong>. 
-        {currentUserRole === 'Intern' 
-          ? " As an intern, your calendar schedule is read-only. You cannot manually add or delete global tasks/events." 
+        <strong>Workflow Simulator:</strong> You are currently viewing this page as a <strong>{currentUserRole}</strong>.
+        {currentUserRole === 'Intern'
+          ? " As an intern, your calendar schedule is read-only. You cannot manually add or delete global tasks/events."
           : " You have permission to add, edit, and plan calendar tasks/events for this project."}
       </Alert>
 
@@ -261,7 +198,7 @@ export function CalendarPage() {
       <section className={styles.topSection} aria-label="Calendar controls">
         {/* Action Buttons Row */}
         <div className={styles.actionRow}>
-          
+
           {/* Mock Role Switcher (For demonstration purposes) */}
           <button type="button" className={styles.exportButton} onClick={(e) => setRoleAnchorEl(e.currentTarget)}>
             <UserCircle2 size={16} strokeWidth={2} aria-hidden="true" />
@@ -318,11 +255,11 @@ export function CalendarPage() {
               onChange={(e) => setSelectedProject(e.target.value)}
               aria-label="Filter by project"
             >
-              <option value="Software Dev Alpha">Software Dev Alpha</option>
-              <option value="Network Security Audit">Network Security Audit</option>
-              <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-              <option value="Mobile App Beta">Mobile App Beta</option>
-              <option value="All Projects">All Projects</option>
+              {projectsList.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
@@ -469,10 +406,10 @@ export function CalendarPage() {
                           ev.color === 'green'
                             ? styles.eventGreen
                             : ev.color === 'amber'
-                            ? styles.eventAmber
-                            : ev.color === 'red'
-                            ? styles.eventRed
-                            : styles.eventBlue
+                              ? styles.eventAmber
+                              : ev.color === 'red'
+                                ? styles.eventRed
+                                : styles.eventBlue
 
                         return (
                           <button
@@ -508,15 +445,14 @@ export function CalendarPage() {
                         <button
                           key={ev.id}
                           type="button"
-                          className={`${styles.eventPill} ${
-                            ev.color === 'green'
-                              ? styles.eventGreen
-                              : ev.color === 'amber'
+                          className={`${styles.eventPill} ${ev.color === 'green'
+                            ? styles.eventGreen
+                            : ev.color === 'amber'
                               ? styles.eventAmber
                               : ev.color === 'red'
-                              ? styles.eventRed
-                              : styles.eventBlue
-                          }`}
+                                ? styles.eventRed
+                                : styles.eventBlue
+                            }`}
                           onClick={() => setSelectedEvent(ev)}
                         >
                           {ev.time ? `${ev.time} ` : ''}{ev.title}
@@ -635,10 +571,11 @@ export function CalendarPage() {
                 value={newEventProject}
                 onChange={(e) => setNewEventProject(e.target.value)}
               >
-                <option value="Software Dev Alpha">Software Dev Alpha</option>
-                <option value="Network Security Audit">Network Security Audit</option>
-                <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-                <option value="Mobile App Beta">Mobile App Beta</option>
+                {projectsList.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
               </select>
             </div>
 
