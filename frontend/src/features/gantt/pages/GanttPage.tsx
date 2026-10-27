@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Tasks } from '@/api/services/tasks.service'
 import { Projects } from '@/api/services/projects.service'
-import { useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 import {
   Alert,
   DialogContent,
@@ -19,16 +19,12 @@ import {
   Plus,
   Search,
   Share,
-  UserCircle2
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { useAuth } from '@/hooks/useAuth'
 import styles from './GanttPage.module.css'
 
-// Updated statuses based on workflow document
 export type GanttStatus = 'To Do' | 'In Progress' | 'Submitted' | 'Completed' | 'Blocked'
-export type UserRole = 'Intern' | 'Scrum Master' | 'Mentor'
 
 export interface GanttTaskItem {
   id: string
@@ -46,7 +42,6 @@ export interface GanttTaskItem {
   barColor?: 'blue' | 'green'
 }
 
-
 const timelineColumns = [
   { key: 'col-0', label: 'Mon 05', isToday: false },
   { key: 'col-1', label: 'Tue 06', isToday: false },
@@ -58,15 +53,8 @@ const timelineColumns = [
 
 export function GanttPage() {
   const { user } = useAuth()
-  const isIntern = user?.role === 'INTERN'
   const [tasks, setTasks] = useState<GanttTaskItem[]>([])
   const [activeView, setActiveView] = useState<'Days' | 'Weeks' | 'Months'>('Weeks')
-
-  // Simulated Authentication / Role State to demonstrate workflow restrictions
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole>('Scrum Master')
-
-  // A signed-in intern always sees the chart in view-only mode, regardless of the simulator.
-  const effectiveUserRole: UserRole = isIntern ? 'Intern' : currentUserRole
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
@@ -75,7 +63,6 @@ export function GanttPage() {
   const [selectedStatus, setSelectedStatus] = useState('All statuses')
   const [selectedDate, setSelectedDate] = useState('Select date')
   const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
-  const [roleAnchorEl, setRoleAnchorEl] = useState<null | HTMLElement>(null)
 
   // Modals & Notifications
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -107,14 +94,14 @@ export function GanttPage() {
     })
   }, [tasks, selectedProject, selectedStatus, searchQuery])
 
-  // Computed metrics mapped accurately to specific workflow task states
-  const totalTasksCount = tasks.length === 6 ? 24 : tasks.length
-  const activeNowCount = tasks.filter((t) => t.status === 'In Progress').length + (tasks.length === 6 ? 6 : 0)
-  const pendingCount = tasks.filter((t) => t.status === 'To Do').length + (tasks.length === 6 ? 11 : 0)
-  const blockedCount = tasks.filter((t) => t.status === 'Blocked').length + (tasks.length === 6 ? 3 : 0)
+  // Computed metrics 
+  const totalTasksCount = tasks.length
+  const activeNowCount = tasks.filter((t) => t.status === 'In Progress').length
+  const pendingCount = tasks.filter((t) => t.status === 'To Do').length
+  const blockedCount = tasks.filter((t) => t.status === 'Blocked').length
 
   // Role Permissions
-  const canManageTasks = effectiveUserRole === 'Scrum Master' || effectiveUserRole === 'Mentor'
+  const canManageTasks = user?.role === 'ADMIN' || user?.role === 'MENTOR' || user?.role === 'INTERN'
 
   const handleExport = () => {
     setToastMessage(`Timeline for ${selectedProject} exported successfully.`)
@@ -122,7 +109,7 @@ export function GanttPage() {
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!canManageTasks) return // Security check mirroring backend validation
+    if (!canManageTasks) return
     if (!newTaskName.trim()) return
 
     const initials = newTaskAssignee
@@ -141,7 +128,7 @@ export function GanttPage() {
       assigneeName: newTaskAssignee,
       assigneeInitials: initials,
       status: newTaskStatus,
-      project: selectedProject === 'All Projects' ? 'Software Dev Alpha' : selectedProject,
+      project: selectedProject,
       startCol: start,
       endCol: end,
       barLabel: newTabBarLabel.trim() || newTaskName.trim(),
@@ -164,10 +151,8 @@ export function GanttPage() {
   }
 
   useEffect(() => {
-    if (selectedProject === 'All Projects') return;
+    if (selectedProject === 'All Projects' || !selectedProject) return;
 
-    // Note: You will need the actual projectId here, not just the name. 
-    // For now, if your API expects an ID, pass the ID instead of the string 'Software Dev Alpha'.
     Tasks.getGanttData(selectedProject)
       .then(data => setTasks(data))
       .catch(err => console.error("Failed to load Gantt data:", err))
@@ -187,24 +172,8 @@ export function GanttPage() {
 
   return (
     <main className={styles.page}>
-
-      {/* Interns get a view-only notice; the role simulator stays available for demos */}
-      {isIntern ? (
-        <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
-          You have <strong>view-only</strong> access to the Gantt chart. Contact your mentor or an administrator to make changes.
-        </Alert>
-      ) : (
-        <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
-          <strong>Workflow Simulator:</strong> You are currently viewing this page as a <strong>{effectiveUserRole}</strong>.{' '}
-          {effectiveUserRole === 'Intern'
-            ? 'The Gantt chart is read-only. You cannot add or delete tasks.'
-            : 'You have permission to add, edit, and plan tasks.'}
-        </Alert>
-      )}
-
       {/* 4 Summary / Metric Cards */}
       <section className={styles.metricsGrid} aria-label="Task metrics summary">
-        {/* Metric 1: Total Tasks */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconBlue}`}>
             <Check size={20} strokeWidth={2.5} aria-hidden="true" />
@@ -215,7 +184,6 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 2: Active now (In Progress) */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconGreen}`}>
             <Play size={18} fill="currentColor" strokeWidth={0} aria-hidden="true" />
@@ -226,7 +194,6 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 3: Pending (To Do) */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconAmber}`}>
             <FileText size={20} strokeWidth={2} aria-hidden="true" />
@@ -237,7 +204,6 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 4: Blocked */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconRed}`}>
             <AlertTriangle size={20} strokeWidth={2} aria-hidden="true" />
@@ -252,7 +218,6 @@ export function GanttPage() {
       {/* Control Bar: Filters & Actions */}
       <section className={styles.controlBar} aria-label="Gantt timeline controls">
         <div className={styles.filterGroup}>
-          {/* Search Tasks Input */}
           <div className={styles.searchInputWrapper}>
             <Search size={16} className={styles.searchIcon} aria-hidden="true" />
             <input
@@ -265,7 +230,6 @@ export function GanttPage() {
             />
           </div>
 
-          {/* Project Dropdown */}
           <div className={styles.selectWrapper}>
             <select
               className={styles.filterSelect}
@@ -282,7 +246,6 @@ export function GanttPage() {
             <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
           </div>
 
-          {/* Status Dropdown */}
           <div className={styles.selectWrapper}>
             <select
               className={styles.filterSelect}
@@ -300,7 +263,6 @@ export function GanttPage() {
             <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
           </div>
 
-          {/* Date Picker Button */}
           <button
             type="button"
             className={styles.datePickerButton}
@@ -333,36 +295,7 @@ export function GanttPage() {
           </Menu>
         </div>
 
-        {/* Action Buttons */}
         <div className={styles.actionsGroup}>
-
-          {/* Mock Role Switcher (for demonstration purposes; hidden from real interns so view-only cannot be bypassed) */}
-          {!isIntern && (
-            <>
-              <button type="button" className={styles.exportButton} onClick={(e) => setRoleAnchorEl(e.currentTarget)}>
-                <UserCircle2 size={16} strokeWidth={2} aria-hidden="true" />
-                <span>View As: {currentUserRole}</span>
-              </button>
-              <Menu
-                anchorEl={roleAnchorEl}
-                open={Boolean(roleAnchorEl)}
-                onClose={() => setRoleAnchorEl(null)}
-                slotProps={{ paper: { sx: { borderRadius: '10px', minWidth: 150 } } }}
-              >
-                {(['Intern', 'Scrum Master', 'Mentor'] as UserRole[]).map((role) => (
-                  <MenuItem
-                    key={role}
-                    selected={role === currentUserRole}
-                    onClick={() => { setCurrentUserRole(role); setRoleAnchorEl(null); }}
-                    sx={{ fontSize: 13.5 }}
-                  >
-                    {role}
-                  </MenuItem>
-                ))}
-              </Menu>
-            </>
-          )}
-
           <button
             type="button"
             className={styles.exportButton}
@@ -373,7 +306,6 @@ export function GanttPage() {
             <span>Export</span>
           </button>
 
-          {/* Only render if user role permits task creation */}
           {canManageTasks && (
             <button
               type="button"
@@ -390,13 +322,11 @@ export function GanttPage() {
 
       {/* Gantt Timeline Card */}
       <section className={styles.timelineCard} aria-labelledby="timeline-card-title">
-        {/* Timeline Header */}
         <div className={styles.timelineHeader}>
           <h2 id="timeline-card-title" className={styles.timelineTitle}>
-            {selectedProject === 'All Projects' ? 'Software Dev Alpha' : selectedProject} Timeline
+            Project Timeline
           </h2>
 
-          {/* View Switcher (Days, Weeks, Months) */}
           <div className={styles.viewSwitcher} role="tablist" aria-label="Timeline view granularity">
             {(['Days', 'Weeks', 'Months'] as const).map((view) => (
               <button
@@ -413,7 +343,6 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Gantt Table & Grid */}
         <div className={styles.ganttScrollWrapper}>
           <table className={styles.ganttTable}>
             <thead>
@@ -435,7 +364,6 @@ export function GanttPage() {
             </thead>
             <tbody>
               {filteredTasks.map((task) => {
-                // Map the workflow document statuses to the existing CSS class color profiles
                 const statusClass =
                   task.status === 'Completed' || task.status === 'Submitted'
                     ? styles.statusCompleted
@@ -456,13 +384,11 @@ export function GanttPage() {
 
                 return (
                   <tr key={task.id} className={styles.taskRow}>
-                    {/* Task Meta */}
                     <td className={styles.taskMetaCell}>
                       <p className={styles.taskName}>{task.name}</p>
                       <p className={styles.taskPhase}>{task.phase}</p>
                     </td>
 
-                    {/* Assignee */}
                     <td className={styles.assigneeCell}>
                       <div className={styles.assigneeWrapper}>
                         <span className={`${styles.assigneeAvatar} ${avatarColorClass}`}>
@@ -472,14 +398,12 @@ export function GanttPage() {
                       </div>
                     </td>
 
-                    {/* Status */}
                     <td className={styles.statusCell}>
                       <span className={`${styles.statusPill} ${statusClass}`}>
                         {task.status}
                       </span>
                     </td>
 
-                    {/* 6 Timeline Day Columns */}
                     {timelineColumns.map((col, colIndex) => {
                       const isBarStart = hasBar && task.startCol === colIndex
                       const colSpan = hasBar ? task.endCol! - task.startCol! + 1 : 1
@@ -514,7 +438,7 @@ export function GanttPage() {
         </div>
       </section>
 
-      {/* Add New Task Modal (Only accessible by roles with manage privileges) */}
+      {/* Add New Task Modal */}
       {canManageTasks && (
         <Modal
           open={isAddModalOpen}
