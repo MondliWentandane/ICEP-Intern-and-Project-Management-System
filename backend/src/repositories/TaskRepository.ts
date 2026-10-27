@@ -21,6 +21,10 @@ export class TaskRepository {
   static async getTasks(where: Prisma.TaskWhereInput = {}) {
     return prisma.task.findMany({
       where,
+      include: {
+        project: { select: { name: true } },
+        assignedTo: { include: { user: { select: { fullName: true } } } },
+      },
       orderBy: { createdAt: "desc" }
     });
   }

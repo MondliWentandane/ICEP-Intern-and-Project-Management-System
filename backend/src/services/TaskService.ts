@@ -454,9 +454,13 @@ export class TaskService {
                 id: task.id,
                 title: task.title,
                 projectId: task.projectId,
+                projectName: task.project.name,
+                assignedToId: task.assignedToId,
+                assigneeName: task.assignedTo?.user.fullName ?? null,
                 startDate: task.startDate,
                 dueDate: task.dueDate,
-                status: task.status
+                status: task.status,
+                approvedAt: task.approvedAt
             }));
     }
 
