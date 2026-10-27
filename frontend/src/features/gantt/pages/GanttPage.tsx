@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Tasks } from '@/api/services/tasks.service'
+import { Projects } from '@/api/services/projects.service'
 import { useEffect } from 'react'
 import {
   Alert,
@@ -69,7 +70,8 @@ export function GanttPage() {
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedProject, setSelectedProject] = useState('Software Dev Alpha')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [projectsList, setProjectsList] = useState<{ id: string, name: string }[]>([])
   const [selectedStatus, setSelectedStatus] = useState('All statuses')
   const [selectedDate, setSelectedDate] = useState('Select date')
   const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
@@ -160,6 +162,7 @@ export function GanttPage() {
     setSelectedTask(null)
     setToastMessage('Task deleted.')
   }
+
   useEffect(() => {
     if (selectedProject === 'All Projects') return;
 
@@ -169,6 +172,18 @@ export function GanttPage() {
       .then(data => setTasks(data))
       .catch(err => console.error("Failed to load Gantt data:", err))
   }, [selectedProject])
+
+  useEffect(() => {
+    Projects.list()
+      .then((response) => {
+        const data = Array.isArray(response) ? response : (response as any).data;
+        setProjectsList(data)
+        if (data.length > 0) {
+          setSelectedProject(data[0].id)
+        }
+      })
+      .catch(err => console.error("Failed to load projects:", err))
+  }, [])
 
   return (
     <main className={styles.page}>
@@ -258,11 +273,11 @@ export function GanttPage() {
               onChange={(e) => setSelectedProject(e.target.value)}
               aria-label="Filter by project"
             >
-              <option value="Software Dev Alpha">Software Dev Alpha</option>
-              <option value="Network Security Audit">Network Security Audit</option>
-              <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-              <option value="Mobile App Beta">Mobile App Beta</option>
-              <option value="All Projects">All Projects</option>
+              {projectsList.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
             <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
           </div>
