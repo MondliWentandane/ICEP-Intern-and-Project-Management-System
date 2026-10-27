@@ -48,7 +48,8 @@ export function Sidebar({ mobileOpen, collapsed, onClose }: { mobileOpen: boolea
   }, [location.pathname, links, collapsed])
 
   if (!user) return null
-  const initials = user.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()
+  const displayName = user.name?.trim() || user.email || 'User'
+  const initials = displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
   const handleLogout = () => { logout(); navigate('/login') }
 
   return <>
@@ -83,8 +84,8 @@ export function Sidebar({ mobileOpen, collapsed, onClose }: { mobileOpen: boolea
         })}
       </Box>
       <Box className={styles['sidebar-user']}>
-        <Box className={styles['user-avatar']} title={collapsed ? user.name : undefined}>{initials}</Box>
-        <Box className={styles['user-copy']}><Typography className={styles['user-name']}>{user.name}</Typography><Typography className={styles['user-role']}>{roleLabels[user.role] ?? user.role}</Typography></Box>
+        <Box className={styles['user-avatar']} title={collapsed ? displayName : undefined}>{initials}</Box>
+        <Box className={styles['user-copy']}><Typography className={styles['user-name']}>{displayName}</Typography><Typography className={styles['user-role']}>{roleLabels[user.role] ?? user.role}</Typography></Box>
         <IconButton aria-label="Sign out" className={styles['logout-button']} onClick={handleLogout}><LogOut size={18} /></IconButton>
       </Box>
     </Box>

@@ -9,6 +9,8 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     role: string;
+    name: string;
+    email: string;
   };
 }
 
@@ -89,6 +91,8 @@ export const verifyToken = async (
     req.user = {
       id: user.id,
       role: user.role,
+      name: user.fullName,
+      email: user.email,
     };
 
     next();

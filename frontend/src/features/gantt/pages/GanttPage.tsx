@@ -42,26 +42,152 @@ export interface GanttTaskItem {
   assigneeAvatarColor?: 'slate' | 'blue' | 'default'
   status: GanttStatus
   project: string
-  startCol?: number
-  endCol?: number
+  startDate: string | null
+  endDate: string | null
+  progress: number
   barLabel?: string
   barProgress?: string
   barColor?: 'blue' | 'green'
 }
 
-const timelineColumns = [
-  { key: 'col-0', label: 'Mon 05', isToday: false },
-  { key: 'col-1', label: 'Tue 06', isToday: false },
-  { key: 'col-2', label: 'Wed 07', isToday: false },
-  { key: 'col-3', label: 'Thu 08', isToday: false },
-  { key: 'col-4', label: 'Fri 09', isToday: false },
-  { key: 'col-5', label: 'Mon 12', isToday: true },
-]
+interface ApiGanttTask {
+  id: string
+  title: string
+  description?: string | null
+  category?: string
+  projectId?: string
+  assignedToId?: string | null
+  assigneeName?: string | null
+  status: ApiTaskStatus
+  approvedAt?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  dueDate?: string | null
+  progress?: number
+}
+
+interface TimelineColumn {
+  key: string
+  label: string
+  isToday: boolean
+  startDate: Date
+  endDate: Date
+}
+
+function parseLocalDate(value?: string | null): Date | null {
+  if (!value) return null
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
+}
+
+function initialsFor(name: string): string {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
+}
+
+function toGanttTask(task: ApiGanttTask, projectId: string): GanttTaskItem {
+  const status: GanttStatus = task.status === 'TODO'
+    ? 'To Do'
+    : task.status === 'IN_PROGRESS'
+      ? 'In Progress'
+      : task.approvedAt
+        ? 'Completed'
+        : 'Submitted'
+  const assigneeName = task.assigneeName || 'Unassigned'
+  const progress = task.status === 'COMPLETED' ? 100 : task.progress ?? 0
+
+  return {
+    id: task.id,
+    name: task.title,
+    phase: task.description || task.category || 'Task',
+    assigneeName,
+    assigneeInitials: initialsFor(assigneeName),
+    status,
+    project: projectId,
+    startDate: task.startDate ?? task.dueDate ?? null,
+    endDate: task.endDate ?? task.dueDate ?? null,
+    progress,
+    barLabel: task.title,
+    barProgress: String(progress) + '%',
+    barColor: status === 'Completed' || status === 'Submitted' ? 'blue' : 'green',
+  }
+}
+
+function buildTimelineColumns(tasks: GanttTaskItem[], view: 'Days' | 'Weeks' | 'Months'): TimelineColumn[] {
+  const taskDates = tasks.flatMap((task) => [parseLocalDate(task.startDate), parseLocalDate(task.endDate)])
+    .filter((date): date is Date => date !== null)
+    .sort((a, b) => a.getTime() - b.getTime())
+  const today = new Date()
+  let from = taskDates[0] ?? new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  let to = taskDates[taskDates.length - 1] ?? new Date(from)
+
+  if (view === 'Weeks') {
+    from = new Date(from)
+    from.setDate(from.getDate() - ((from.getDay() + 6) % 7))
+    to = new Date(to)
+    to.setDate(to.getDate() + (6 - ((to.getDay() + 6) % 7)))
+    if (!taskDates.length) to.setDate(from.getDate() + 34)
+  } else if (view === 'Months') {
+    from = new Date(from.getFullYear(), from.getMonth(), 1)
+    to = new Date(to.getFullYear(), to.getMonth() + 1, 0)
+    if (!taskDates.length) to = new Date(from.getFullYear(), from.getMonth() + 5, 0)
+  } else if (!taskDates.length) {
+    to.setDate(to.getDate() + 5)
+  }
+
+  const columns: TimelineColumn[] = []
+  let cursor = new Date(from)
+  while (cursor <= to) {
+    const startDate = new Date(cursor)
+    let endDate = new Date(cursor)
+    let label = ''
+
+    if (view === 'Days') {
+      label = startDate.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })
+      cursor.setDate(cursor.getDate() + 1)
+    } else if (view === 'Weeks') {
+      endDate.setDate(endDate.getDate() + 6)
+      label = startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' - ' + endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+      cursor.setDate(cursor.getDate() + 7)
+    } else {
+      endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0)
+      label = startDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+      cursor = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1)
+    }
+
+    columns.push({
+      key: 'timeline-' + columns.length,
+      label,
+      isToday: today >= startDate && today <= endDate,
+      startDate,
+      endDate,
+    })
+  }
+  return columns
+}
+
+function getTaskColumnSpan(task: GanttTaskItem, columns: TimelineColumn[]) {
+  const start = parseLocalDate(task.startDate)
+  const end = parseLocalDate(task.endDate ?? task.startDate)
+  if (!start || !end) return null
+
+  const first = columns.findIndex((column) => column.endDate >= start)
+  let last = -1
+  for (let index = columns.length - 1; index >= 0; index -= 1) {
+    if (columns[index].startDate <= end) {
+      last = index
+      break
+    }
+  }
+  if (first < 0 || last < first) return null
+  return { start: first, end: last }
+}
 
 export function GanttPage() {
   const { user } = useAuth()
   const [tasks, setTasks] = useState<GanttTaskItem[]>([])
   const [activeView, setActiveView] = useState<'Days' | 'Weeks' | 'Months'>('Weeks')
+  const timelineColumns = useMemo(() => buildTimelineColumns(tasks, activeView), [tasks, activeView])
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
@@ -131,7 +257,6 @@ export function GanttPage() {
       return
     }
 
-    const initials = selectedMember.name.split(' ').map((part) => part[0]).join('').toUpperCase()
     const apiStatus: Record<NewTaskStatus, ApiTaskStatus> = {
       'To Do': 'TODO',
       'In Progress': 'IN_PROGRESS',
@@ -150,22 +275,13 @@ export function GanttPage() {
 
     try {
       const savedTask = await Tasks.create(payload)
-      const displayStatus: Record<ApiTaskStatus, GanttStatus> = {
-        TODO: 'To Do',
-        IN_PROGRESS: 'In Progress',
-        COMPLETED: 'Completed',
-      }
-      setTasks((prev) => [...prev, {
-        id: savedTask.id,
-        name: savedTask.title,
-        phase: newTaskPhase,
+      const ganttTask = toGanttTask({
+        ...savedTask,
         assigneeName: selectedMember.name,
-        assigneeInitials: initials,
-        status: displayStatus[savedTask.status as ApiTaskStatus] ?? 'To Do',
-        project: selectedProject,
+      } as ApiGanttTask, selectedProject)
+      setTasks((prev) => [...prev, {
+        ...ganttTask,
         barLabel: newTabBarLabel.trim() || newTaskName.trim(),
-        barProgress: savedTask.status === 'COMPLETED' ? '100%' : '0%',
-        barColor: savedTask.status === 'COMPLETED' ? 'blue' : 'green',
       }])
 
       setIsAddModalOpen(false)
@@ -237,8 +353,11 @@ export function GanttPage() {
     if (selectedProject === 'All Projects' || !selectedProject) return;
 
     Tasks.getGanttData(selectedProject)
-      .then(data => setTasks(data))
-      .catch(err => console.error("Failed to load Gantt data:", err))
+      .then((data) => setTasks((data as ApiGanttTask[]).map((task) => toGanttTask(task, selectedProject))))
+      .catch((err) => {
+        setTasks([])
+        console.error("Failed to load Gantt data:", err)
+      })
   }, [selectedProject])
 
   useEffect(() => {
@@ -460,7 +579,7 @@ export function GanttPage() {
                       ? styles.avatarSlate
                       : ''
 
-                const hasBar = task.startCol !== undefined && task.endCol !== undefined
+                const taskSpan = getTaskColumnSpan(task, timelineColumns)
 
                 return (
                   <tr key={task.id} className={styles.taskRow}>
@@ -485,8 +604,8 @@ export function GanttPage() {
                     </td>
 
                     {timelineColumns.map((col, colIndex) => {
-                      const isBarStart = hasBar && task.startCol === colIndex
-                      const colSpan = hasBar ? task.endCol! - task.startCol! + 1 : 1
+                      const isBarStart = taskSpan !== null && taskSpan.start === colIndex
+                      const colSpan = taskSpan !== null ? taskSpan.end - taskSpan.start + 1 : 1
                       const barWidth = `calc(${colSpan * 100}% - 12px)`
 
                       return (

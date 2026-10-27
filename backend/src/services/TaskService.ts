@@ -430,10 +430,16 @@ export class TaskService {
         return tasks.map(task => ({
             id: task.id,
             title: task.title,
+            description: task.description,
+            category: task.category,
+            projectId: task.projectId,
+            assignedToId: task.assignedToId,
+            assigneeName: task.assignedTo?.user.fullName ?? null,
             startDate: task.startDate,
             endDate: task.dueDate,
             progress: task.progress,
             status: task.status,
+            approvedAt: task.approvedAt,
             parentId: task.parentId
         }));
     }

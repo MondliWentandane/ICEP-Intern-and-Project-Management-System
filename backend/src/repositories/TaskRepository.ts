@@ -51,7 +51,10 @@ export class TaskRepository {
   static async getProjectTasks(projectId: string) {
     return prisma.task.findMany({
       where: { projectId },
-      include: { subtasks: true },
+      include: {
+        subtasks: true,
+        assignedTo: { include: { user: { select: { fullName: true } } } },
+      },
       orderBy: { position: "asc" }
     });
   }
