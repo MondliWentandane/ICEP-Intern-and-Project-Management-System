@@ -1,4 +1,3 @@
-
 import { TaskRepository } from "../repositories/TaskRepository";
 import { notificationService } from "./NotificationService";
 
@@ -25,18 +24,29 @@ export class TaskService {
             return project;
         }
 
-        if (user.role !== "MENTOR") {
-            throw new Error("Permission denied");
+        if (user.role === "MENTOR") {
+            const mentor = await TaskRepository.getMentorByUserId(user.id);
+            if (!mentor || project.supervisorId !== mentor.id) {
+                throw new Error("You are not authorized to manage this project");
+            }
+            return project;
         }
 
-        // Find the mentor record linked to this user
-        const mentor = await TaskRepository.getMentorByUserId(user.id);
+        // ENFORCE SCRUM MASTER RULE
+        if (user.role === "INTERN") {
+            const intern = await TaskRepository.getInternByUserId(user.id);
+            if (!intern) throw new Error("Permission denied");
 
-        if (!mentor || project.supervisorId !== mentor.id) {
-            throw new Error("You are not authorized to manage this project");
+            const assignment = await TaskRepository.getProjectAssignment(projectId, intern.id);
+
+            // The intern must be on the team AND have the Scrum Master role
+            if (!assignment || assignment.leftAt !== null || assignment.projectRole !== "Scrum Master") {
+                throw new Error("You must be the designated Scrum Master to manage tasks for this project.");
+            }
+            return project;
         }
 
-        return project;
+        throw new Error("Permission denied");
     }
 
     // Create a new task
@@ -106,7 +116,7 @@ export class TaskService {
         return task;
     }
 
-    
+
     // Retrieve a task with authorization
     static async getTask(id: string, user: TaskUser) {
 
@@ -140,8 +150,8 @@ export class TaskService {
 
         throw new Error("Permission denied");
     }
- 
-     
+
+
     // Retrieve all tasks visible to a user
     static async getTasks(user: TaskUser) {
         if (user.role === "ADMIN") {
@@ -209,10 +219,8 @@ export class TaskService {
                 throw new Error("Permission denied");
             }
 
-            return TaskRepository.getTasks({
-                projectId,
-                assignedToId: intern.id
-            });
+            // Return ALL project tasks so the intern can see the team's progress
+            return TaskRepository.getProjectTasks(projectId);
         }
 
         throw new Error("Permission denied");
@@ -242,7 +250,7 @@ export class TaskService {
 
         throw new Error("Permission denied");
     }
-   
+
     static async updateTask(
         id: string,
         data: {
@@ -270,8 +278,8 @@ export class TaskService {
 
         if (data.progress !== undefined &&
             (!Number.isInteger(data.progress) ||
-             data.progress < 0 ||
-             data.progress > 100)) {
+                data.progress < 0 ||
+                data.progress > 100)) {
             throw new Error("Progress must be between 0 and 100");
         }
 
@@ -383,7 +391,7 @@ export class TaskService {
 
             const nextStatus =
                 task.status === "TODO" ? "IN_PROGRESS" :
-                task.status === "IN_PROGRESS" ? "COMPLETED" : null;
+                    task.status === "IN_PROGRESS" ? "COMPLETED" : null;
 
             if (status !== nextStatus) {
                 throw new Error("Interns can only advance their own tasks from TODO to IN_PROGRESS to COMPLETED");
@@ -399,8 +407,8 @@ export class TaskService {
         }
         return updated;
     }
-    
-    
+
+
     // Gantt chart data for a project
     static async getGanttData(
         projectId: string,
@@ -434,8 +442,8 @@ export class TaskService {
                 status: task.status
             }));
     }
-   
-    
+
+
     // Assign or unassign an intern
     static async assignTo(
         id: string,
@@ -584,5 +592,5 @@ export class TaskService {
         );
     }
 
-    
+
 }
