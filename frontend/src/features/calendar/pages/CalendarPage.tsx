@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Tasks } from '@/api/services/tasks.service'
+import { Projects } from '@/api/services/projects.service'
 import { useEffect } from 'react'
 import {
   Alert,
@@ -101,7 +102,8 @@ export function CalendarPage() {
   const [roleAnchorEl, setRoleAnchorEl] = useState<null | HTMLElement>(null)
 
   // Top Filters
-  const [selectedProject, setSelectedProject] = useState('Software Dev Alpha')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [projectsList, setProjectsList] = useState<{ id: string, name: string }[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState('All Assignees')
   const [selectedStatus, setSelectedStatus] = useState('All Statuses')
 
@@ -163,6 +165,18 @@ export function CalendarPage() {
     setSelectedEvent(null)
     setToastMessage('Event removed.')
   }
+
+  useEffect(() => {
+    Projects.list()
+      .then((response) => {
+        const data = Array.isArray(response) ? response : (response as any).data;
+        setProjectsList(data)
+        if (data.length > 0) {
+          setSelectedProject(data[0].id)
+        }
+      })
+      .catch(err => console.error("Failed to load projects:", err))
+  }, [])
 
   useEffect(() => {
     Tasks.getCalendarEvents()
@@ -241,11 +255,11 @@ export function CalendarPage() {
               onChange={(e) => setSelectedProject(e.target.value)}
               aria-label="Filter by project"
             >
-              <option value="Software Dev Alpha">Software Dev Alpha</option>
-              <option value="Network Security Audit">Network Security Audit</option>
-              <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-              <option value="Mobile App Beta">Mobile App Beta</option>
-              <option value="All Projects">All Projects</option>
+              {projectsList.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
@@ -557,10 +571,11 @@ export function CalendarPage() {
                 value={newEventProject}
                 onChange={(e) => setNewEventProject(e.target.value)}
               >
-                <option value="Software Dev Alpha">Software Dev Alpha</option>
-                <option value="Network Security Audit">Network Security Audit</option>
-                <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-                <option value="Mobile App Beta">Mobile App Beta</option>
+                {projectsList.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
               </select>
             </div>
 
