@@ -50,6 +50,8 @@ export class TaskController {
                 description,
                 assignedToId,
                 priority,
+                status,
+                startDate,
                 dueDate
             } = req.body;
 
@@ -60,6 +62,8 @@ export class TaskController {
     description,
     assignedToId,
     priority,
+    status,
+    startDate,
     dueDate,
     createdById: userId
 }, req.user!);
@@ -72,10 +76,7 @@ export class TaskController {
 
         } catch (error) {
             console.error("Create task error:", error);
-
-            res.status(500).json({
-                message: "Unable to create task"
-            });
+            handleTaskError(res, error);
         }
     }
     

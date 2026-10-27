@@ -25,6 +25,13 @@ import { Modal } from '@/components/ui/Modal'
 import styles from './GanttPage.module.css'
 
 export type GanttStatus = 'To Do' | 'In Progress' | 'Submitted' | 'Completed' | 'Blocked'
+type NewTaskStatus = 'To Do' | 'In Progress' | 'Completed'
+type ApiTaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+
+interface ProjectTeamMember {
+  id: string
+  name: string
+}
 
 export interface GanttTaskItem {
   id: string
@@ -72,10 +79,11 @@ export function GanttPage() {
   // New task form state
   const [newTaskName, setNewTaskName] = useState('')
   const [newTaskPhase, setNewTaskPhase] = useState('Phase 1')
-  const [newTaskAssignee, setNewTaskAssignee] = useState('Moeez S.')
-  const [newTaskStatus, setNewTaskStatus] = useState<GanttStatus>('In Progress')
-  const [newTaskStartCol, setNewTaskStartCol] = useState('0')
-  const [newTaskEndCol, setNewTaskEndCol] = useState('1')
+  const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([])
+  const [newTaskAssignee, setNewTaskAssignee] = useState('')
+  const [newTaskStatus, setNewTaskStatus] = useState<NewTaskStatus>('To Do')
+  const [newTaskStartDate, setNewTaskStartDate] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [newTabBarLabel, setNewTabBarLabel] = useState('')
 
   const filteredTasks = useMemo(() => {
@@ -104,44 +112,74 @@ export function GanttPage() {
     setToastMessage(`Timeline for ${selectedProject} exported successfully.`)
   }
 
-  // WIRED TO BACKEND POST API
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canManageTasks) return
     if (!newTaskName.trim()) return
 
-    const initials = newTaskAssignee.split(' ').map((p) => p[0]).join('').toUpperCase()
-    const start = Number(newTaskStartCol)
-    const end = Number(newTaskEndCol)
+    const selectedMember = teamMembers.find((member) => member.id === newTaskAssignee)
+    if (!selectedProject || !selectedMember) {
+      setToastMessage('Choose a project team member to assign this task to.')
+      return
+    }
+    if (!newTaskStartDate || !newTaskDueDate) {
+      setToastMessage('Choose a start date and due date.')
+      return
+    }
+    if (newTaskDueDate < newTaskStartDate) {
+      setToastMessage('The due date must be on or after the start date.')
+      return
+    }
 
+    const initials = selectedMember.name.split(' ').map((part) => part[0]).join('').toUpperCase()
+    const apiStatus: Record<NewTaskStatus, ApiTaskStatus> = {
+      'To Do': 'TODO',
+      'In Progress': 'IN_PROGRESS',
+      Completed: 'COMPLETED',
+    }
     const payload = {
-      name: newTaskName.trim(),
-      phase: newTaskPhase,
-      assigneeName: newTaskAssignee,
-      assigneeInitials: initials,
-      status: newTaskStatus,
-      project: selectedProject,
-      projectId: selectedProject, // Pass ID for backend validation
-      startCol: start,
-      endCol: end,
-      barLabel: newTabBarLabel.trim() || newTaskName.trim(),
-      barProgress: newTaskStatus === 'Completed' ? '100%' : '50%',
-      barColor: newTaskStatus === 'Completed' ? 'blue' : 'green',
+      title: newTaskName.trim(),
+      projectId: selectedProject,
+      assignedToId: selectedMember.id,
+      description: newTaskPhase.trim() || undefined,
+      priority: 'MEDIUM',
+      status: apiStatus[newTaskStatus],
+      startDate: newTaskStartDate,
+      dueDate: newTaskDueDate,
     }
 
     try {
       const savedTask = await Tasks.create(payload)
-
-      // Update UI with the task returned by your backend (or fallback to our payload shape)
-      setTasks((prev) => [...prev, savedTask || { ...payload, id: `task-${Date.now()}` }])
+      const displayStatus: Record<ApiTaskStatus, GanttStatus> = {
+        TODO: 'To Do',
+        IN_PROGRESS: 'In Progress',
+        COMPLETED: 'Completed',
+      }
+      setTasks((prev) => [...prev, {
+        id: savedTask.id,
+        name: savedTask.title,
+        phase: newTaskPhase,
+        assigneeName: selectedMember.name,
+        assigneeInitials: initials,
+        status: displayStatus[savedTask.status as ApiTaskStatus] ?? 'To Do',
+        project: selectedProject,
+        barLabel: newTabBarLabel.trim() || newTaskName.trim(),
+        barProgress: savedTask.status === 'COMPLETED' ? '100%' : '0%',
+        barColor: savedTask.status === 'COMPLETED' ? 'blue' : 'green',
+      }])
 
       setIsAddModalOpen(false)
       setNewTaskName('')
+      setNewTaskPhase('Phase 1')
+      setNewTaskAssignee('')
+      setNewTaskStatus('To Do')
+      setNewTaskStartDate('')
+      setNewTaskDueDate('')
       setNewTabBarLabel('')
-      setToastMessage(`Task successfully saved to database!`)
+      setToastMessage('Task successfully saved to database!')
     } catch (error: any) {
       console.error(error)
-      setToastMessage(error.response?.data?.message || 'Permission Denied: You do not have Scrum Master rights for this project.')
+      setToastMessage(error.response?.data?.message || 'Unable to create task. Check the project role and required fields.')
     }
   }
 
@@ -158,6 +196,42 @@ export function GanttPage() {
       setToastMessage('Permission Denied: Cannot delete this task.')
     }
   }
+
+  useEffect(() => {
+    if (!selectedProject || selectedProject === 'All Projects') {
+      setTeamMembers([])
+      setNewTaskAssignee('')
+      return
+    }
+
+    let cancelled = false
+    Projects.get(selectedProject)
+      .then((response) => {
+        if (cancelled) return
+        const project = response.data as unknown as {
+          assignments?: Array<{ internId: string; intern?: { user?: { fullName?: string } } }>
+        }
+        const members = (project.assignments ?? [])
+          .filter((assignment) => assignment.internId && assignment.intern?.user?.fullName)
+          .map((assignment) => ({
+            id: assignment.internId,
+            name: assignment.intern!.user!.fullName!,
+          }))
+        setTeamMembers(members)
+        setNewTaskAssignee((current) =>
+          members.some((member) => member.id === current) ? current : members[0]?.id ?? '',
+        )
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setTeamMembers([])
+          setNewTaskAssignee('')
+          console.error('Failed to load project team:', err)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [selectedProject])
 
   useEffect(() => {
     if (selectedProject === 'All Projects' || !selectedProject) return;
@@ -504,12 +578,13 @@ export function GanttPage() {
                     className={styles.modalSelect}
                     value={newTaskAssignee}
                     onChange={(e) => setNewTaskAssignee(e.target.value)}
+                    required
+                    disabled={teamMembers.length === 0}
                   >
-                    <option value="Moeez S.">Moeez S.</option>
-                    <option value="Thabo M.">Thabo M.</option>
-                    <option value="Jane S.">Jane S.</option>
-                    <option value="Ron J.">Ron J.</option>
-                    <option value="Pat Naidoo">Pat Naidoo</option>
+                    <option value="">Choose a project team member</option>
+                    {teamMembers.map((member) => (
+                      <option key={member.id} value={member.id}>{member.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -523,13 +598,11 @@ export function GanttPage() {
                     id="task-status-select"
                     className={styles.modalSelect}
                     value={newTaskStatus}
-                    onChange={(e) => setNewTaskStatus(e.target.value as GanttStatus)}
+                    onChange={(e) => setNewTaskStatus(e.target.value as NewTaskStatus)}
                   >
                     <option value="To Do">To Do</option>
                     <option value="In Progress">In Progress</option>
-                    <option value="Submitted">Submitted</option>
                     <option value="Completed">Completed</option>
-                    <option value="Blocked">Blocked</option>
                   </select>
                 </div>
 
@@ -553,38 +626,29 @@ export function GanttPage() {
                   <label htmlFor="task-start-col" className={styles.formLabel}>
                     Timeline Start Day
                   </label>
-                  <select
+                  <input
                     id="task-start-col"
-                    className={styles.modalSelect}
-                    value={newTaskStartCol}
-                    onChange={(e) => setNewTaskStartCol(e.target.value)}
-                  >
-                    <option value="0">Mon 05</option>
-                    <option value="1">Tue 06</option>
-                    <option value="2">Wed 07</option>
-                    <option value="3">Thu 08</option>
-                    <option value="4">Fri 09</option>
-                    <option value="5">Mon 12</option>
-                  </select>
+                    type="date"
+                    className={styles.formInput}
+                    value={newTaskStartDate}
+                    onChange={(e) => setNewTaskStartDate(e.target.value)}
+                    required
+                  />
                 </div>
 
                 <div className={styles.formGroup}>
                   <label htmlFor="task-end-col" className={styles.formLabel}>
                     Timeline End Day
                   </label>
-                  <select
+                  <input
                     id="task-end-col"
-                    className={styles.modalSelect}
-                    value={newTaskEndCol}
-                    onChange={(e) => setNewTaskEndCol(e.target.value)}
-                  >
-                    <option value="0">Mon 05</option>
-                    <option value="1">Tue 06</option>
-                    <option value="2">Wed 07</option>
-                    <option value="3">Thu 08</option>
-                    <option value="4">Fri 09</option>
-                    <option value="5">Mon 12</option>
-                  </select>
+                    type="date"
+                    className={styles.formInput}
+                    value={newTaskDueDate}
+                    onChange={(e) => setNewTaskDueDate(e.target.value)}
+                    min={newTaskStartDate || undefined}
+                    required
+                  />
                 </div>
               </div>
             </form>
