@@ -192,7 +192,11 @@ export function GanttPage() {
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState('')
-  const [projectsList, setProjectsList] = useState<{ id: string, name: string }[]>([])
+  const [projectsList, setProjectsList] = useState<Array<{
+    id: string
+    name: string
+    assignments?: Array<{ projectRole?: string | null; intern?: { user?: { id?: string } } }>
+  }>>([])
   const [selectedStatus, setSelectedStatus] = useState('All statuses')
   const [selectedDate, setSelectedDate] = useState('Select date')
   const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
@@ -232,7 +236,12 @@ export function GanttPage() {
   const pendingCount = tasks.filter((t) => t.status === 'To Do').length
   const blockedCount = tasks.filter((t) => t.status === 'Blocked').length
 
-  const canManageTasks = user?.role === 'ADMIN' || user?.role === 'MENTOR' || user?.role === 'INTERN'
+  const isProjectScrumMaster = projectsList
+    .find((project) => project.id === selectedProject)?.assignments?.some((assignment) =>
+      assignment.intern?.user?.id === user?.id && assignment.projectRole === 'Scrum Master',
+    ) ?? false
+  const canManageTasks = user?.role === 'ADMIN' || user?.role === 'MENTOR' ||
+    (user?.role === 'INTERN' && isProjectScrumMaster)
 
   const handleExport = () => {
     setToastMessage(`Timeline for ${selectedProject} exported successfully.`)
@@ -325,7 +334,11 @@ export function GanttPage() {
       .then((response) => {
         if (cancelled) return
         const project = response.data as unknown as {
-          assignments?: Array<{ internId: string; intern?: { user?: { fullName?: string } } }>
+          assignments?: Array<{
+            internId: string
+            projectRole?: string | null
+            intern?: { user?: { id?: string; fullName?: string } }
+          }>
         }
         const members = (project.assignments ?? [])
           .filter((assignment) => assignment.internId && assignment.intern?.user?.fullName)
@@ -347,7 +360,7 @@ export function GanttPage() {
       })
 
     return () => { cancelled = true }
-  }, [selectedProject])
+  }, [selectedProject, user?.id])
 
   useEffect(() => {
     if (selectedProject === 'All Projects' || !selectedProject) return;

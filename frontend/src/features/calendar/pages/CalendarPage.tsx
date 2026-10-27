@@ -83,6 +83,15 @@ interface CalendarCell {
   badgeValue?: number
 }
 
+interface CalendarProject {
+  id: string
+  name: string
+  assignments?: Array<{
+    projectRole?: string | null
+    intern?: { user?: { id?: string } }
+  }>
+}
+
 // Fixed 35 days matching the October 2026 mockup
 const october2026Cells: CalendarCell[] = [
   { dateString: '2026-09-28', dayNumber: 28, isCurrentMonth: false },
@@ -130,7 +139,7 @@ export function CalendarPage() {
 
   // Top Filters
   const [selectedProject, setSelectedProject] = useState('')
-  const [projectsList, setProjectsList] = useState<{ id: string, name: string }[]>([])
+  const [projectsList, setProjectsList] = useState<CalendarProject[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState('All Assignees')
   const [selectedStatus, setSelectedStatus] = useState('All Statuses')
 
@@ -144,7 +153,19 @@ export function CalendarPage() {
   const [newEventDate, setNewEventDate] = useState('2026-10-15')
   const [newEventProject, setNewEventProject] = useState('')
 
-  const canManageTasks = user?.role === 'ADMIN' || user?.role === 'MENTOR' || user?.role === 'INTERN'
+  const canManageAllProjects = user?.role === 'ADMIN' || user?.role === 'MENTOR'
+  const managedProjectIds = useMemo(() => new Set(projectsList
+    .filter((project) => project.assignments?.some((assignment) =>
+      assignment.intern?.user?.id === user?.id && assignment.projectRole === 'Scrum Master',
+    ))
+    .map((project) => project.id)), [projectsList, user?.id])
+  const canManageTasks = canManageAllProjects || (user?.role === 'INTERN' && managedProjectIds.size > 0)
+  const canManageNewEventProject = canManageAllProjects || managedProjectIds.has(newEventProject)
+  const canDeleteSelectedEvent = canManageAllProjects ||
+    (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
+  const availableProjectsForNewEvent = canManageAllProjects
+    ? projectsList
+    : projectsList.filter((project) => managedProjectIds.has(project.id))
 
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
@@ -161,7 +182,7 @@ export function CalendarPage() {
 
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!canManageTasks) return 
+    if (!canManageNewEventProject) return
     if (!newEventTitle.trim()) return
 
     const payload = {
@@ -187,7 +208,7 @@ export function CalendarPage() {
   }
 
   const handleDeleteEvent = async (id: string) => {
-    if (!canManageTasks) return
+    if (!canManageAllProjects && !(user?.role === 'INTERN' && managedProjectIds.has(events.find((event) => event.id === id)?.project ?? ''))) return
     try {
       await Tasks.delete(id)
       setEvents((prev) => prev.filter((ev) => ev.id !== id))
@@ -202,7 +223,7 @@ export function CalendarPage() {
   useEffect(() => {
     Projects.list()
       .then((response) => {
-        const data = Array.isArray(response) ? response : (response as any).data;
+        const data = (Array.isArray(response) ? response : (response as any).data) as CalendarProject[]
         setProjectsList(data)
         if (data.length > 0) {
           setSelectedProject(data[0].id)
@@ -236,7 +257,12 @@ export function CalendarPage() {
             <button
               type="button"
               className={styles.addEventButton}
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                if (user?.role === 'INTERN' && !managedProjectIds.has(newEventProject)) {
+                  setNewEventProject(availableProjectsForNewEvent[0]?.id ?? '')
+                }
+                setIsAddModalOpen(true)
+              }}
               id="calendar-add-event-btn"
             >
               <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
@@ -529,7 +555,7 @@ export function CalendarPage() {
                 value={newEventProject}
                 onChange={(e) => setNewEventProject(e.target.value)}
               >
-                {projectsList.map((project) => (
+                {availableProjectsForNewEvent.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
                   </option>
@@ -549,8 +575,8 @@ export function CalendarPage() {
           maxWidth="xs"
           fullWidth
           actions={
-            <div style={{ display: 'flex', gap: '10px', justifyContent: canManageTasks ? 'space-between' : 'flex-end', width: '100%' }}>
-              {canManageTasks && (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: canDeleteSelectedEvent ? 'space-between' : 'flex-end', width: '100%' }}>
+              {canDeleteSelectedEvent && (
                 <Button appearance="danger" onClick={() => handleDeleteEvent(selectedEvent.id)}>
                   Delete
                 </Button>
