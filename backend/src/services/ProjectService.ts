@@ -76,6 +76,7 @@ export class ProjectService {
     await notificationService.projectAssigned(projectId, internId, role, actorUserId);
     return assignment;
   }
+
   /** Changes one member's role (PUT /projects/:id/members/:internId). */
   async updateRole(projectId: string, internId: string, projectRole?: string | null, actorUserId?: string) {
     await this.get(projectId);
@@ -83,9 +84,31 @@ export class ProjectService {
     if (!current) throw Object.assign(new Error("This intern is not on the project team"), { statusCode: 404 });
     const role = cleanRole(projectRole);
     const assignment = await repository.updateRole(projectId, internId, role);
-    if (role !== current.projectRole) await notificationService.projectRoleChanged(projectId, internId, current.projectRole, role, actorUserId);
+
+    // Notification logic
+    if (role !== current.projectRole) {
+      await notificationService.projectRoleChanged(projectId, internId, current.projectRole, role, actorUserId);
+
+      // NEW: Specific notification for Scrum Master assignment
+      if (role === "Scrum Master") {
+        const internUser = await prisma.intern.findUnique({ where: { id: internId }, select: { user: { select: { id: true, role: true } } } });
+        const project = await prisma.project.findUnique({ where: { id: projectId }, select: { name: true } });
+        if (internUser && project) {
+          await prisma.notification.create({
+            data: {
+              userId: internUser.user.id,
+              type: "PROJECT_ASSIGNED",
+              title: "Designated as Scrum Master",
+              message: `You have been designated as the Scrum Master for "${project.name}". You can now manage tasks and the Gantt schedule for this project.`,
+              link: `/intern/project`
+            }
+          });
+        }
+      }
+    }
     return assignment;
   }
+
   /**
    * Makes the team exactly `members` (PUT /projects/:id/members): new interns are added, roles are updated,
    * interns left out are removed. An intern can be on several projects' teams at once.
