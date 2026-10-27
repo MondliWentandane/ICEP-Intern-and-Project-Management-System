@@ -102,10 +102,8 @@ export function CalendarPage() {
   const [newEventType, setNewEventType] = useState<EventColor>('blue')
   const [newEventProject, setNewEventProject] = useState('')
 
-  // Role Permissions
   const canManageTasks = user?.role === 'ADMIN' || user?.role === 'MENTOR' || user?.role === 'INTERN'
 
-  // Filtered Events
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
       if (selectedProject !== 'All Projects' && ev.project !== selectedProject) return false
@@ -119,34 +117,49 @@ export function CalendarPage() {
     setToastMessage(`Calendar for ${currentMonthName} exported successfully.`)
   }
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  // WIRED TO BACKEND POST API
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canManageTasks) return 
     if (!newEventTitle.trim()) return
 
-    const createdEvent: CalendarEventItem = {
-      id: `ev-${Date.now()}`,
+    const payload = {
       title: newEventTitle.trim(),
       date: newEventDate,
       time: newEventTime.trim() || undefined,
       project: newEventProject,
+      projectId: newEventProject, // Pass ID for backend validation
       assignee: 'Pat Naidoo',
       status: 'To Do',
       color: newEventTime ? 'blue-meeting' : newEventType,
     }
 
-    setEvents((prev) => [...prev, createdEvent])
-    setIsAddModalOpen(false)
-    setNewEventTitle('')
-    setNewEventTime('')
-    setToastMessage(`Event "${createdEvent.title}" added to calendar.`)
+    try {
+      const savedEvent = await Tasks.create(payload)
+      setEvents((prev) => [...prev, savedEvent || { ...payload, id: `ev-${Date.now()}` }])
+      
+      setIsAddModalOpen(false)
+      setNewEventTitle('')
+      setNewEventTime('')
+      setToastMessage(`Event successfully saved to database!`)
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage(error.response?.data?.message || 'Permission Denied: You do not have Scrum Master rights for this project.')
+    }
   }
 
-  const handleDeleteEvent = (id: string) => {
+  // WIRED TO BACKEND DELETE API
+  const handleDeleteEvent = async (id: string) => {
     if (!canManageTasks) return
-    setEvents((prev) => prev.filter((ev) => ev.id !== id))
-    setSelectedEvent(null)
-    setToastMessage('Event removed.')
+    try {
+      await Tasks.delete(id)
+      setEvents((prev) => prev.filter((ev) => ev.id !== id))
+      setSelectedEvent(null)
+      setToastMessage('Event deleted from database.')
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage('Permission Denied: Cannot delete this event.')
+    }
   }
 
   useEffect(() => {
@@ -170,7 +183,6 @@ export function CalendarPage() {
 
   return (
     <main className={styles.page}>
-      {/* Top Controls Section */}
       <section className={styles.topSection} aria-label="Calendar controls">
         <div className={styles.actionRow}>
           <button
@@ -196,9 +208,7 @@ export function CalendarPage() {
           )}
         </div>
 
-        {/* Filters Row */}
         <div className={styles.filtersRow}>
-          {/* Project Filter */}
           <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
@@ -215,7 +225,6 @@ export function CalendarPage() {
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
 
-          {/* Assignees Filter */}
           <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
@@ -232,7 +241,6 @@ export function CalendarPage() {
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
 
-          {/* Statuses Filter */}
           <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
@@ -252,9 +260,7 @@ export function CalendarPage() {
         </div>
       </section>
 
-      {/* Main Calendar Card */}
       <section className={styles.calendarCard} aria-labelledby="calendar-month-heading">
-        {/* Calendar Card Toolbar */}
         <div className={styles.calendarToolbar}>
           <div className={styles.navigationControls}>
             <div className={styles.navButtonGroup}>
@@ -289,7 +295,6 @@ export function CalendarPage() {
             </button>
           </div>
 
-          {/* View Switcher Tabs */}
           <div className={styles.viewSwitcher} role="tablist" aria-label="Calendar view selector">
             {(['Month', 'Week', 'Day'] as const).map((view) => (
               <button
@@ -306,7 +311,6 @@ export function CalendarPage() {
           </div>
         </div>
 
-        {/* View Content */}
         {currentView === 'Month' ? (
           <div>
             <div className={styles.daysHeader} role="row">
@@ -443,7 +447,6 @@ export function CalendarPage() {
         )}
       </section>
 
-      {/* Add Event Modal */}
       <Modal
         open={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -545,7 +548,6 @@ export function CalendarPage() {
         </DialogContent>
       </Modal>
 
-      {/* Event Details Modal */}
       {selectedEvent && (
         <Modal
           open={Boolean(selectedEvent)}
@@ -584,7 +586,6 @@ export function CalendarPage() {
         </Modal>
       )}
 
-      {/* Snackbar feedback notification */}
       <Snackbar
         open={Boolean(toastMessage)}
         autoHideDuration={3500}
@@ -593,7 +594,7 @@ export function CalendarPage() {
       >
         <Alert
           onClose={() => setToastMessage(null)}
-          severity="success"
+          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') ? 'error' : 'success'}
           sx={{ width: '100%', borderRadius: '8px' }}
         >
           {toastMessage}
