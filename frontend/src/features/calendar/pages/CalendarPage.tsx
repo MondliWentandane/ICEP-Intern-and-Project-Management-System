@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import {
   Alert,
   DialogContent,
+  Menu,
+  MenuItem,
   Snackbar,
 } from '@mui/material'
 import {
@@ -10,13 +12,14 @@ import {
   ChevronRight,
   Plus,
   Share,
+  UserCircle2
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { useAuth } from '@/hooks/useAuth'
 import styles from './CalendarPage.module.css'
 
 export type EventColor = 'blue' | 'blue-meeting' | 'green' | 'amber' | 'red'
+export type UserRole = 'Intern' | 'Scrum Master' | 'Mentor'
 
 export interface CalendarEventItem {
   id: string
@@ -73,7 +76,7 @@ const initialEvents: CalendarEventItem[] = [
     date: '2026-10-05',
     project: 'Software Dev Alpha',
     assignee: 'Morgan Mentor',
-    status: 'On Track',
+    status: 'In Progress',
     color: 'green',
   },
   {
@@ -100,7 +103,7 @@ const initialEvents: CalendarEventItem[] = [
     date: '2026-10-10',
     project: 'Software Dev Alpha',
     assignee: 'Pat Naidoo',
-    status: 'At Risk',
+    status: 'Blocked',
     color: 'red',
   },
   {
@@ -109,7 +112,7 @@ const initialEvents: CalendarEventItem[] = [
     date: '2026-10-14',
     project: 'Software Dev Alpha',
     assignee: 'Pat Naidoo',
-    status: 'Pending Review',
+    status: 'Submitted',
     color: 'amber',
   },
 ]
@@ -171,12 +174,13 @@ const october2026Cells: CalendarCell[] = [
 ]
 
 export function CalendarPage() {
-  const { user } = useAuth()
-  const isIntern = user?.role === 'intern'
-
   const [events, setEvents] = useState<CalendarEventItem[]>(initialEvents)
   const [currentMonthName, setCurrentMonthName] = useState('October 2026')
   const [currentView, setCurrentView] = useState<'Month' | 'Week' | 'Day'>('Month')
+
+  // Simulated Authentication / Role State to demonstrate workflow restrictions
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>('Scrum Master')
+  const [roleAnchorEl, setRoleAnchorEl] = useState<null | HTMLElement>(null)
 
   // Top Filters
   const [selectedProject, setSelectedProject] = useState('Software Dev Alpha')
@@ -195,6 +199,9 @@ export function CalendarPage() {
   const [newEventType, setNewEventType] = useState<EventColor>('blue')
   const [newEventProject, setNewEventProject] = useState('Software Dev Alpha')
 
+  // Role Permissions
+  const canManageTasks = currentUserRole === 'Scrum Master' || currentUserRole === 'Mentor'
+
   // Filtered Events
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
@@ -211,6 +218,7 @@ export function CalendarPage() {
 
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!canManageTasks) return // Security check mirroring backend validation
     if (!newEventTitle.trim()) return
 
     const createdEvent: CalendarEventItem = {
@@ -220,7 +228,7 @@ export function CalendarPage() {
       time: newEventTime.trim() || undefined,
       project: newEventProject,
       assignee: 'Pat Naidoo',
-      status: 'On Track',
+      status: 'To Do',
       color: newEventTime ? 'blue-meeting' : newEventType,
     }
 
@@ -232,6 +240,7 @@ export function CalendarPage() {
   }
 
   const handleDeleteEvent = (id: string) => {
+    if (!canManageTasks) return
     setEvents((prev) => prev.filter((ev) => ev.id !== id))
     setSelectedEvent(null)
     setToastMessage('Event removed.')
@@ -239,10 +248,43 @@ export function CalendarPage() {
 
   return (
     <main className={styles.page}>
+      
+      {/* Simulation Banner for testing roles */}
+      <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
+        <strong>Workflow Simulator:</strong> You are currently viewing this page as a <strong>{currentUserRole}</strong>. 
+        {currentUserRole === 'Intern' 
+          ? " As an intern, your calendar schedule is read-only. You cannot manually add or delete global tasks/events." 
+          : " You have permission to add, edit, and plan calendar tasks/events for this project."}
+      </Alert>
+
       {/* Top Controls Section */}
       <section className={styles.topSection} aria-label="Calendar controls">
         {/* Action Buttons Row */}
         <div className={styles.actionRow}>
+          
+          {/* Mock Role Switcher (For demonstration purposes) */}
+          <button type="button" className={styles.exportButton} onClick={(e) => setRoleAnchorEl(e.currentTarget)}>
+            <UserCircle2 size={16} strokeWidth={2} aria-hidden="true" />
+            <span>View As: {currentUserRole}</span>
+          </button>
+          <Menu
+            anchorEl={roleAnchorEl}
+            open={Boolean(roleAnchorEl)}
+            onClose={() => setRoleAnchorEl(null)}
+            slotProps={{ paper: { sx: { borderRadius: '10px', minWidth: 150 } } }}
+          >
+            {(['Intern', 'Scrum Master', 'Mentor'] as UserRole[]).map((role) => (
+              <MenuItem
+                key={role}
+                selected={role === currentUserRole}
+                onClick={() => { setCurrentUserRole(role); setRoleAnchorEl(null); }}
+                sx={{ fontSize: 13.5 }}
+              >
+                {role}
+              </MenuItem>
+            ))}
+          </Menu>
+
           <button
             type="button"
             className={styles.exportButton}
@@ -253,7 +295,7 @@ export function CalendarPage() {
             <span>Export</span>
           </button>
 
-          {!isIntern && (
+          {canManageTasks && (
             <button
               type="button"
               className={styles.addEventButton}
@@ -311,11 +353,11 @@ export function CalendarPage() {
               aria-label="Filter by status"
             >
               <option value="All Statuses">All Statuses</option>
-              <option value="On Track">On Track</option>
+              <option value="To Do">To Do</option>
               <option value="In Progress">In Progress</option>
+              <option value="Submitted">Submitted</option>
               <option value="Completed">Completed</option>
-              <option value="Pending Review">Pending Review</option>
-              <option value="At Risk">At Risk</option>
+              <option value="Blocked">Blocked</option>
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
@@ -629,8 +671,8 @@ export function CalendarPage() {
           maxWidth="xs"
           fullWidth
           actions={
-            <div style={{ display: 'flex', gap: '10px', justifyContent: isIntern ? 'flex-end' : 'space-between', width: '100%' }}>
-              {!isIntern && (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: canManageTasks ? 'space-between' : 'flex-end', width: '100%' }}>
+              {canManageTasks && (
                 <Button appearance="danger" onClick={() => handleDeleteEvent(selectedEvent.id)}>
                   Delete
                 </Button>

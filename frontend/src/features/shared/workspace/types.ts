@@ -19,6 +19,8 @@ export interface InternProject {
   role?: string
   status?: string
   current?: boolean
+  /** The group (team) name on that project, when it has one. */
+  groupName?: string
 }
 
 export interface InternDocument {

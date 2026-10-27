@@ -1,22 +1,31 @@
-// TODO: Implement the Figma screen and connect the matching feature service.
+// Projects and their groups come from the database (features/projects/data/projectsApi.ts).
 import { useEffect, useState, type FormEvent, type JSX, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { PageScaffold } from '@/components/ui/PageScaffold'
-import CreateProjectButton, { type Group, type Id, type NewProject } from '@/components/ui/CreateProjectButton'
+import CreateProjectButton, { type Group, type NewProject } from '@/components/ui/CreateProjectButton'
+import { TeamMemberPicker } from '@/features/projects/components/TeamMemberPicker'
+import {
+  teamError, useCreateProject, useDeleteProject, useProjects, useUpdateProject,
+  type ProjectRecord, type TeamMemberInput,
+} from '@/features/projects/data/projectsApi'
 
 const PageScaffoldWithChildren = PageScaffold as unknown as (props: {
   title: string
   children?: ReactNode
 }) => JSX.Element
 
-export type Project = NewProject & { id: number; progress: number }
+export type Project = ProjectRecord
 
-// TODO: replace with groups from your Team Builder feature service.
-const GROUPS: Group[] = [
-  { id: 1, name: 'Group 1', members: 3 },
-  { id: 2, name: 'Group 2', members: 5 },
-  { id: 7, name: 'Group 7', members: 4 },
-]
+/** The project's group (name + member count), or undefined while nobody is assigned. */
+const groupOf = (project: Project): Group | undefined =>
+  project.members.length || project.groupName
+    ? { id: project.id, name: project.groupName ?? 'Unnamed group', members: project.members.length }
+    : undefined
+
+const errorText = (error: unknown, fallback: string) => {
+  const data = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data
+  return data?.error ?? data?.message ?? fallback
+}
 
 const COVERS = [
   ['#0b2a5b', '#2f5fa8'],
@@ -53,28 +62,39 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 /* ---------- edit ---------- */
 function EditProjectDialog({
-  project, groups, onSave, onClose,
-}: { project: Project; groups: Group[]; onSave: (p: Project) => void; onClose: () => void }) {
+  project, onSave, onClose,
+}: { project: Project; onSave: (p: NewProject & { id: string }) => Promise<unknown>; onClose: () => void }) {
   const [name, setName] = useState(project.name)
   const [statement, setStatement] = useState(project.problemStatement)
-  const [groupId, setGroupId] = useState<Id | null>(project.groupId)
+  const [groupName, setGroupName] = useState(project.groupName ?? '')
+  const [members, setMembers] = useState<TeamMemberInput[]>(project.members.map((m) => ({ internId: m.internId, projectRole: m.role ?? '' })))
   const [showErrors, setShowErrors] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const nameError = name.trim().length < 3 ? 'Enter a project name (at least 3 characters).' : ''
   const statementError = statement.trim().length < 20 ? 'Describe the problem in at least 20 characters.' : ''
+  const groupError = members.length > 0 && !groupName.trim() ? 'Give the group a name.' : ''
   const field =
     'w-full rounded-2xl border border-transparent bg-[#f1f4fa] px-4 py-3 text-sm text-[#0f1b33] focus:border-[#0b2a5b] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b2a5b]/20'
 
-  const save = (e: FormEvent) => {
+  const save = async (e: FormEvent) => {
     e.preventDefault()
     setShowErrors(true)
-    if (nameError || statementError) return
-    onSave({ ...project, name: name.trim(), problemStatement: statement.trim(), groupId })
+    if (nameError || statementError || groupError || teamError(members)) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      await onSave({ id: project.id, name: name.trim(), problemStatement: statement.trim(), groupName: groupName.trim(), members })
+    } catch (error) {
+      setSaveError(errorText(error, 'Your changes could not be saved. Please try again.'))
+      setSaving(false)
+    }
   }
 
   return (
     <Modal title="Edit project" onClose={onClose}>
-      <form onSubmit={save} noValidate className="mt-5 space-y-4">
+      <form onSubmit={(e) => void save(e)} noValidate className="mt-5 space-y-4">
         <div>
           <label htmlFor="edit-name" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">Project name</label>
           <input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} className={field} />
@@ -86,22 +106,15 @@ function EditProjectDialog({
           {showErrors && statementError && <p className="mt-1 text-xs text-red-700">{statementError}</p>}
         </div>
         <div>
-          <label htmlFor="edit-group" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">Group</label>
-          <select
-            id="edit-group"
-            value={groupId === null ? '' : String(groupId)}
-            onChange={(e) => setGroupId(groups.find((g) => String(g.id) === e.target.value)?.id ?? null)}
-            className={field}
-          >
-            <option value="">Not assigned</option>
-            {groups.map((g) => (
-              <option key={g.id} value={String(g.id)}>{g.name} ({g.members} members)</option>
-            ))}
-          </select>
+          <label htmlFor="edit-group" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">Group name</label>
+          <input id="edit-group" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="e.g. Group 7" className={field} />
+          {showErrors && groupError && <p className="mt-1 text-xs text-red-700">{groupError}</p>}
         </div>
+        <TeamMemberPicker value={members} onChange={setMembers} currentProjectId={project.id} showErrors={showErrors} />
+        {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
         <div className="flex justify-end gap-3 pt-2">
           <button type="button" onClick={onClose} className="rounded-full bg-[#f1f4fa] px-5 py-2.5 text-sm font-medium text-[#0f1b33] hover:bg-[#e4ebf7]">Cancel</button>
-          <button type="submit" className="rounded-full bg-[#0b2a5b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#13397d]">Save changes</button>
+          <button type="submit" disabled={saving} className="rounded-full bg-[#0b2a5b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#13397d] disabled:opacity-60">{saving ? 'Saving…' : 'Save changes'}</button>
         </div>
       </form>
     </Modal>
@@ -109,15 +122,16 @@ function EditProjectDialog({
 }
 
 /* ---------- delete ---------- */
-function DeleteProjectDialog({ project, onConfirm, onClose }: { project: Project; onConfirm: () => void; onClose: () => void }) {
+function DeleteProjectDialog({ project, onConfirm, onClose, busy, error }: { project: Project; onConfirm: () => void; onClose: () => void; busy?: boolean; error?: string }) {
   return (
     <Modal title="Delete project?" onClose={onClose}>
       <p className="mt-3 text-sm text-[#55627a]">
         <b className="text-[#0f1b33]">{project.name}</b> will be permanently removed. This can't be undone.
       </p>
+      {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
       <div className="mt-6 flex justify-end gap-3">
         <button type="button" onClick={onClose} className="rounded-full bg-[#f1f4fa] px-5 py-2.5 text-sm font-medium text-[#0f1b33] hover:bg-[#e4ebf7]">Cancel</button>
-        <button type="button" onClick={onConfirm} className="rounded-full bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800">Delete</button>
+        <button type="button" onClick={onConfirm} disabled={busy} className="rounded-full bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">{busy ? 'Deleting…' : 'Delete'}</button>
       </div>
     </Modal>
   )
@@ -160,11 +174,10 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
           <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${group ? 'bg-[#dff3e7] text-[#1f8a4c]' : 'bg-[#fdeccf] text-[#b86200]'}`}>
             {group ? 'Active' : 'Pending'}
           </span>
-          {/* TODO: replace the placeholder letters with real member initials */}
           <div className="flex">
-            {Array.from({ length: shown }).map((_, i) => (
-              <span key={i} className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-white text-[11px] font-semibold text-white first:ml-0" style={{ background: AVATARS[i % AVATARS.length] }}>
-                {'ABCD'[i]}
+            {project.members.slice(0, shown).map((member, i) => (
+              <span key={member.internId} title={`${member.name}${member.role ? ` – ${member.role}` : ''}`} className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-white text-[11px] font-semibold text-white first:ml-0" style={{ background: AVATARS[i % AVATARS.length] }}>
+                {initials(member.name)}
               </span>
             ))}
             {members > 4 && (
@@ -207,59 +220,72 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
 /* ---------- page ---------- */
 export function ProjectsPage() {
   const navigate = useNavigate()
-  const [projects, setProjects] = useState<Project[]>([])
+  const { pathname } = useLocation()
+  const { data: projects = [], isLoading, isError, error, refetch } = useProjects()
+  const createProject = useCreateProject()
+  const updateProject = useUpdateProject()
+  const deleteProject = useDeleteProject()
   const [editing, setEditing] = useState<Project | null>(null)
   const [deleting, setDeleting] = useState<Project | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
-  const handleCreate = (project: NewProject) => {
-    // TODO: save through your projects service, then update the list from its response.
-    setProjects((list) => [{ ...project, id: Date.now(), progress: 0 }, ...list])
-  }
+  // Saved to the database; each assigned intern is notified of their group and role.
+  const handleCreate = (project: NewProject) => createProject.mutateAsync(project)
 
-  const handleSave = (updated: Project) => {
-    // TODO: update through your projects service.
-    setProjects((list) => list.map((p) => (p.id === updated.id ? updated : p)))
+  const handleSave = async (updated: NewProject & { id: string }) => {
+    await updateProject.mutateAsync(updated)
     setEditing(null)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleting) return
-    // TODO: delete through your projects service.
-    setProjects((list) => list.filter((p) => p.id !== deleting.id))
-    setDeleting(null)
+    setDeleteError('')
+    try {
+      await deleteProject.mutateAsync(deleting.id)
+      setDeleting(null)
+    } catch (cause) {
+      setDeleteError(errorText(cause, 'The project could not be deleted.'))
+    }
   }
 
   return (
     <PageScaffoldWithChildren title="Projects">
       <div className="mb-6 flex justify-end">
-        <CreateProjectButton groups={GROUPS} onCreate={handleCreate} />
+        <CreateProjectButton onCreate={handleCreate} />
       </div>
 
-      {projects.length === 0 ? (
+      {isLoading ? (
+        <p className="rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">Loading projects…</p>
+      ) : isError ? (
+        <p role="alert" className="rounded-3xl bg-red-50 p-10 text-center text-red-700">
+          {errorText(error, 'Projects could not be loaded.')}{' '}
+          <button type="button" onClick={() => void refetch()} className="font-semibold underline">Try again</button>
+        </p>
+      ) : projects.length === 0 ? (
         <p className="rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">
           No projects yet. Click <b>Create project</b> to add one.
         </p>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p, i) => {
-            const group = GROUPS.find((g) => g.id === p.groupId)
+            const group = groupOf(p)
             return (
               <ProjectCard
                 key={p.id}
                 project={p}
                 index={i}
                 group={group}
-                onOpen={() => navigate(`/projects/${p.id}`, { state: { project: p, group } })}
+                onOpen={() => navigate(`${pathname.replace(/\/$/, '')}/${p.id}`, { state: { project: p, group } })}
                 onEdit={() => setEditing(p)}
-                onDelete={() => setDeleting(p)}
+                onDelete={() => { setDeleteError(''); setDeleting(p) }}
               />
             )
           })}
         </div>
       )}
 
-      {editing && <EditProjectDialog project={editing} groups={GROUPS} onSave={handleSave} onClose={() => setEditing(null)} />}
-      {deleting && <DeleteProjectDialog project={deleting} onConfirm={handleDelete} onClose={() => setDeleting(null)} />}
+      {editing && <EditProjectDialog project={editing} onSave={handleSave} onClose={() => setEditing(null)} />}
+      {deleting && <DeleteProjectDialog project={deleting} onConfirm={() => void handleDelete()} onClose={() => setDeleting(null)} busy={deleteProject.isPending} error={deleteError} />}
     </PageScaffoldWithChildren>
   )
 }

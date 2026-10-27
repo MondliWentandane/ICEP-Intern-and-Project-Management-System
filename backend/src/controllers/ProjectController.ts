@@ -17,6 +17,7 @@ const sendError = (res: Response, error: unknown) => {
   const err = error as Error & { statusCode?: number };
   return res.status(err.statusCode ?? 500).json({ error: err.message || "Internal server error" });
 };
+const actor = (req: Request) => (req as Request & { user?: { id: string; role: string } }).user;
 const parseDate = (value: unknown) => {
   if (value === null) return null;
   if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
@@ -27,9 +28,15 @@ const parseDate = (value: unknown) => {
 
 export async function listProjects(req: Request, res: Response) {
   try {
+    // Admin / WIL Handler see every project; a mentor sees the projects they supervise; an intern sees their own.
+    const user = actor(req);
+    let supervisorId = req.query.supervisorId as string | undefined;
+    let internUserId: string | undefined;
+    if (user?.role === "MENTOR") supervisorId = (await service.mentorFor(user.id))?.id ?? "no-mentor-profile";
+    if (user?.role === "INTERN") internUserId = user.id;
     return res.json(await service.list({
       status: req.query.status as string, departmentId: req.query.departmentId as string,
-      supervisorId: req.query.supervisorId as string,
+      supervisorId, internUserId,
     }));
   } catch (error) { return sendError(res, error); }
 }
@@ -44,7 +51,7 @@ export async function createProject(req: Request, res: Response) {
       ...body,
       ...(body.startDate !== undefined ? { startDate: parseDate(body.startDate) ?? undefined } : {}),
       ...(body.endDate !== undefined ? { endDate: parseDate(body.endDate) ?? undefined } : {}),
-      createdById: (req as Request & { user?: { id: string } }).user?.id,
+      createdById: actor(req)?.id,
     });
     return res.status(201).json(project);
   } catch (error) { return sendError(res, error); }
@@ -56,7 +63,7 @@ export async function updateProject(req: Request, res: Response) {
       ...body,
       ...(body.startDate !== undefined ? { startDate: parseDate(body.startDate) } : {}),
       ...(body.endDate !== undefined ? { endDate: parseDate(body.endDate) } : {}),
-    });
+    }, actor(req)?.id);
     return res.json(project);
   } catch (error) { return sendError(res, error); }
 }
@@ -67,12 +74,31 @@ export async function deleteProject(req: Request, res: Response) {
 export async function assignProjectMember(req: Request, res: Response) {
   try {
     const { internId, projectRole } = req.body;
-    return res.status(201).json(await service.assign(routeParam(req.params.id, "id"), internId, projectRole));
+    return res.status(201).json(await service.assign(routeParam(req.params.id, "id"), internId, projectRole, actor(req)?.id));
   } catch (error) { return sendError(res, error); }
 }
 export async function removeProjectMember(req: Request, res: Response) {
   try {
-    await service.removeAssignment(routeParam(req.params.id, "id"), routeParam(req.params.internId, "internId"));
+    await service.removeAssignment(routeParam(req.params.id, "id"), routeParam(req.params.internId, "internId"), actor(req)?.id);
     return res.status(204).send();
+  } catch (error) { return sendError(res, error); }
+}
+/** GET /projects/:id/members: the current team with each member's role. */
+export async function listProjectMembers(req: Request, res: Response) {
+  try { return res.json((await service.get(routeParam(req.params.id, "id"))).assignments); }
+  catch (error) { return sendError(res, error); }
+}
+/** PUT /projects/:id/members  body: { members: [{ internId, projectRole }] } — sets the whole team. */
+export async function setProjectMembers(req: Request, res: Response) {
+  try {
+    return res.json(await service.setMembers(routeParam(req.params.id, "id"), req.body?.members, actor(req)?.id));
+  } catch (error) { return sendError(res, error); }
+}
+/** PUT /projects/:id/members/:internId  body: { projectRole } — changes one member's role. */
+export async function updateProjectMember(req: Request, res: Response) {
+  try {
+    return res.json(await service.updateRole(
+      routeParam(req.params.id, "id"), routeParam(req.params.internId, "internId"), req.body?.projectRole, actor(req)?.id,
+    ));
   } catch (error) { return sendError(res, error); }
 }

@@ -40,6 +40,7 @@ const navigation: Record<UserRole, NavigationItem[]> = {
     { label: 'My Profile', path: '/intern/profile', section: 'MAIN' },
     { label: 'Task Board', path: '/intern/tasks', section: 'PROJECTS', readOnly: true },
     { label: 'Calendar', path: '/intern/calendar', section: 'PROJECTS', readOnly: true },
+    { label: 'Gantt Chart', path: '/intern/gantt', section: 'PROJECTS', readOnly: true },
     { label: 'Notifications', path: '/intern/notifications', section: 'COMMUNICATION' },
   ],
 }

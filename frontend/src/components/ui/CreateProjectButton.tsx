@@ -1,24 +1,24 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { TeamMemberPicker } from "@/features/projects/components/TeamMemberPicker";
+import { teamError, type TeamMemberInput } from "@/features/projects/data/projectsApi";
 
 export type Id = number | string;
 export type Group = { id: Id; name: string; members: number };
-export type NewProject = { name: string; problemStatement: string; groupId: Id | null };
-type Props = { groups?: Group[]; onCreate?: (project: NewProject) => void };
+/** The group is the project's team: a group name plus interns from the database, each with a role. */
+export type NewProject = { name: string; problemStatement: string; groupName: string; members: TeamMemberInput[] };
+type Props = { onCreate?: (project: NewProject) => Promise<unknown> | void };
 
-// Replace with real groups from your API / Team Builder.
-const DEFAULT_GROUPS: Group[] = [
-  { id: 1, name: "Group 1", members: 3 },
-  { id: 2, name: "Group 2", members: 5 },
-  { id: 7, name: "Group 7", members: 4 },
-];
-
-export default function CreateProjectButton({ groups = DEFAULT_GROUPS, onCreate }: Props) {
+export default function CreateProjectButton({ onCreate }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [statement, setStatement] = useState("");
-  const [groupId, setGroupId] = useState<Id | null>(null);
+  const [groupName, setGroupName] = useState("");
+  const [members, setMembers] = useState<TeamMemberInput[]>([]);
   const [showErrors, setShowErrors] = useState(false);
+  const [showTeamErrors, setShowTeamErrors] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
 
   const nameError = name.trim().length < 3 ? "Enter a project name (at least 3 characters)." : "";
@@ -30,8 +30,12 @@ export default function CreateProjectButton({ groups = DEFAULT_GROUPS, onCreate 
     setStep(1);
     setName("");
     setStatement("");
-    setGroupId(null);
+    setGroupName("");
+    setMembers([]);
     setShowErrors(false);
+    setShowTeamErrors(false);
+    setSaving(false);
+    setSaveError("");
   };
 
   useEffect(() => {
@@ -48,16 +52,26 @@ export default function CreateProjectButton({ groups = DEFAULT_GROUPS, onCreate 
     if (!nameError && !statementError) setStep(2);
   };
 
-  const submit = () => {
-    onCreate?.({
-      name: name.trim(),
-      problemStatement: statement.trim(),
-      groupId, // null = not assigned yet
-    });
-    close();
+  const groupError = members.length > 0 && !groupName.trim() ? "Give the group a name." : "";
+  const submit = async () => {
+    setShowTeamErrors(true);
+    if (groupError || teamError(members)) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onCreate?.({
+        name: name.trim(),
+        problemStatement: statement.trim(),
+        groupName: groupName.trim(),
+        members, // empty = no group yet
+      });
+      close();
+    } catch (error) {
+      const message = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
+      setSaveError(message?.error ?? message?.message ?? "The project could not be saved. Please try again.");
+      setSaving(false);
+    }
   };
-
-  const selectedGroup = groups.find((g) => g.id === groupId);
   const input =
     "w-full rounded-2xl border border-transparent bg-[#f1f4fa] px-4 py-3 text-sm text-[#0f1b33] placeholder:text-[#55627a] focus:border-[#0b2a5b] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b2a5b]/20";
 
@@ -90,7 +104,7 @@ export default function CreateProjectButton({ groups = DEFAULT_GROUPS, onCreate 
                 <p className="mt-1 text-sm text-[#55627a]">
                   {step === 1
                     ? "Give the project a name and describe the problem it solves."
-                    : "Choose the group that will work on this project."}
+                    : "Name the group, pick interns and give each one a role."}
                 </p>
               </div>
               <button
@@ -166,39 +180,36 @@ export default function CreateProjectButton({ groups = DEFAULT_GROUPS, onCreate 
                   <p className="mt-1 line-clamp-3 text-sm text-[#55627a]">{statement.trim()}</p>
                 </div>
 
-                <div role="radiogroup" aria-label="Groups" className="mt-4 space-y-2">
-                  {groups.length === 0 && (
-                    <p className="text-sm text-[#55627a]">No groups yet. Create one in Team Builder first.</p>
-                  )}
-                  {groups.map((g) => {
-                    const on = g.id === groupId;
-                    return (
-                      <button
-                        key={g.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        onClick={() => setGroupId(on ? null : g.id)}
-                        className={`flex w-full items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition ${
-                          on ? "border-[#0b2a5b] bg-[#f3f6fb]" : "border-[#e1e7f0] hover:border-[#9cc0f2]"
-                        }`}
-                      >
-                        <span>
-                          <span className="block text-sm font-semibold text-[#0f1b33]">{g.name}</span>
-                          <span className="text-xs text-[#55627a]">{g.members} members</span>
-                        </span>
-                        <span className={`text-xs font-semibold ${on ? "text-[#0b2a5b]" : "text-transparent"}`}>Selected</span>
-                      </button>
-                    );
-                  })}
+                <div className="mt-4">
+                  <label htmlFor="group-name" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">
+                    Group name
+                  </label>
+                  <input
+                    id="group-name"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="e.g. Group 7"
+                    className={input}
+                  />
+                  {showTeamErrors && groupError && <p className="mt-1 text-xs text-red-700">{groupError}</p>}
                 </div>
+
+                <div className="mt-4">
+                  <TeamMemberPicker value={members} onChange={setMembers} showErrors={showTeamErrors} />
+                </div>
+
+                {saveError && <p role="alert" className="mt-3 text-sm text-red-700">{saveError}</p>}
 
                 <div className="mt-6 flex items-center justify-between gap-3">
                   <button type="button" onClick={() => setStep(1)} className="rounded-full bg-[#f1f4fa] px-5 py-2.5 text-sm font-medium text-[#0f1b33] hover:bg-[#e4ebf7]">
                     Back
                   </button>
-                  <button type="button" onClick={submit} className="rounded-full bg-[#0b2a5b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#13397d]">
-                    {selectedGroup ? `Create and assign to ${selectedGroup.name}` : "Create without a group"}
+                  <button type="button" onClick={() => void submit()} disabled={saving} className="rounded-full bg-[#0b2a5b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#13397d] disabled:opacity-60">
+                    {saving
+                      ? "Saving…"
+                      : members.length
+                        ? `Create and assign ${members.length} member${members.length === 1 ? "" : "s"}`
+                        : "Create without a group"}
                   </button>
                 </div>
               </div>

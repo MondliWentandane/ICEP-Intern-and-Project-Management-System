@@ -1,11 +1,17 @@
+import { prisma } from "../config/prisma";
 import { ProjectRepository } from "../repositories/ProjectRepository";
 import { notificationService } from "./NotificationService";
 
 const repository = new ProjectRepository();
 const statuses = ["PLANNED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"];
+const badRequest = (message: string) => Object.assign(new Error(message), { statusCode: 400 });
+
+/** One team member as the Projects page sends it: the intern and their role in this group. */
+export type MemberInput = { internId: string; projectRole?: string | null };
+const cleanRole = (role?: string | null) => (typeof role === "string" && role.trim() ? role.trim() : null);
 
 export class ProjectService {
-  list(filters: { status?: string; departmentId?: string; supervisorId?: string }) {
+  list(filters: { status?: string; departmentId?: string; supervisorId?: string; internUserId?: string }) {
     if (filters.status && !statuses.includes(filters.status)) {
       throw Object.assign(new Error("Invalid project status"), { statusCode: 400 });
     }
@@ -16,41 +22,108 @@ export class ProjectService {
     if (!project) throw Object.assign(new Error("Project not found"), { statusCode: 404 });
     return project;
   }
-  async create(input: Parameters<ProjectRepository["create"]>[0]) {
-    if (!input.name?.trim() || !input.departmentId) {
+  /** The signed-in mentor's own Mentor row (supervisor + department for the projects they create). */
+  mentorFor(userId?: string) {
+    return userId ? prisma.mentor.findUnique({ where: { userId }, select: { id: true, departmentId: true } }) : Promise.resolve(null);
+  }
+  async create(input: Parameters<ProjectRepository["create"]>[0] & { members?: MemberInput[] }) {
+    const { members, ...data } = input;
+    // A mentor's project belongs to their department and they supervise it; the form does not ask for either.
+    const mentor = await this.mentorFor(data.createdById);
+    if (mentor) {
+      data.departmentId ||= mentor.departmentId;
+      data.supervisorId ||= mentor.id;
+    }
+    if (!data.departmentId) {
+      const first = await prisma.department.findFirst({ orderBy: { name: "asc" }, select: { id: true } });
+      if (first) data.departmentId = first.id;
+    }
+    if (!data.name?.trim() || !data.departmentId) {
       throw Object.assign(new Error("Project name and departmentId are required"), { statusCode: 400 });
     }
-    if (input.startDate && input.endDate && input.endDate < input.startDate) {
+    if (data.startDate && data.endDate && data.endDate < data.startDate) {
       throw Object.assign(new Error("endDate must not be before startDate"), { statusCode: 400 });
     }
-    if (input.status && !statuses.includes(input.status)) {
+    if (data.status && !statuses.includes(data.status)) {
       throw Object.assign(new Error("Invalid project status"), { statusCode: 400 });
     }
-    return repository.create({ ...input, name: input.name.trim() });
+    const project = await repository.create({ ...data, name: data.name.trim() });
+    if (members?.length) await this.setMembers(project.id, members, data.createdById);
+    await notificationService.projectCreated(project.id, data.createdById);
+    return members?.length ? this.get(project.id) : project;
   }
-  async update(id: string, input: Parameters<ProjectRepository["update"]>[1]) {
+  async update(id: string, input: Parameters<ProjectRepository["update"]>[1] & { members?: MemberInput[] }, actorUserId?: string) {
+    const { members, ...data } = input;
     const current = await this.get(id);
-    const startDate = input.startDate === null ? undefined : input.startDate ?? current.startDate ?? undefined;
-    const endDate = input.endDate === null ? undefined : input.endDate ?? current.endDate ?? undefined;
+    const startDate = data.startDate === null ? undefined : data.startDate ?? current.startDate ?? undefined;
+    const endDate = data.endDate === null ? undefined : data.endDate ?? current.endDate ?? undefined;
     if (startDate && endDate && endDate < startDate) {
       throw Object.assign(new Error("endDate must not be before startDate"), { statusCode: 400 });
     }
-    if (input.status && !statuses.includes(input.status)) {
+    if (data.status && !statuses.includes(data.status)) {
       throw Object.assign(new Error("Invalid project status"), { statusCode: 400 });
     }
-    return repository.update(id, input);
+    await repository.update(id, data);
+    if (members) await this.setMembers(id, members, actorUserId);
+    return this.get(id);
   }
   async delete(id: string) { await this.get(id); await repository.delete(id); }
-  async assign(projectId: string, internId: string, projectRole?: string) {
+  async assign(projectId: string, internId: string, projectRole?: string | null, actorUserId?: string) {
     await this.get(projectId);
     if (!internId?.trim()) throw Object.assign(new Error("internId is required"), { statusCode: 400 });
-    const assignment = await repository.assign(projectId, internId, projectRole);
-    await notificationService.projectAssigned(projectId, internId);
+    const role = cleanRole(projectRole);
+    const assignment = await repository.assign(projectId, internId, role, actorUserId);
+    await notificationService.projectAssigned(projectId, internId, role, actorUserId);
     return assignment;
   }
-  async removeAssignment(projectId: string, internId: string) {
+  /** Changes one member's role (PUT /projects/:id/members/:internId). */
+  async updateRole(projectId: string, internId: string, projectRole?: string | null, actorUserId?: string) {
+    await this.get(projectId);
+    const current = (await repository.activeMembers(projectId)).find((m) => m.internId === internId);
+    if (!current) throw Object.assign(new Error("This intern is not on the project team"), { statusCode: 404 });
+    const role = cleanRole(projectRole);
+    const assignment = await repository.updateRole(projectId, internId, role);
+    if (role !== current.projectRole) await notificationService.projectRoleChanged(projectId, internId, current.projectRole, role, actorUserId);
+    return assignment;
+  }
+  /**
+   * Makes the team exactly `members` (PUT /projects/:id/members): new interns are added, roles are updated,
+   * interns left out are removed. An intern can be on several projects' teams at once.
+   * Every intern affected gets a notification saying what changed.
+   */
+  async setMembers(projectId: string, members: MemberInput[], actorUserId?: string) {
+    if (!Array.isArray(members)) throw badRequest("members must be a list of { internId, projectRole }");
+    const wanted = new Map<string, string | null>();
+    for (const member of members) {
+      if (!member || typeof member.internId !== "string" || !member.internId.trim()) throw badRequest("Every member needs an internId");
+      wanted.set(member.internId.trim(), cleanRole(member.projectRole));
+    }
+    const found = await prisma.intern.count({ where: { id: { in: [...wanted.keys()] } } });
+    if (found !== wanted.size) throw badRequest("One or more interns do not exist");
+
+    const current = new Map((await repository.activeMembers(projectId)).map((m) => [m.internId, m.projectRole]));
+    for (const [internId, role] of wanted) {
+      if (!current.has(internId)) {
+        await repository.assign(projectId, internId, role, actorUserId);
+        await notificationService.projectAssigned(projectId, internId, role, actorUserId);
+      } else if (current.get(internId) !== role) {
+        await repository.updateRole(projectId, internId, role);
+        await notificationService.projectRoleChanged(projectId, internId, current.get(internId) ?? null, role, actorUserId);
+      }
+    }
+    for (const internId of current.keys()) {
+      if (!wanted.has(internId)) {
+        await repository.removeAssignment(projectId, internId);
+        await notificationService.projectRemoved(projectId, internId, actorUserId);
+      }
+    }
+    return this.get(projectId);
+  }
+  async removeAssignment(projectId: string, internId: string, actorUserId?: string) {
     await this.get(projectId);
     if (!internId?.trim()) throw Object.assign(new Error("internId is required"), { statusCode: 400 });
-    return repository.removeAssignment(projectId, internId);
+    const removed = await repository.removeAssignment(projectId, internId);
+    await notificationService.projectRemoved(projectId, internId, actorUserId);
+    return removed;
   }
 }

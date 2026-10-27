@@ -23,6 +23,7 @@ import {
   type ProjectStatus,
 } from '@/features/projects/data/newProject'
 import { IcepLogo } from '@/components/brand/IcepLogo'
+import { downloadBlob } from '@/utils/format'
 import styles from './MentorDashboardPage.module.css'
 
 interface TeamMember {
@@ -147,6 +148,26 @@ const initialDeadlines: DeadlineItem[] = [
     colorVariant: 'blue',
   },
 ]
+
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+const PRIORITY: Record<DeadlineItem['colorVariant'], string> = { red: 'Urgent', amber: 'Due soon', blue: 'Upcoming' }
+const csvCell = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value)
+
+/** Upcoming deadlines as a CSV file (opens in Excel / Google Sheets), sorted by date. */
+function exportSchedule(items: DeadlineItem[], year: number) {
+  const dated = items.map((item) => {
+    const month = MONTHS.indexOf(item.month.toUpperCase())
+    const day = Number(item.day)
+    const iso = month >= 0 && day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : `${item.month} ${item.day}`
+    return { iso, item }
+  }).sort((a, b) => a.iso.localeCompare(b.iso))
+  const rows = [
+    ['Date', 'Deadline', 'Project', 'Priority'],
+    ...dated.map(({ iso, item }) => [iso, item.title, item.project, PRIORITY[item.colorVariant]]),
+  ]
+  const csv = '\ufeff' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `upcoming-deadlines-${new Date().toISOString().slice(0, 10)}.csv`)
+}
 
 export function MentorDashboardPage() {
   const [projects, setProjects] = useState<ProjectItem[]>(initialProjects)
@@ -477,7 +498,9 @@ export function MentorDashboardPage() {
               <MenuItem
                 onClick={() => {
                   handleCloseDeadlinesMenu()
-                  setToastMessage('Schedule exported.')
+                  if (!deadlines.length) { setToastMessage('There are no deadlines to export.'); return }
+                  exportSchedule(deadlines, Number(selectedMonth.split(' ')[1]) || new Date().getFullYear())
+                  setToastMessage(`Schedule exported (${deadlines.length} deadline${deadlines.length === 1 ? '' : 's'}).`)
                 }}
                 sx={{ fontSize: 13.5 }}
               >

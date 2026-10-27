@@ -85,7 +85,8 @@ export const router = createBrowserRouter([
   {
     path: '/intern', element: guarded(['INTERN'], <DashboardLayout />), children: [
       { path: 'project', element: <MyProjectPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'tasks', element: <InternTaskBoardPage /> },
-      { path: 'calendar', element: <CalendarPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+      { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> }, { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
     ]
   },
   { path: '/403', element: <NotFoundPage /> }, { path: '*', element: <NotFoundPage /> },
