@@ -16,12 +16,15 @@ import {
   Plus,
   Search,
   Share,
+  UserCircle2
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import styles from './GanttPage.module.css'
 
-export type GanttStatus = 'Completed' | 'Active' | 'Pending' | 'Rejected' | 'Blocked'
+// Updated statuses based on workflow document
+export type GanttStatus = 'To Do' | 'In Progress' | 'Submitted' | 'Completed' | 'Blocked'
+export type UserRole = 'Intern' | 'Scrum Master' | 'Mentor'
 
 export interface GanttTaskItem {
   id: string
@@ -32,8 +35,6 @@ export interface GanttTaskItem {
   assigneeAvatarColor?: 'slate' | 'blue' | 'default'
   status: GanttStatus
   project: string
-  // Column span indices in the 6 visible columns:
-  // 0: Mon 05, 1: Tue 06, 2: Wed 07, 3: Thu 08, 4: Fri 09, 5: Mon 12
   startCol?: number
   endCol?: number
   barLabel?: string
@@ -76,7 +77,7 @@ const initialTasks: GanttTaskItem[] = [
     phase: 'Phase 2',
     assigneeName: 'Moeez S.',
     assigneeInitials: 'MS',
-    status: 'Active',
+    status: 'In Progress',
     project: 'Software Dev Alpha',
     startCol: 5,
     endCol: 5,
@@ -90,7 +91,7 @@ const initialTasks: GanttTaskItem[] = [
     assigneeName: 'Jane S.',
     assigneeInitials: 'JS',
     assigneeAvatarColor: 'blue',
-    status: 'Active',
+    status: 'In Progress',
     project: 'Software Dev Alpha',
     startCol: 5,
     endCol: 5,
@@ -103,7 +104,7 @@ const initialTasks: GanttTaskItem[] = [
     phase: 'Phase 3',
     assigneeName: 'Thabo M.',
     assigneeInitials: 'TM',
-    status: 'Pending',
+    status: 'To Do',
     project: 'Software Dev Alpha',
   },
   {
@@ -113,7 +114,7 @@ const initialTasks: GanttTaskItem[] = [
     assigneeName: 'Ron J.',
     assigneeInitials: 'RJ',
     assigneeAvatarColor: 'slate',
-    status: 'Rejected',
+    status: 'Blocked',
     project: 'Software Dev Alpha',
   },
 ]
@@ -130,6 +131,9 @@ const timelineColumns = [
 export function GanttPage() {
   const [tasks, setTasks] = useState<GanttTaskItem[]>(initialTasks)
   const [activeView, setActiveView] = useState<'Days' | 'Weeks' | 'Months'>('Weeks')
+  
+  // Simulated Authentication / Role State to demonstrate workflow restrictions
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>('Scrum Master')
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
@@ -137,6 +141,7 @@ export function GanttPage() {
   const [selectedStatus, setSelectedStatus] = useState('All statuses')
   const [selectedDate, setSelectedDate] = useState('Select date')
   const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
+  const [roleAnchorEl, setRoleAnchorEl] = useState<null | HTMLElement>(null)
 
   // Modals & Notifications
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -147,7 +152,7 @@ export function GanttPage() {
   const [newTaskName, setNewTaskName] = useState('')
   const [newTaskPhase, setNewTaskPhase] = useState('Phase 1')
   const [newTaskAssignee, setNewTaskAssignee] = useState('Moeez S.')
-  const [newTaskStatus, setNewTaskStatus] = useState<GanttStatus>('Active')
+  const [newTaskStatus, setNewTaskStatus] = useState<GanttStatus>('In Progress')
   const [newTaskStartCol, setNewTaskStartCol] = useState('0')
   const [newTaskEndCol, setNewTaskEndCol] = useState('1')
   const [newTabBarLabel, setNewTabBarLabel] = useState('')
@@ -168,11 +173,14 @@ export function GanttPage() {
     })
   }, [tasks, selectedProject, selectedStatus, searchQuery])
 
-  // Computed metrics
+  // Computed metrics mapped accurately to specific workflow task states
   const totalTasksCount = tasks.length === 6 ? 24 : tasks.length
-  const activeNowCount = tasks.filter((t) => t.status === 'Active').length + (tasks.length === 6 ? 6 : 0)
-  const pendingCount = tasks.filter((t) => t.status === 'Pending').length + (tasks.length === 6 ? 11 : 0)
-  const blockedCount = tasks.filter((t) => t.status === 'Rejected' || t.status === 'Blocked').length + (tasks.length === 6 ? 3 : 0)
+  const activeNowCount = tasks.filter((t) => t.status === 'In Progress').length + (tasks.length === 6 ? 6 : 0)
+  const pendingCount = tasks.filter((t) => t.status === 'To Do').length + (tasks.length === 6 ? 11 : 0)
+  const blockedCount = tasks.filter((t) => t.status === 'Blocked').length + (tasks.length === 6 ? 3 : 0)
+
+  // Role Permissions
+  const canManageTasks = currentUserRole === 'Scrum Master' || currentUserRole === 'Mentor'
 
   const handleExport = () => {
     setToastMessage(`Timeline for ${selectedProject} exported successfully.`)
@@ -180,6 +188,7 @@ export function GanttPage() {
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!canManageTasks) return // Security check mirroring backend validation
     if (!newTaskName.trim()) return
 
     const initials = newTaskAssignee
@@ -214,6 +223,7 @@ export function GanttPage() {
   }
 
   const handleDeleteTask = (id: string) => {
+    if (!canManageTasks) return
     setTasks((prev) => prev.filter((t) => t.id !== id))
     setSelectedTask(null)
     setToastMessage('Task deleted.')
@@ -221,6 +231,15 @@ export function GanttPage() {
 
   return (
     <main className={styles.page}>
+      
+      {/* Simulation Banner for testing roles */}
+      <Alert severity="info" sx={{ borderRadius: 2, display: 'flex', alignItems: 'center' }}>
+        <strong>Workflow Simulator:</strong> You are currently viewing this page as a <strong>{currentUserRole}</strong>. 
+        {currentUserRole === 'Intern' 
+          ? " The Gantt chart is read-only. You cannot add or delete tasks." 
+          : " You have permission to add, edit, and plan tasks."}
+      </Alert>
+
       {/* 4 Summary / Metric Cards */}
       <section className={styles.metricsGrid} aria-label="Task metrics summary">
         {/* Metric 1: Total Tasks */}
@@ -234,7 +253,7 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 2: Active now */}
+        {/* Metric 2: Active now (In Progress) */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconGreen}`}>
             <Play size={18} fill="currentColor" strokeWidth={0} aria-hidden="true" />
@@ -245,7 +264,7 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 3: Pending */}
+        {/* Metric 3: Pending (To Do) */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconAmber}`}>
             <FileText size={20} strokeWidth={2} aria-hidden="true" />
@@ -256,14 +275,14 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 4: Blocked/Rejected */}
+        {/* Metric 4: Blocked */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconRed}`}>
             <AlertTriangle size={20} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className={styles.statContent}>
             <p className={styles.statValue}>{blockedCount}</p>
-            <p className={styles.statLabel}>Blocked/Rejected</p>
+            <p className={styles.statLabel}>Blocked</p>
           </div>
         </div>
       </section>
@@ -310,10 +329,11 @@ export function GanttPage() {
               aria-label="Filter by status"
             >
               <option value="All statuses">All statuses</option>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Submitted">Submitted</option>
               <option value="Completed">Completed</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Rejected">Rejected</option>
+              <option value="Blocked">Blocked</option>
             </select>
             <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
           </div>
@@ -324,8 +344,6 @@ export function GanttPage() {
             className={styles.datePickerButton}
             onClick={(e) => setDateAnchorEl(e.currentTarget)}
             aria-label="Select date"
-            aria-haspopup="true"
-            aria-expanded={Boolean(dateAnchorEl)}
           >
             <Calendar size={16} strokeWidth={2} aria-hidden="true" />
             <span>{selectedDate}</span>
@@ -334,15 +352,7 @@ export function GanttPage() {
             anchorEl={dateAnchorEl}
             open={Boolean(dateAnchorEl)}
             onClose={() => setDateAnchorEl(null)}
-            slotProps={{
-              paper: {
-                sx: {
-                  borderRadius: '10px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                  minWidth: 150,
-                },
-              },
-            }}
+            slotProps={{ paper: { sx: { borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', minWidth: 150 } } }}
           >
             {['Select date', 'Oct 05 - Oct 09', 'Oct 12 - Oct 16', 'Oct 19 - Oct 23', 'Oct 2026'].map((dateOption) => (
               <MenuItem
@@ -363,6 +373,30 @@ export function GanttPage() {
 
         {/* Action Buttons */}
         <div className={styles.actionsGroup}>
+          
+          {/* Mock Role Switcher (For demonstration purposes) */}
+          <button type="button" className={styles.exportButton} onClick={(e) => setRoleAnchorEl(e.currentTarget)}>
+            <UserCircle2 size={16} strokeWidth={2} aria-hidden="true" />
+            <span>View As: {currentUserRole}</span>
+          </button>
+          <Menu
+            anchorEl={roleAnchorEl}
+            open={Boolean(roleAnchorEl)}
+            onClose={() => setRoleAnchorEl(null)}
+            slotProps={{ paper: { sx: { borderRadius: '10px', minWidth: 150 } } }}
+          >
+            {(['Intern', 'Scrum Master', 'Mentor'] as UserRole[]).map((role) => (
+              <MenuItem
+                key={role}
+                selected={role === currentUserRole}
+                onClick={() => { setCurrentUserRole(role); setRoleAnchorEl(null); }}
+                sx={{ fontSize: 13.5 }}
+              >
+                {role}
+              </MenuItem>
+            ))}
+          </Menu>
+
           <button
             type="button"
             className={styles.exportButton}
@@ -373,15 +407,18 @@ export function GanttPage() {
             <span>Export</span>
           </button>
 
-          <button
-            type="button"
-            className={styles.addTaskButton}
-            onClick={() => setIsAddModalOpen(true)}
-            id="gantt-add-task-btn"
-          >
-            <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
-            <span>Add New Task</span>
-          </button>
+          {/* Only render if user role permits task creation */}
+          {canManageTasks && (
+            <button
+              type="button"
+              className={styles.addTaskButton}
+              onClick={() => setIsAddModalOpen(true)}
+              id="gantt-add-task-btn"
+            >
+              <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
+              <span>Add New Task</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -432,12 +469,13 @@ export function GanttPage() {
             </thead>
             <tbody>
               {filteredTasks.map((task) => {
+                // Map the workflow document statuses to the existing CSS class color profiles
                 const statusClass =
-                  task.status === 'Completed'
+                  task.status === 'Completed' || task.status === 'Submitted'
                     ? styles.statusCompleted
-                    : task.status === 'Active'
+                    : task.status === 'In Progress'
                     ? styles.statusActive
-                    : task.status === 'Pending'
+                    : task.status === 'To Do'
                     ? styles.statusPending
                     : styles.statusRejected
 
@@ -477,12 +515,8 @@ export function GanttPage() {
 
                     {/* 6 Timeline Day Columns */}
                     {timelineColumns.map((col, colIndex) => {
-                      // Check if a bar starts at this column
                       const isBarStart = hasBar && task.startCol === colIndex
                       const colSpan = hasBar ? task.endCol! - task.startCol! + 1 : 1
-
-                      // Calculate span width in percentage
-                      // (100% * colSpan) with small margin
                       const barWidth = `calc(${colSpan * 100}% - 12px)`
 
                       return (
@@ -515,150 +549,153 @@ export function GanttPage() {
         </div>
       </section>
 
-      {/* Add New Task Modal */}
-      <Modal
-        open={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        title="Add New Gantt Task"
-        maxWidth="sm"
-        fullWidth
-        actions={
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
-            <Button appearance="secondary" onClick={() => setIsAddModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button appearance="primary" onClick={handleCreateTask}>
-              Add Task
-            </Button>
-          </div>
-        }
-      >
-        <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
-          <form className={styles.modalForm} onSubmit={handleCreateTask} id="new-gantt-task-form">
-            <div className={styles.formGroup}>
-              <label htmlFor="task-name-input" className={styles.formLabel}>
-                Task Name
-              </label>
-              <input
-                id="task-name-input"
-                type="text"
-                className={styles.formInput}
-                placeholder="e.g. End-to-End Testing"
-                value={newTaskName}
-                onChange={(e) => setNewTaskName(e.target.value)}
-                required
-              />
+      {/* Add New Task Modal (Only accessible by roles with manage privileges) */}
+      {canManageTasks && (
+        <Modal
+          open={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          title="Add New Gantt Task"
+          maxWidth="sm"
+          fullWidth
+          actions={
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+              <Button appearance="secondary" onClick={() => setIsAddModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button appearance="primary" onClick={handleCreateTask}>
+                Add Task
+              </Button>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          }
+        >
+          <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
+            <form className={styles.modalForm} onSubmit={handleCreateTask} id="new-gantt-task-form">
               <div className={styles.formGroup}>
-                <label htmlFor="task-phase-input" className={styles.formLabel}>
-                  Phase / Category
+                <label htmlFor="task-name-input" className={styles.formLabel}>
+                  Task Name
                 </label>
                 <input
-                  id="task-phase-input"
+                  id="task-name-input"
                   type="text"
                   className={styles.formInput}
-                  placeholder="e.g. Phase 2"
-                  value={newTaskPhase}
-                  onChange={(e) => setNewTaskPhase(e.target.value)}
+                  placeholder="e.g. End-to-End Testing"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  required
                 />
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="task-assignee-select" className={styles.formLabel}>
-                  Assignee
-                </label>
-                <select
-                  id="task-assignee-select"
-                  className={styles.modalSelect}
-                  value={newTaskAssignee}
-                  onChange={(e) => setNewTaskAssignee(e.target.value)}
-                >
-                  <option value="Moeez S.">Moeez S.</option>
-                  <option value="Thabo M.">Thabo M.</option>
-                  <option value="Jane S.">Jane S.</option>
-                  <option value="Ron J.">Ron J.</option>
-                  <option value="Pat Naidoo">Pat Naidoo</option>
-                </select>
-              </div>
-            </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-phase-input" className={styles.formLabel}>
+                    Phase / Category
+                  </label>
+                  <input
+                    id="task-phase-input"
+                    type="text"
+                    className={styles.formInput}
+                    placeholder="e.g. Phase 2"
+                    value={newTaskPhase}
+                    onChange={(e) => setNewTaskPhase(e.target.value)}
+                  />
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div className={styles.formGroup}>
-                <label htmlFor="task-status-select" className={styles.formLabel}>
-                  Status
-                </label>
-                <select
-                  id="task-status-select"
-                  className={styles.modalSelect}
-                  value={newTaskStatus}
-                  onChange={(e) => setNewTaskStatus(e.target.value as GanttStatus)}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-assignee-select" className={styles.formLabel}>
+                    Assignee
+                  </label>
+                  <select
+                    id="task-assignee-select"
+                    className={styles.modalSelect}
+                    value={newTaskAssignee}
+                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                  >
+                    <option value="Moeez S.">Moeez S.</option>
+                    <option value="Thabo M.">Thabo M.</option>
+                    <option value="Jane S.">Jane S.</option>
+                    <option value="Ron J.">Ron J.</option>
+                    <option value="Pat Naidoo">Pat Naidoo</option>
+                  </select>
+                </div>
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="task-bar-label" className={styles.formLabel}>
-                  Bar Label (Optional)
-                </label>
-                <input
-                  id="task-bar-label"
-                  type="text"
-                  className={styles.formInput}
-                  placeholder="e.g. Test Suite V1"
-                  value={newTabBarLabel}
-                  onChange={(e) => setNewTabBarLabel(e.target.value)}
-                />
-              </div>
-            </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-status-select" className={styles.formLabel}>
+                    Status
+                  </label>
+                  <select
+                    id="task-status-select"
+                    className={styles.modalSelect}
+                    value={newTaskStatus}
+                    onChange={(e) => setNewTaskStatus(e.target.value as GanttStatus)}
+                  >
+                    <option value="To Do">To Do</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Submitted">Submitted</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Blocked">Blocked</option>
+                  </select>
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div className={styles.formGroup}>
-                <label htmlFor="task-start-col" className={styles.formLabel}>
-                  Timeline Start Day
-                </label>
-                <select
-                  id="task-start-col"
-                  className={styles.modalSelect}
-                  value={newTaskStartCol}
-                  onChange={(e) => setNewTaskStartCol(e.target.value)}
-                >
-                  <option value="0">Mon 05</option>
-                  <option value="1">Tue 06</option>
-                  <option value="2">Wed 07</option>
-                  <option value="3">Thu 08</option>
-                  <option value="4">Fri 09</option>
-                  <option value="5">Mon 12</option>
-                </select>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-bar-label" className={styles.formLabel}>
+                    Bar Label (Optional)
+                  </label>
+                  <input
+                    id="task-bar-label"
+                    type="text"
+                    className={styles.formInput}
+                    placeholder="e.g. Test Suite V1"
+                    value={newTabBarLabel}
+                    onChange={(e) => setNewTabBarLabel(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="task-end-col" className={styles.formLabel}>
-                  Timeline End Day
-                </label>
-                <select
-                  id="task-end-col"
-                  className={styles.modalSelect}
-                  value={newTaskEndCol}
-                  onChange={(e) => setNewTaskEndCol(e.target.value)}
-                >
-                  <option value="0">Mon 05</option>
-                  <option value="1">Tue 06</option>
-                  <option value="2">Wed 07</option>
-                  <option value="3">Thu 08</option>
-                  <option value="4">Fri 09</option>
-                  <option value="5">Mon 12</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-start-col" className={styles.formLabel}>
+                    Timeline Start Day
+                  </label>
+                  <select
+                    id="task-start-col"
+                    className={styles.modalSelect}
+                    value={newTaskStartCol}
+                    onChange={(e) => setNewTaskStartCol(e.target.value)}
+                  >
+                    <option value="0">Mon 05</option>
+                    <option value="1">Tue 06</option>
+                    <option value="2">Wed 07</option>
+                    <option value="3">Thu 08</option>
+                    <option value="4">Fri 09</option>
+                    <option value="5">Mon 12</option>
+                  </select>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-end-col" className={styles.formLabel}>
+                    Timeline End Day
+                  </label>
+                  <select
+                    id="task-end-col"
+                    className={styles.modalSelect}
+                    value={newTaskEndCol}
+                    onChange={(e) => setNewTaskEndCol(e.target.value)}
+                  >
+                    <option value="0">Mon 05</option>
+                    <option value="1">Tue 06</option>
+                    <option value="2">Wed 07</option>
+                    <option value="3">Thu 08</option>
+                    <option value="4">Fri 09</option>
+                    <option value="5">Mon 12</option>
+                  </select>
+                </div>
               </div>
-            </div>
-          </form>
-        </DialogContent>
-      </Modal>
+            </form>
+          </DialogContent>
+        </Modal>
+      )}
 
       {/* Task Details Modal */}
       {selectedTask && (
@@ -669,10 +706,12 @@ export function GanttPage() {
           maxWidth="xs"
           fullWidth
           actions={
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', width: '100%' }}>
-              <Button appearance="danger" onClick={() => handleDeleteTask(selectedTask.id)}>
-                Delete Task
-              </Button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: canManageTasks ? 'space-between' : 'flex-end', width: '100%' }}>
+              {canManageTasks && (
+                <Button appearance="danger" onClick={() => handleDeleteTask(selectedTask.id)}>
+                  Delete Task
+                </Button>
+              )}
               <Button appearance="secondary" onClick={() => setSelectedTask(null)}>
                 Close
               </Button>
