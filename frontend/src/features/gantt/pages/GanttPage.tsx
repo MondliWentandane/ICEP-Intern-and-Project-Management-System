@@ -78,7 +78,6 @@ export function GanttPage() {
   const [newTaskEndCol, setNewTaskEndCol] = useState('1')
   const [newTabBarLabel, setNewTabBarLabel] = useState('')
 
-  // Derived filtered tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       if (selectedProject !== 'All Projects' && task.project !== selectedProject) return false
@@ -94,41 +93,35 @@ export function GanttPage() {
     })
   }, [tasks, selectedProject, selectedStatus, searchQuery])
 
-  // Computed metrics 
   const totalTasksCount = tasks.length
   const activeNowCount = tasks.filter((t) => t.status === 'In Progress').length
   const pendingCount = tasks.filter((t) => t.status === 'To Do').length
   const blockedCount = tasks.filter((t) => t.status === 'Blocked').length
 
-  // Role Permissions
   const canManageTasks = user?.role === 'ADMIN' || user?.role === 'MENTOR' || user?.role === 'INTERN'
 
   const handleExport = () => {
     setToastMessage(`Timeline for ${selectedProject} exported successfully.`)
   }
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  // WIRED TO BACKEND POST API
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canManageTasks) return
     if (!newTaskName.trim()) return
 
-    const initials = newTaskAssignee
-      .split(' ')
-      .map((p) => p[0])
-      .join('')
-      .toUpperCase()
-
+    const initials = newTaskAssignee.split(' ').map((p) => p[0]).join('').toUpperCase()
     const start = Number(newTaskStartCol)
     const end = Number(newTaskEndCol)
 
-    const newTask: GanttTaskItem = {
-      id: `task-${Date.now()}`,
+    const payload = {
       name: newTaskName.trim(),
       phase: newTaskPhase,
       assigneeName: newTaskAssignee,
       assigneeInitials: initials,
       status: newTaskStatus,
       project: selectedProject,
+      projectId: selectedProject, // Pass ID for backend validation
       startCol: start,
       endCol: end,
       barLabel: newTabBarLabel.trim() || newTaskName.trim(),
@@ -136,18 +129,34 @@ export function GanttPage() {
       barColor: newTaskStatus === 'Completed' ? 'blue' : 'green',
     }
 
-    setTasks((prev) => [...prev, newTask])
-    setIsAddModalOpen(false)
-    setNewTaskName('')
-    setNewTabBarLabel('')
-    setToastMessage(`Task "${newTask.name}" added to Gantt timeline.`)
+    try {
+      const savedTask = await Tasks.create(payload)
+
+      // Update UI with the task returned by your backend (or fallback to our payload shape)
+      setTasks((prev) => [...prev, savedTask || { ...payload, id: `task-${Date.now()}` }])
+
+      setIsAddModalOpen(false)
+      setNewTaskName('')
+      setNewTabBarLabel('')
+      setToastMessage(`Task successfully saved to database!`)
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage(error.response?.data?.message || 'Permission Denied: You do not have Scrum Master rights for this project.')
+    }
   }
 
-  const handleDeleteTask = (id: string) => {
+  // WIRED TO BACKEND DELETE API
+  const handleDeleteTask = async (id: string) => {
     if (!canManageTasks) return
-    setTasks((prev) => prev.filter((t) => t.id !== id))
-    setSelectedTask(null)
-    setToastMessage('Task deleted.')
+    try {
+      await Tasks.delete(id)
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      setSelectedTask(null)
+      setToastMessage('Task deleted from database.')
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage('Permission Denied: Cannot delete this task.')
+    }
   }
 
   useEffect(() => {
@@ -172,7 +181,6 @@ export function GanttPage() {
 
   return (
     <main className={styles.page}>
-      {/* 4 Summary / Metric Cards */}
       <section className={styles.metricsGrid} aria-label="Task metrics summary">
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconBlue}`}>
@@ -215,7 +223,6 @@ export function GanttPage() {
         </div>
       </section>
 
-      {/* Control Bar: Filters & Actions */}
       <section className={styles.controlBar} aria-label="Gantt timeline controls">
         <div className={styles.filterGroup}>
           <div className={styles.searchInputWrapper}>
@@ -320,7 +327,6 @@ export function GanttPage() {
         </div>
       </section>
 
-      {/* Gantt Timeline Card */}
       <section className={styles.timelineCard} aria-labelledby="timeline-card-title">
         <div className={styles.timelineHeader}>
           <h2 id="timeline-card-title" className={styles.timelineTitle}>
@@ -629,7 +635,6 @@ export function GanttPage() {
         </Modal>
       )}
 
-      {/* Snackbar Notification */}
       <Snackbar
         open={Boolean(toastMessage)}
         autoHideDuration={3500}
@@ -638,7 +643,7 @@ export function GanttPage() {
       >
         <Alert
           onClose={() => setToastMessage(null)}
-          severity="success"
+          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') ? 'error' : 'success'}
           sx={{ width: '100%', borderRadius: '8px' }}
         >
           {toastMessage}
