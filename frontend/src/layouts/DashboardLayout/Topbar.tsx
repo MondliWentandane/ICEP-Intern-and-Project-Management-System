@@ -20,7 +20,8 @@ export function Topbar({ menuOpen, phone, onMenuClick }: { menuOpen: boolean; ph
   const profilePath = user ? `${rolePrefix[user.role]}/profile` : '/login'
   const notificationsPath = user ? `${rolePrefix[user.role]}/notifications` : '/login'
   const menuLabel = phone ? (menuOpen ? 'Close navigation' : 'Open navigation') : (menuOpen ? 'Collapse sidebar' : 'Expand sidebar')
-  const initials = user?.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase() ?? 'U'
+  const displayName = user?.name?.trim() || user?.email || 'User'
+  const initials = displayName.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
   return <AppBar position="sticky" color="inherit" elevation={0} className={styles.topbar}>
     <Toolbar className={styles['topbar-toolbar']}>
       {/* Three lines that fold into a collapse arrow (desktop, sidebar open) or an X (phone, menu open) */}

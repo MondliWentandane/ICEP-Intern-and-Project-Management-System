@@ -1,3 +1,4 @@
+import { TaskStatus } from "@prisma/client";
 import { TaskRepository } from "../repositories/TaskRepository";
 import { notificationService } from "./NotificationService";
 
@@ -55,6 +56,8 @@ export class TaskService {
         projectId: string;
         description?: string | null;
         priority?: "LOW" | "MEDIUM" | "HIGH";
+        status?: TaskStatus;
+        startDate?: string | Date | null;
         dueDate?: string | Date | null;
         assignedToId?: string | null;
         createdById: string;
@@ -73,14 +76,20 @@ export class TaskService {
             throw new Error("Invalid task priority");
         }
 
-        const dueDate = data.dueDate == null || data.dueDate === ""
-            ? null
-            : data.dueDate instanceof Date
-                ? data.dueDate
-                : new Date(data.dueDate);
+        const parseOptionalDate = (value: string | Date | null | undefined, label: string) => {
+            if (value == null || value === "") return null;
+            const parsed = value instanceof Date ? value : new Date(value);
+            if (Number.isNaN(parsed.getTime())) throw new Error(label + " must be a valid date");
+            return parsed;
+        };
+        const startDate = parseOptionalDate(data.startDate, "Start date");
+        const dueDate = parseOptionalDate(data.dueDate, "Due date");
 
-        if (dueDate && Number.isNaN(dueDate.getTime())) {
-            throw new Error("Due date must be a valid date");
+        if (startDate && dueDate && dueDate < startDate) {
+            throw new Error("Due date must be on or after the start date");
+        }
+        if (data.status && !Object.values(TaskStatus).includes(data.status)) {
+            throw new Error("Invalid task status");
         }
 
         await this.checkProjectAccess(data.projectId, user);
@@ -108,6 +117,8 @@ export class TaskService {
             projectId: data.projectId,
             description: data.description,
             priority: data.priority,
+            status: data.status ?? TaskStatus.TODO,
+            startDate,
             dueDate,
             assignedToId: data.assignedToId || null,
             createdById: user.id
@@ -419,10 +430,16 @@ export class TaskService {
         return tasks.map(task => ({
             id: task.id,
             title: task.title,
+            description: task.description,
+            category: task.category,
+            projectId: task.projectId,
+            assignedToId: task.assignedToId,
+            assigneeName: task.assignedTo?.user.fullName ?? null,
             startDate: task.startDate,
             endDate: task.dueDate,
             progress: task.progress,
             status: task.status,
+            approvedAt: task.approvedAt,
             parentId: task.parentId
         }));
     }
@@ -437,9 +454,13 @@ export class TaskService {
                 id: task.id,
                 title: task.title,
                 projectId: task.projectId,
+                projectName: task.project.name,
+                assignedToId: task.assignedToId,
+                assigneeName: task.assignedTo?.user.fullName ?? null,
                 startDate: task.startDate,
                 dueDate: task.dueDate,
-                status: task.status
+                status: task.status,
+                approvedAt: task.approvedAt
             }));
     }
 
