@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Tasks } from '@/api/services/tasks.service'
 import { Projects } from '@/api/services/projects.service'
 import { useAuth } from '@/hooks/useAuth'
+import type { CalendarTaskEvent, Project } from '@/types'
 import {
   Alert,
   DialogContent,
@@ -31,20 +32,7 @@ export interface CalendarEventItem {
   color: EventColor
 }
 
-interface ApiCalendarTask {
-  id: string
-  title: string
-  projectId: string
-  projectName: string
-  assignedToId?: string | null
-  assigneeName?: string | null
-  startDate?: string | null
-  dueDate?: string | null
-  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
-  approvedAt?: string | null
-}
-
-function toCalendarEvent(task: ApiCalendarTask): CalendarEventItem | null {
+function toCalendarEvent(task: CalendarTaskEvent): CalendarEventItem | null {
   const date = task.dueDate ?? task.startDate
   if (!date) return null
 
@@ -79,67 +67,54 @@ interface CalendarCell {
   dateString: string
   dayNumber: number
   isCurrentMonth: boolean
-  hasBadge?: boolean
-  badgeValue?: number
 }
 
-interface CalendarProject {
-  id: string
-  name: string
-  assignments?: Array<{
-    projectRole?: string | null
-    intern?: { user?: { id?: string } }
-  }>
+function dateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-// Fixed 35 days matching the October 2026 mockup
-const october2026Cells: CalendarCell[] = [
-  { dateString: '2026-09-28', dayNumber: 28, isCurrentMonth: false },
-  { dateString: '2026-09-29', dayNumber: 29, isCurrentMonth: false },
-  { dateString: '2026-09-30', dayNumber: 30, isCurrentMonth: false, hasBadge: true, badgeValue: 6 },
-  { dateString: '2026-10-01', dayNumber: 1, isCurrentMonth: true },
-  { dateString: '2026-10-02', dayNumber: 2, isCurrentMonth: true },
-  { dateString: '2026-10-03', dayNumber: 3, isCurrentMonth: true },
-  { dateString: '2026-10-04', dayNumber: 4, isCurrentMonth: true },
-  { dateString: '2026-10-05', dayNumber: 5, isCurrentMonth: true },
-  { dateString: '2026-10-06', dayNumber: 6, isCurrentMonth: true },
-  { dateString: '2026-10-07', dayNumber: 7, isCurrentMonth: true },
-  { dateString: '2026-10-08', dayNumber: 8, isCurrentMonth: true },
-  { dateString: '2026-10-09', dayNumber: 9, isCurrentMonth: true },
-  { dateString: '2026-10-10', dayNumber: 10, isCurrentMonth: true },
-  { dateString: '2026-10-11', dayNumber: 11, isCurrentMonth: true },
-  { dateString: '2026-10-12', dayNumber: 12, isCurrentMonth: true },
-  { dateString: '2026-10-13', dayNumber: 13, isCurrentMonth: true },
-  { dateString: '2026-10-14', dayNumber: 14, isCurrentMonth: true },
-  { dateString: '2026-10-15', dayNumber: 15, isCurrentMonth: true },
-  { dateString: '2026-10-16', dayNumber: 16, isCurrentMonth: true },
-  { dateString: '2026-10-17', dayNumber: 17, isCurrentMonth: true },
-  { dateString: '2026-10-18', dayNumber: 18, isCurrentMonth: true },
-  { dateString: '2026-10-19', dayNumber: 19, isCurrentMonth: true },
-  { dateString: '2026-10-20', dayNumber: 20, isCurrentMonth: true },
-  { dateString: '2026-10-21', dayNumber: 21, isCurrentMonth: true },
-  { dateString: '2026-10-22', dayNumber: 22, isCurrentMonth: true },
-  { dateString: '2026-10-23', dayNumber: 23, isCurrentMonth: true },
-  { dateString: '2026-10-24', dayNumber: 24, isCurrentMonth: true },
-  { dateString: '2026-10-25', dayNumber: 25, isCurrentMonth: true },
-  { dateString: '2026-10-26', dayNumber: 26, isCurrentMonth: true },
-  { dateString: '2026-10-27', dayNumber: 27, isCurrentMonth: true },
-  { dateString: '2026-10-28', dayNumber: 28, isCurrentMonth: true },
-  { dateString: '2026-10-29', dayNumber: 29, isCurrentMonth: true },
-  { dateString: '2026-10-30', dayNumber: 30, isCurrentMonth: true },
-  { dateString: '2026-10-31', dayNumber: 31, isCurrentMonth: true },
-  { dateString: '2026-11-01', dayNumber: 1, isCurrentMonth: false },
-]
+function buildMonthCells(date: Date): CalendarCell[] {
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
+  const offset = (firstDay.getDay() + 6) % 7
+  const start = new Date(firstDay)
+  start.setDate(firstDay.getDate() - offset)
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const cellDate = new Date(start)
+    cellDate.setDate(start.getDate() + index)
+    return {
+      dateString: dateKey(cellDate),
+      dayNumber: cellDate.getDate(),
+      isCurrentMonth: cellDate.getMonth() === date.getMonth(),
+    }
+  })
+}
+
+function getWeekDates(date: Date): Date[] {
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(monday)
+    day.setDate(monday.getDate() + index)
+    return day
+  })
+}
 
 export function CalendarPage() {
   const { user } = useAuth()
   const [events, setEvents] = useState<CalendarEventItem[]>([])
-  const [currentMonthName, setCurrentMonthName] = useState('October 2026')
+  const [selectedDate, setSelectedDate] = useState(() => new Date())
   const [currentView, setCurrentView] = useState<'Month' | 'Week' | 'Day'>('Month')
+  const currentMonthName = selectedDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  const monthCells = useMemo(() => buildMonthCells(selectedDate), [selectedDate])
+  const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate])
 
   // Top Filters
-  const [selectedProject, setSelectedProject] = useState('')
-  const [projectsList, setProjectsList] = useState<CalendarProject[]>([])
+  const [selectedProject, setSelectedProject] = useState('All Projects')
+  const [projectsList, setProjectsList] = useState<Project[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState('All Assignees')
   const [selectedStatus, setSelectedStatus] = useState('All Statuses')
 
@@ -150,7 +125,7 @@ export function CalendarPage() {
 
   // Form State
   const [newEventTitle, setNewEventTitle] = useState('')
-  const [newEventDate, setNewEventDate] = useState('2026-10-15')
+  const [newEventDate, setNewEventDate] = useState(() => dateKey(new Date()))
   const [newEventProject, setNewEventProject] = useState('')
 
   const canManageAllProjects = user?.role === 'ADMIN' || user?.role === 'MENTOR'
@@ -180,6 +155,19 @@ export function CalendarPage() {
     setToastMessage(`Calendar for ${currentMonthName} exported successfully.`)
   }
 
+  const shiftDate = (direction: -1 | 1) => {
+    setSelectedDate((current) => {
+      const next = new Date(current)
+      if (currentView === 'Month') {
+        next.setDate(1)
+        next.setMonth(next.getMonth() + direction)
+      } else {
+        next.setDate(next.getDate() + direction * (currentView === 'Week' ? 7 : 1))
+      }
+      return next
+    })
+  }
+
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canManageNewEventProject) return
@@ -189,14 +177,14 @@ export function CalendarPage() {
       title: newEventTitle.trim(),
       projectId: newEventProject,
       dueDate: newEventDate,
-      priority: 'MEDIUM',
-      status: 'TODO',
+      priority: 'MEDIUM' as const,
+      status: 'TODO' as const,
     }
 
     try {
       await Tasks.create(payload)
       const data = await Tasks.getCalendarEvents()
-      setEvents((data as ApiCalendarTask[]).map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null))
+      setEvents(data.map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null))
       
       setIsAddModalOpen(false)
       setNewEventTitle('')
@@ -223,20 +211,38 @@ export function CalendarPage() {
   useEffect(() => {
     Projects.list()
       .then((response) => {
-        const data = (Array.isArray(response) ? response : (response as any).data) as CalendarProject[]
+        const data = response.data.filter((project) =>
+          user?.role !== 'MENTOR' || project.supervisor?.user?.id === user.id,
+        )
         setProjectsList(data)
         if (data.length > 0) {
-          setSelectedProject(data[0].id)
           setNewEventProject(data[0].id)
         }
       })
       .catch(err => console.error("Failed to load projects:", err))
-  }, [])
+  }, [user?.id, user?.role])
 
   useEffect(() => {
-    Tasks.getCalendarEvents()
-      .then((data) => setEvents((data as ApiCalendarTask[]).map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null)))
-      .catch(err => console.error("Failed to load calendar events:", err))
+    let cancelled = false
+    const loadEvents = async () => {
+      try {
+        const data = await Tasks.getCalendarEvents()
+        if (!cancelled) setEvents(data.map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null))
+      } catch (error) {
+        if (!cancelled) console.error('Failed to load calendar events:', error)
+      }
+    }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void loadEvents()
+    }
+    void loadEvents()
+    const intervalId = window.setInterval(() => void loadEvents(), 30_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshWhenVisible)
+    }
   }, [])
 
   return (
@@ -279,6 +285,7 @@ export function CalendarPage() {
               onChange={(e) => setSelectedProject(e.target.value)}
               aria-label="Filter by project"
             >
+              <option value="All Projects">All Projects</option>
               {projectsList.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -329,7 +336,7 @@ export function CalendarPage() {
               <button
                 type="button"
                 className={styles.navArrowBtn}
-                onClick={() => setCurrentMonthName('September 2026')}
+                onClick={() => shiftDate(-1)}
                 aria-label="Previous month"
               >
                 <ChevronLeft size={18} aria-hidden="true" />
@@ -337,7 +344,7 @@ export function CalendarPage() {
               <button
                 type="button"
                 className={styles.navArrowBtn}
-                onClick={() => setCurrentMonthName('November 2026')}
+                onClick={() => shiftDate(1)}
                 aria-label="Next month"
               >
                 <ChevronRight size={18} aria-hidden="true" />
@@ -351,7 +358,7 @@ export function CalendarPage() {
             <button
               type="button"
               className={styles.todayButton}
-              onClick={() => setCurrentMonthName('October 2026')}
+              onClick={() => setSelectedDate(new Date())}
             >
               Today
             </button>
@@ -383,17 +390,12 @@ export function CalendarPage() {
               ))}
             </div>
             <div className={styles.monthGrid} role="grid">
-              {october2026Cells.map((cell) => {
+              {monthCells.map((cell) => {
                 const cellEvents = filteredEvents.filter((ev) => ev.date === cell.dateString)
 
                 return (
                   <div key={cell.dateString} className={styles.cell} role="gridcell">
                     <div className={styles.cellHeader}>
-                      {cell.hasBadge && (
-                        <span className={styles.todayBadge} title="Today's indicator">
-                          {cell.badgeValue}
-                        </span>
-                      )}
                       <span className={cell.isCurrentMonth ? styles.cellDayNumber : styles.cellDayFaded}>
                         {cell.dayNumber}
                       </span>
@@ -431,13 +433,15 @@ export function CalendarPage() {
         ) : currentView === 'Week' ? (
           <div className={styles.weekContainer}>
             <div className={styles.weekHeader}>
-              {['Mon 5', 'Tue 6', 'Wed 7', 'Thu 8', 'Fri 9', 'Sat 10', 'Sun 11'].map((dayStr, index) => {
-                const dayDateStr = `2026-10-0${index + 5}`
+              {weekDates.map((date) => {
+                const dayDateStr = dateKey(date)
                 const dayEvents = filteredEvents.filter((ev) => ev.date === dayDateStr)
 
                 return (
-                  <div key={dayStr} className={styles.weekDayCol}>
-                    <div className={styles.weekDayTitle}>{dayStr}</div>
+                  <div key={dayDateStr} className={styles.weekDayCol}>
+                    <div className={styles.weekDayTitle}>
+                      {date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
+                    </div>
                     <div className={styles.eventList}>
                       {dayEvents.map((ev) => (
                         <button
@@ -466,11 +470,16 @@ export function CalendarPage() {
           <div className={styles.weekContainer}>
             <div style={{ maxWidth: 500, margin: '0 auto', width: '100%' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
-                Schedule for Wednesday, Oct 14, 2026
+                Schedule for {selectedDate.toLocaleDateString('en-GB', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
               </h3>
               <div className={styles.eventList}>
                 {filteredEvents
-                  .filter((ev) => ev.date === '2026-10-14' || ev.date === '2026-10-08')
+                  .filter((ev) => ev.date === dateKey(selectedDate))
                   .map((ev) => (
                     <div
                       key={ev.id}

@@ -94,7 +94,7 @@ function toGanttTask(task: ApiGanttTask, projectId: string): GanttTaskItem {
         ? 'Completed'
         : 'Submitted'
   const assigneeName = task.assigneeName || 'Unassigned'
-  const progress = task.status === 'COMPLETED' ? 100 : task.progress ?? 0
+  const progress = task.status === 'TODO' ? 0 : task.status === 'IN_PROGRESS' ? 50 : 100
 
   return {
     id: task.id,
@@ -276,7 +276,7 @@ export function GanttPage() {
       projectId: selectedProject,
       assignedToId: selectedMember.id,
       description: newTaskPhase.trim() || undefined,
-      priority: 'MEDIUM',
+      priority: 'MEDIUM' as const,
       status: apiStatus[newTaskStatus],
       startDate: newTaskStartDate,
       dueDate: newTaskDueDate,
@@ -363,27 +363,57 @@ export function GanttPage() {
   }, [selectedProject, user?.id])
 
   useEffect(() => {
-    if (selectedProject === 'All Projects' || !selectedProject) return;
+    let cancelled = false
+    const projectIds = selectedProject === 'All Projects'
+      ? projectsList.map((project) => project.id)
+      : selectedProject ? [selectedProject] : []
 
-    Tasks.getGanttData(selectedProject)
-      .then((data) => setTasks((data as ApiGanttTask[]).map((task) => toGanttTask(task, selectedProject))))
-      .catch((err) => {
+    const loadTasks = async () => {
+      if (!projectIds.length) {
         setTasks([])
-        console.error("Failed to load Gantt data:", err)
-      })
-  }, [selectedProject])
+        return
+      }
+
+      try {
+        const projectTasks = await Promise.all(projectIds.map(async (projectId) => {
+          const data = await Tasks.getGanttData(projectId)
+          return data.map((task) => toGanttTask(task, projectId))
+        }))
+        if (!cancelled) setTasks(projectTasks.flat())
+      } catch (err) {
+        if (!cancelled) {
+          setTasks([])
+          console.error('Failed to load Gantt data:', err)
+        }
+      }
+    }
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void loadTasks()
+    }
+    void loadTasks()
+    const intervalId = window.setInterval(() => void loadTasks(), 30_000)
+    window.addEventListener('focus', refreshWhenVisible)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshWhenVisible)
+    }
+  }, [selectedProject, projectsList])
 
   useEffect(() => {
     Projects.list()
       .then((response) => {
-        const data = Array.isArray(response) ? response : (response as any).data;
+        const data = response.data.filter((project) =>
+          user?.role !== 'MENTOR' || project.supervisor?.user?.id === user.id,
+        )
         setProjectsList(data)
         if (data.length > 0) {
           setSelectedProject(data[0].id)
         }
       })
       .catch(err => console.error("Failed to load projects:", err))
-  }, [])
+  }, [user?.id, user?.role])
 
   return (
     <main className={styles.page}>
