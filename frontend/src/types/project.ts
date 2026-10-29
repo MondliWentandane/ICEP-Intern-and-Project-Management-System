@@ -3,7 +3,7 @@ export interface Project {
   id: ID
   name: string
   status: string
-  department?: string
+  department?: string | { id: ID; name: string; description?: string | null } | null
   description?: string
   supervisor?: { user?: { id?: ID } | null } | null
   assignments?: Array<{
