@@ -1,10 +1,3 @@
-// In-app notifications (the bell and the Notifications page). Every notification belongs to ONE user,
-// and GET /notifications only returns the caller's own, so each person sees what concerns them:
-//   ADMIN + WIL_HANDLER  new applications, internships that ended
-//   MENTOR               tasks submitted for review, their interns' internships ending
-//   INTERN               welcome on acceptance, project and task updates, reinstatement
-//   new staff            a welcome when their account is created
-// Notifying never throws: a failed notification must not undo the action that triggered it.
 import type { NotificationType, Role } from "@prisma/client";
 import { prisma } from "../config/prisma";
 
@@ -229,6 +222,21 @@ export const notificationService = {
     await send([task.assignedTo.user], {
       type: "TASK_APPROVED", title: "Task approved",
       message: `Your mentor approved "${task.title}".`,
+      link: (base) => `${base}/tasks`,
+    });
+  }),
+
+  /** The intern: their submitted task was returned for changes. */
+  taskReturned: (taskId: string) => safely("task returned", async () => {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { title: true, project: { select: { name: true } }, assignedTo: { select: { user: { select: { id: true, role: true } } } } },
+    });
+    if (!task?.assignedTo) return;
+    await send([task.assignedTo.user], {
+      type: "SYSTEM",
+      title: "Changes requested on task",
+      message: `Your mentor requested changes on "${task.title}" (${task.project.name}). It has been moved back to In Progress.`,
       link: (base) => `${base}/tasks`,
     });
   }),

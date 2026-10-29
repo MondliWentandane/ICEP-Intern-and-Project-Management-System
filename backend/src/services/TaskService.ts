@@ -533,6 +533,41 @@ export class TaskService {
         return approved;
     }
 
+    // Request changes for a submitted task
+    static async requestTaskChanges(
+        id: string,
+        feedback: string,
+        user: TaskUser
+    ) {
+        const task = await TaskRepository.getTask(id);
+
+        if (!task) {
+            throw new Error("Task not found");
+        }
+
+        await this.checkProjectAccess(task.projectId, user);
+
+        if (task.status !== "COMPLETED") {
+            throw new Error("Can only request changes on completed tasks");
+        }
+
+        if (task.approvedAt) {
+            throw new Error("Cannot request changes on an already approved task");
+        }
+
+        if (typeof feedback !== "string" || !feedback.trim()) {
+            throw new Error("Feedback is required to request changes");
+        }
+
+        // Add the feedback as a comment and revert the task back to IN_PROGRESS
+        await TaskRepository.addComment(id, user.id, `Changes requested: ${feedback.trim()}`);
+        const updated = await TaskRepository.updateTaskStatus(id, "IN_PROGRESS");
+
+        await notificationService.taskReturned(id);
+
+        return updated;
+    }
+
     // Retrieve subtasks
     static async getSubtasks(id: string, user: TaskUser) {
         await this.getTask(id, user);
@@ -612,6 +647,5 @@ export class TaskService {
             body.trim()
         );
     }
-
 
 }
