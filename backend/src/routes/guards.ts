@@ -21,8 +21,8 @@ const param = (value: string | string[] | undefined): string =>
  * Resource-level check used after verifyToken + authorizeRole.
  *  - ADMIN / WIL_HANDLER: always allowed.
  *  - INTERN : only their own intern record, or a project they are (still) assigned to.
- *  - MENTOR : only interns they supervise (directly or via a project they supervise)
- *             and projects they supervise.
+ *  - MENTOR : only interns they supervise (directly or via a project they supervise),
+ *             can read project details, and can mutate projects they supervise.
  * Applies to /interns/:id... and /projects/:id... (anything else is let through).
  */
 const authorizationCheck: RequestHandler = async (
@@ -74,10 +74,11 @@ const authorizationCheck: RequestHandler = async (
         });
         allowed = count > 0;
       } else if (user.role === "MENTOR") {
-        const count = await prisma.project.count({
-          where: { id, supervisor: { userId: user.id } },
-        });
-        allowed = count > 0;
+        if (req.method === "GET") {
+          allowed = (await prisma.project.count({ where: { id } })) > 0;
+        } else {
+          allowed = (await prisma.project.count({ where: { id, supervisor: { userId: user.id } } })) > 0;
+        }
       }
     } else {
       allowed = true;

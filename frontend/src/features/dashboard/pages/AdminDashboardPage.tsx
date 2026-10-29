@@ -98,7 +98,7 @@ export function AdminDashboardPage() {
                         <TableRow key={project.id} hover>
                           <TableCell>
                             <Typography variant="body2" component={RouterLink} to={`${BASE}/projects/${project.id}`} sx={{ fontWeight: 600, color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>{project.name}</Typography>
-                            {project.department && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{project.department}</Typography>}
+                            {project.department && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{typeof project.department === 'string' ? project.department : project.department.name}</Typography>}
                           </TableCell>
                           <TableCell><StatusBadge status={project.status} /></TableCell>
                           <TableCell>

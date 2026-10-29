@@ -52,11 +52,6 @@ export class ApplicationRepository {
     });
   }
 
-  /**
-   * Accepting an applicant makes them an intern: a user account with role INTERN and no password yet,
-   * plus their intern profile (campus, intake and department from the position). Their documents and
-   * skills move across to the profile. Runs as one transaction, and does nothing if it already exists.
-   */
   createInternFromApplication(applicationId: string) {
     return prisma.$transaction(async (tx) => {
       const application = await tx.application.findUnique({
@@ -101,9 +96,12 @@ export class ApplicationRepository {
           skills: { create: application.skills.map(({ skillId }) => ({ skillId })) },
         },
       });
-      // The CV etc. now also show on the Intern Profile page.
+
       await tx.document.updateMany({ where: { applicationId: application.id }, data: { internId: intern.id } });
       return intern;
+    }, {
+      maxWait: 5000,
+      timeout: 15000
     });
   }
 
@@ -115,12 +113,14 @@ export class ApplicationRepository {
         referenceCode: true, email: true, fullName: true, status: true,
         studentNumber: true, institution: true, qualification: true,
         interviewAt: true, interviewVenue: true, reviewedAt: true, createdAt: true, updatedAt: true,
-        position: { select: {
-          title: true,
-          campus: { select: { name: true } },
-          department: { select: { name: true } },
-          intake: { select: { name: true, startDate: true, endDate: true } },
-        } },
+        position: {
+          select: {
+            title: true,
+            campus: { select: { name: true } },
+            department: { select: { name: true } },
+            intake: { select: { name: true, startDate: true, endDate: true } },
+          }
+        },
         documents: { select: { type: true } },
         reviewedBy: { select: { fullName: true } },
       },

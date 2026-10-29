@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Alert,
-  DialogContent,
   Menu,
   MenuItem,
   Snackbar,
@@ -13,43 +12,25 @@ import {
   CheckCircle2,
   Folder,
   MoreHorizontal,
-  Plus,
 } from 'lucide-react'
+import { PROJECT_STATUS_LABELS } from '@/features/projects/data/newProject'
+import { useProjects, type ProjectRecord } from '@/features/projects/data/projectsApi'
+import { IcepLogo } from '@/components/brand/IcepLogo'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { TagInput } from '@/components/ui/TagInput'
 import {
-  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, PROJECT_STATUS_LABELS, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
+  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
   type ProjectStatus,
 } from '@/features/projects/data/newProject'
-import { IcepLogo } from '@/components/brand/IcepLogo'
 import { downloadBlob } from '@/utils/format'
 import styles from './MentorDashboardPage.module.css'
 
-interface TeamMember {
-  initials: string
-  colorClass: string
-}
-
 const statusLabels = PROJECT_STATUS_LABELS
-// A new project can't start as Completed.
-const NEW_PROJECT_STATUSES: ProjectStatus[] = ['PLANNED', 'IN_PROGRESS', 'ON_HOLD']
-
-interface ProjectItem {
-  id: string
-  name: string
-  groupName?: string
-  description?: string
-  requiredSkills?: string[]
-  team: TeamMember[]
-  status: ProjectStatus
-  progress: number
-  dueDate: string
-  colorClass: string
-}
 
 interface DeadlineItem {
   id: string
+  isoDate: string
   month: string
   day: string
   title: string
@@ -57,110 +38,15 @@ interface DeadlineItem {
   colorVariant: 'red' | 'amber' | 'blue'
 }
 
-const initialProjects: ProjectItem[] = [
-  {
-    id: 'proj-1',
-    name: 'Software Dev Alpha',
-    groupName: 'Group A',
-    team: [
-      { initials: 'MS', colorClass: styles.avatarMS },
-      { initials: 'TM', colorClass: styles.avatarTM },
-      { initials: 'JS', colorClass: styles.avatarJS },
-    ],
-    status: 'IN_PROGRESS',
-    progress: 75,
-    dueDate: 'Nov 15',
-    colorClass: styles.barBlue,
-  },
-  {
-    id: 'proj-2',
-    name: 'Network Security Audit',
-    groupName: 'Group B',
-    team: [
-      { initials: 'RJ', colorClass: styles.avatarRJ },
-      { initials: 'MS', colorClass: styles.avatarMS },
-    ],
-    status: 'ON_HOLD',
-    progress: 30,
-    dueDate: 'Oct 28',
-    colorClass: styles.barOrange,
-  },
-  {
-    id: 'proj-3',
-    name: 'Data Migration Phase 2',
-    groupName: 'Group C',
-    team: [
-      { initials: 'TN', colorClass: styles.avatarTN },
-      { initials: 'AB', colorClass: styles.avatarAB },
-    ],
-    status: 'IN_PROGRESS',
-    progress: 95,
-    dueDate: 'Oct 12',
-    colorClass: styles.barGreen,
-  },
-  {
-    id: 'proj-4',
-    name: 'Mobile App Beta',
-    groupName: 'Group D',
-    team: [
-      { initials: 'JS', colorClass: styles.avatarJS },
-      { initials: 'MS', colorClass: styles.avatarMS },
-      { initials: 'TM', colorClass: styles.avatarTM },
-    ],
-    status: 'IN_PROGRESS',
-    progress: 45,
-    dueDate: 'Dec 01',
-    colorClass: styles.barBlue,
-  },
-]
-
-const initialDeadlines: DeadlineItem[] = [
-  {
-    id: 'dl-1',
-    month: 'OCT',
-    day: '08',
-    title: 'Security Patch Sign-off',
-    project: 'Network Security Audit',
-    colorVariant: 'red',
-  },
-  {
-    id: 'dl-2',
-    month: 'OCT',
-    day: '12',
-    title: 'Final Data Validation',
-    project: 'Data Migration Phase 2',
-    colorVariant: 'amber',
-  },
-  {
-    id: 'dl-3',
-    month: 'OCT',
-    day: '15',
-    title: 'Database Schema V2',
-    project: 'Software Dev Alpha',
-    colorVariant: 'blue',
-  },
-  {
-    id: 'dl-4',
-    month: 'OCT',
-    day: '22',
-    title: 'UI Design Handoff',
-    project: 'Mobile App Beta',
-    colorVariant: 'blue',
-  },
-]
-
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 const PRIORITY: Record<DeadlineItem['colorVariant'], string> = { red: 'Urgent', amber: 'Due soon', blue: 'Upcoming' }
 const csvCell = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value)
+const AVATAR_COLORS = [styles.avatarMS, styles.avatarTM, styles.avatarJS, styles.avatarRJ, styles.avatarTN, styles.avatarAB]
+const memberInitials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
+const formatShortDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { month: 'short', day: '2-digit' })
 
 /** Upcoming deadlines as a CSV file (opens in Excel / Google Sheets), sorted by date. */
-function exportSchedule(items: DeadlineItem[], year: number) {
-  const dated = items.map((item) => {
-    const month = MONTHS.indexOf(item.month.toUpperCase())
-    const day = Number(item.day)
-    const iso = month >= 0 && day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : `${item.month} ${item.day}`
-    return { iso, item }
-  }).sort((a, b) => a.iso.localeCompare(b.iso))
+function exportSchedule(items: DeadlineItem[]) {
+  const dated = items.map((item) => ({ iso: item.isoDate, item })).sort((a, b) => a.iso.localeCompare(b.iso))
   const rows = [
     ['Date', 'Deadline', 'Project', 'Priority'],
     ...dated.map(({ iso, item }) => [iso, item.title, item.project, PRIORITY[item.colorVariant]]),
@@ -170,11 +56,10 @@ function exportSchedule(items: DeadlineItem[], year: number) {
 }
 
 export function MentorDashboardPage() {
-  const [projects, setProjects] = useState<ProjectItem[]>(initialProjects)
-  const [deadlines] = useState<DeadlineItem[]>(initialDeadlines)
-  const [activeProjectsCount, setActiveProjectsCount] = useState(12)
-  const [approvalsCount] = useState(5)
-  const [atRiskCount] = useState(2)
+  const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useProjects()
+  const [approvalsCount] = useState(0)
+  const activeProjectsCount = projects.filter((project) => project.status !== 'COMPLETED').length
+  const atRiskCount = projects.filter((project) => project.status === 'ON_HOLD').length
 
   // Date selection state
   const [selectedMonth, setSelectedMonth] = useState('Oct 2026')
@@ -182,17 +67,6 @@ export function MentorDashboardPage() {
 
   // Deadline menu state
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null)
-
-  // New Project modal state
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [projectName, setProjectName] = useState('')
-  const [groupName, setGroupName] = useState('')
-  const [description, setDescription] = useState('')
-  const [status, setStatus] = useState<ProjectStatus>('PLANNED')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [requiredSkills, setRequiredSkills] = useState<string[]>([])
-  const [formError, setFormError] = useState('')
 
   // Feedback toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -214,61 +88,29 @@ export function MentorDashboardPage() {
     setMenuAnchorEl(null)
   }
 
-  const resetForm = () => {
-    setProjectName('')
-    setGroupName('')
-    setDescription('')
-    setStatus('PLANNED')
-    setStartDate('')
-    setEndDate('')
-    setRequiredSkills([])
-    setFormError('')
-  }
-
-  const formatShortDate = (iso: string) =>
-    new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
-
-  // Department, supervisor and creator aren't asked for: they come from the signed-in mentor.
-  // See features/projects/data/newProject.ts for what the backend hook-up needs.
-  const handleCreateProject = (e: React.FormEvent) => {
-    e.preventDefault()
-    const input = toNewProject({ name: projectName, groupName, description, status, startDate, endDate, requiredSkills })
-    const problem = validateNewProject(input)
-    if (problem) { setFormError(problem); return }
-
-    // TODO (backend hook-up): await Projects.create(input) -> POST /api/projects, and use the saved project below.
-    const colorClass = input.status === 'ON_HOLD' ? styles.barOrange : styles.barBlue
-    const newProject: ProjectItem = {
-      id: `proj-${Date.now()}`,
-      name: input.name,
-      groupName: input.groupName,
-      description: input.description,
-      requiredSkills: input.requiredSkills,
-      team: [],
-      status: input.status,
-      progress: 0, // calculated from tasks once the project has some
-      dueDate: input.endDate ? formatShortDate(input.endDate) : '—',
-      colorClass,
-    }
-
-    setProjects([newProject, ...projects])
-    setActiveProjectsCount((prev) => prev + 1)
-    setIsModalOpen(false)
-    resetForm()
-    setToastMessage(`Project "${newProject.name}" successfully created!`)
-  }
-
-  // Calculate average progress
-  const averageProgress = Math.round(
-    projects.reduce((acc, p) => acc + p.progress, 0) / (projects.length || 1)
-  )
+  const deadlines = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return projects.flatMap((project) => {
+      if (!project.endDate) return []
+      const date = new Date(project.endDate)
+      const daysUntilDue = Math.ceil((date.getTime() - today.getTime()) / 86_400_000)
+      if (daysUntilDue < 0) return []
+      return [{
+        id: project.id,
+        isoDate: project.endDate.slice(0, 10),
+        month: date.toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase(),
+        day: date.toLocaleDateString('en-ZA', { day: '2-digit' }),
+        title: 'Project deadline',
+        project: project.name,
+        colorVariant: daysUntilDue <= 3 ? 'red' as const : daysUntilDue <= 7 ? 'amber' as const : 'blue' as const,
+      }]
+    }).sort((a, b) => a.isoDate.localeCompare(b.isoDate))
+  }, [projects])
+  const averageProgress = Math.round(projects.reduce((total, project) => total + project.progress, 0) / (projects.length || 1))
 
   return (
     <main className={styles.page}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <IcepLogo />
-      </div>
-
       {/* Top Bar Actions */}
       <section className={styles.topBar} aria-label="Dashboard controls">
         <button
@@ -308,15 +150,10 @@ export function MentorDashboardPage() {
           ))}
         </Menu>
 
-        <button
-          type="button"
-          className={styles.newProjectButton}
-          onClick={() => setIsModalOpen(true)}
-          id="new-project-button"
-        >
-          <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
+        <Link to="/mentor/projects" className={styles.newProjectButton} id="new-project-button">
+          <Folder size={18} strokeWidth={2.5} aria-hidden="true" />
           <span>New Project</span>
-        </button>
+        </Link>
       </section>
 
       {/* 4 Metric / KPI Cards */}
@@ -338,7 +175,7 @@ export function MentorDashboardPage() {
             <CheckCircle2 size={22} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className={styles.statContent}>
-            <p className={styles.statValue}>{projects.length === 4 ? '64%' : `${averageProgress}%`}</p>
+            <p className={styles.statValue}>{averageProgress}%</p>
             <p className={styles.statLabel}>Avg. Progress</p>
           </div>
         </div>
@@ -404,7 +241,13 @@ export function MentorDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {projects.map((proj) => {
+                {projectsLoading ? (
+                  <tr><td colSpan={4}>Loading projects…</td></tr>
+                ) : projectsError ? (
+                  <tr><td colSpan={4}>Projects could not be loaded. Refresh the page to try again.</td></tr>
+                ) : projects.length === 0 ? (
+                  <tr><td colSpan={4}>No projects yet. Create a project to see it here.</td></tr>
+                ) : projects.map((proj: ProjectRecord) => {
                   const statusClass =
                     proj.status === 'IN_PROGRESS' || proj.status === 'COMPLETED'
                       ? styles.statusOnTrack
@@ -418,18 +261,17 @@ export function MentorDashboardPage() {
                         <div className={styles.projectInfo}>
                           <span className={styles.projectName}>{proj.name}</span>
                           {proj.groupName && <span className={styles.projectDepartment}>{proj.groupName}</span>}
-                          {!!proj.requiredSkills?.length && <span className={styles.projectDepartment}>Skills: {proj.requiredSkills.join(', ')}</span>}
                         </div>
                       </td>
                       <td>
                         <div className={styles.teamAvatars}>
-                          {proj.team.map((member, idx) => (
+                          {proj.members.map((member, idx) => (
                             <span
-                              key={`${member.initials}-${idx}`}
-                              className={`${styles.teamAvatar} ${member.colorClass}`}
-                              title={`Team Member ${member.initials}`}
+                              key={`${member.internId}-${idx}`}
+                              className={`${styles.teamAvatar} ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}
+                              title={member.name}
                             >
-                              {member.initials}
+                              {memberInitials(member.name)}
                             </span>
                           ))}
                         </div>
@@ -443,11 +285,11 @@ export function MentorDashboardPage() {
                         <div className={styles.progressColumn}>
                           <div className={styles.progressMeta}>
                             <span className={styles.progressValue}>{proj.progress}%</span>
-                            <span className={styles.progressDate}>{proj.dueDate}</span>
+                            <span className={styles.progressDate}>{proj.endDate ? formatShortDate(proj.endDate) : '—'}</span>
                           </div>
                           <div className={styles.progressTrack}>
                             <div
-                              className={`${styles.progressBar} ${proj.colorClass}`}
+                              className={`${styles.progressBar} ${proj.status === 'ON_HOLD' ? styles.barOrange : proj.status === 'COMPLETED' ? styles.barGreen : styles.barBlue}`}
                               style={{ width: `${proj.progress}%` }}
                               role="progressbar"
                               aria-valuenow={proj.progress}
@@ -499,7 +341,7 @@ export function MentorDashboardPage() {
                 onClick={() => {
                   handleCloseDeadlinesMenu()
                   if (!deadlines.length) { setToastMessage('There are no deadlines to export.'); return }
-                  exportSchedule(deadlines, Number(selectedMonth.split(' ')[1]) || new Date().getFullYear())
+                  exportSchedule(deadlines)
                   setToastMessage(`Schedule exported (${deadlines.length} deadline${deadlines.length === 1 ? '' : 's'}).`)
                 }}
                 sx={{ fontSize: 13.5 }}
@@ -547,141 +389,6 @@ export function MentorDashboardPage() {
           </Link>
         </section>
       </div>
-
-      {/* New Project Modal */}
-      <Modal
-        open={isModalOpen}
-        onClose={() => { setIsModalOpen(false); resetForm() }}
-        title="Create New Project"
-        maxWidth="sm"
-        fullWidth
-        actions={
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
-            <Button appearance="secondary" onClick={() => { setIsModalOpen(false); resetForm() }}>
-              Cancel
-            </Button>
-            <Button appearance="primary" onClick={handleCreateProject}>
-              Create Project
-            </Button>
-          </div>
-        }
-      >
-        <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
-          <form className={styles.modalForm} onSubmit={handleCreateProject} id="new-project-form">
-            {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
-            <div className={styles.formGroup}>
-              <label htmlFor="project-name-input" className={styles.formLabel}>
-                Project Name
-              </label>
-              <input
-                id="project-name-input"
-                type="text"
-                className={styles.formInput}
-                placeholder="e.g. Cloud Security Pipeline"
-                value={projectName}
-                maxLength={NAME_MAX}
-                onChange={(e) => setProjectName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="group-name-input" className={styles.formLabel}>
-                Group Name (optional)
-              </label>
-              <input
-                id="group-name-input"
-                type="text"
-                className={styles.formInput}
-                placeholder="e.g. Group A"
-                maxLength={GROUP_MAX}
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="description-input" className={styles.formLabel}>
-                Description (optional)
-              </label>
-              <textarea
-                id="description-input"
-                className={styles.formInput}
-                rows={3}
-                placeholder="What is this project about?"
-                maxLength={DESCRIPTION_MAX}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <span className={styles.formHint}>{description.length}/{DESCRIPTION_MAX}</span>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel} id="skills-label">
-                Required skills (optional)
-              </label>
-              <span className={styles.formHint}>Used to suggest interns in the Team Builder. Type a skill and press Enter, or pick one below.</span>
-              <div role="group" aria-labelledby="skills-label">
-                <TagInput tags={requiredSkills} onChange={setRequiredSkills} placeholder="e.g. React" />
-              </div>
-              <div className={styles.skillSuggestions}>
-                {SKILL_SUGGESTIONS.filter((skill) => !requiredSkills.some((tag) => tag.toLowerCase() === skill.toLowerCase())).map((skill) => (
-                  <button key={skill} type="button" className={styles.skillSuggestion} onClick={() => setRequiredSkills((current) => (current.includes(skill) ? current : [...current, skill]))}>
-                    + {skill}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="status-select" className={styles.formLabel}>
-                Status
-              </label>
-              <select
-                id="status-select"
-                className={styles.formSelect}
-                value={status}
-                onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-              >
-                {NEW_PROJECT_STATUSES.map((value) => (
-                  <option key={value} value={value}>{statusLabels[value]}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className={styles.formGroup}>
-                <label htmlFor="start-date-input" className={styles.formLabel}>
-                  Start Date
-                </label>
-                <input
-                  id="start-date-input"
-                  type="date"
-                  className={styles.formInput}
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label htmlFor="end-date-input" className={styles.formLabel}>
-                  End Date
-                </label>
-                <input
-                  id="end-date-input"
-                  type="date"
-                  className={styles.formInput}
-                  min={startDate || undefined}
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <p className={styles.formHint}>Progress starts at 0% and is calculated from the project's tasks. The department and supervisor are taken from your mentor profile.</p>
-          </form>
-        </DialogContent>
-      </Modal>
 
       {/* Snackbar feedback notification */}
       <Snackbar

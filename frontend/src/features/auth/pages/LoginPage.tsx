@@ -73,10 +73,6 @@ export function LoginPage() {
         />
         <Button className="auth-submit" type="submit" fullWidth disabled={isSubmitting}>{isSubmitting ? 'Signing in…' : 'Login'}</Button>
       </Stack>
-      <Stack className="auth-login-footer" direction="row" spacing={0}>
-        <span>Don&apos;t have an account?</span>
-        <Link className="auth-footer-link" component={RouterLink} to="/careers">Apply here</Link>
-      </Stack>
     </Stack>
   )
 }
