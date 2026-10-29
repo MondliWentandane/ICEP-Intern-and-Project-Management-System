@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { TagInput } from '@/components/ui/TagInput'
 import {
-  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, PROJECT_STATUS_LABELS, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
+  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
   type ProjectStatus,
 } from '@/features/projects/data/newProject'
 import { downloadBlob } from '@/utils/format'
