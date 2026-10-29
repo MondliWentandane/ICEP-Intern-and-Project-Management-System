@@ -1,9 +1,10 @@
-// Projects and their groups come from the database (features/projects/data/projectsApi.ts).
-import { useEffect, useState, type FormEvent, type JSX, type ReactNode } from 'react'
+import { useMemo, useState, type SyntheticEvent, type JSX, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { PageScaffold } from '@/components/ui/PageScaffold'
-import CreateProjectButton, { type Group, type NewProject } from '@/components/ui/CreateProjectButton'
+import type { Group, NewProject } from '@/components/ui/CreateProjectButton'
 import { TeamMemberPicker } from '@/features/projects/components/TeamMemberPicker'
+import { CreateProjectFlow } from '@/features/projects/components/CreateProjectFlow'
+import { ModalShell, FIELD, errorText } from '@/features/projects/components/Shared'
 import {
   teamError, useCreateProject, useDeleteProject, useProjects, useUpdateProject,
   fetchProjects, type ProjectRecord, type TeamMemberInput,
@@ -15,17 +16,13 @@ const PageScaffoldWithChildren = PageScaffold as unknown as (props: {
 }) => JSX.Element
 
 export type Project = ProjectRecord
+type Status = 'Active' | 'Pending' | 'Completed'
 
 /** The project's group (name + member count), or undefined while nobody is assigned. */
 const groupOf = (project: Project): Group | undefined =>
   project.members.length || project.groupName
     ? { id: project.id, name: project.groupName ?? 'Unnamed group', members: project.members.length }
     : undefined
-
-const errorText = (error: unknown, fallback: string) => {
-  const data = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data
-  return data?.error ?? data?.message ?? fallback
-}
 
 const COVERS = [
   ['#0b2a5b', '#2f5fa8'],
@@ -34,31 +31,23 @@ const COVERS = [
   ['#2f5fa8', '#9cc0f2'],
   ['#0b2a5b', '#4a78c4'],
 ]
+const COVER_HEIGHTS = [190, 130, 160, 150, 200, 170, 140]
 const AVATARS = ['#0b2a5b', '#2f5fa8', '#13397d', '#5b8bd6', '#4a78c4']
+
+const BADGE: Record<Status, string> = {
+  Active: 'bg-[#dff3e7] text-[#1f8a4c]',
+  Pending: 'bg-[#fdeccf] text-[#b86200]',
+  Completed: 'bg-[#e0eafa] text-[#2f5fa8]',
+}
 
 const initials = (name: string) =>
   name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
 
-/* ---------- shared modal ---------- */
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+const statusOf = (p: Project, group?: Group): Status =>
+  p.progress >= 100 ? 'Completed' : group ? 'Active' : 'Pending'
 
-  return (
-    <div
-      className="fixed inset-0 z-[1300] flex items-center justify-center bg-slate-900/50 p-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div role="dialog" aria-modal="true" aria-label={title} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
-        <h2 className="text-xl font-bold text-[#0f1b33]">{title}</h2>
-        {children}
-      </div>
-    </div>
-  )
-}
+const pill =
+  'rounded-full border border-transparent bg-[#f1f4fa] px-5 py-3 text-sm text-[#0f1b33] focus:border-[#0b2a5b] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b2a5b]/20'
 
 /* ---------- edit ---------- */
 function EditProjectDialog({
@@ -75,10 +64,8 @@ function EditProjectDialog({
   const nameError = name.trim().length < 3 ? 'Enter a project name (at least 3 characters).' : ''
   const statementError = statement.trim().length < 20 ? 'Describe the problem in at least 20 characters.' : ''
   const groupError = members.length > 0 && !groupName.trim() ? 'Give the group a name.' : ''
-  const field =
-    'w-full rounded-2xl border border-transparent bg-[#f1f4fa] px-4 py-3 text-sm text-[#0f1b33] focus:border-[#0b2a5b] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b2a5b]/20'
 
-  const save = async (e: FormEvent) => {
+  const save = async (e: SyntheticEvent) => {
     e.preventDefault()
     setShowErrors(true)
     if (nameError || statementError || groupError || teamError(members)) return
@@ -93,21 +80,21 @@ function EditProjectDialog({
   }
 
   return (
-    <Modal title="Edit project" onClose={onClose}>
+    <ModalShell title="Edit project" onClose={onClose}>
       <form onSubmit={(e) => void save(e)} noValidate className="mt-5 space-y-4">
         <div>
           <label htmlFor="edit-name" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">Project name</label>
-          <input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} className={field} />
+          <input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} className={FIELD} />
           {showErrors && nameError && <p className="mt-1 text-xs text-red-700">{nameError}</p>}
         </div>
         <div>
           <label htmlFor="edit-statement" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">Problem statement</label>
-          <textarea id="edit-statement" rows={5} value={statement} onChange={(e) => setStatement(e.target.value)} className={`${field} resize-none`} />
+          <textarea id="edit-statement" rows={5} value={statement} onChange={(e) => setStatement(e.target.value)} className={`${FIELD} resize-none`} />
           {showErrors && statementError && <p className="mt-1 text-xs text-red-700">{statementError}</p>}
         </div>
         <div>
           <label htmlFor="edit-group" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">Group name</label>
-          <input id="edit-group" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="e.g. Group 7" className={field} />
+          <input id="edit-group" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="e.g. Group 7" className={FIELD} />
           {showErrors && groupError && <p className="mt-1 text-xs text-red-700">{groupError}</p>}
         </div>
         <TeamMemberPicker value={members} onChange={setMembers} currentProjectId={project.id} showErrors={showErrors} />
@@ -117,14 +104,14 @@ function EditProjectDialog({
           <button type="submit" disabled={saving} className="rounded-full bg-[#0b2a5b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#13397d] disabled:opacity-60">{saving ? 'Saving…' : 'Save changes'}</button>
         </div>
       </form>
-    </Modal>
+    </ModalShell>
   )
 }
 
 /* ---------- delete ---------- */
 function DeleteProjectDialog({ project, onConfirm, onClose, busy, error }: { project: Project; onConfirm: () => void; onClose: () => void; busy?: boolean; error?: string }) {
   return (
-    <Modal title="Delete project?" onClose={onClose}>
+    <ModalShell title="Delete project?" onClose={onClose}>
       <p className="mt-3 text-sm text-[#55627a]">
         <b className="text-[#0f1b33]">{project.name}</b> will be permanently removed. This can't be undone.
       </p>
@@ -133,7 +120,7 @@ function DeleteProjectDialog({ project, onConfirm, onClose, busy, error }: { pro
         <button type="button" onClick={onClose} className="rounded-full bg-[#f1f4fa] px-5 py-2.5 text-sm font-medium text-[#0f1b33] hover:bg-[#e4ebf7]">Cancel</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="rounded-full bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">{busy ? 'Deleting…' : 'Delete'}</button>
       </div>
-    </Modal>
+    </ModalShell>
   )
 }
 
@@ -143,8 +130,12 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
   onOpen: () => void; onEdit: () => void; onDelete: () => void
 }) {
   const [from, to] = COVERS[index % COVERS.length]
+  const height = COVER_HEIGHTS[index % COVER_HEIGHTS.length]
   const members = group?.members ?? 0
   const shown = Math.min(members, 4)
+  const status = statusOf(project, group)
+  const scrum = project.members.find((m) => m.role === 'Scrum Master')?.name
+
   return (
     <div
       role="link"
@@ -158,22 +149,25 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
           onOpen()
         }
       }}
-      className="cursor-pointer overflow-hidden rounded-3xl bg-white shadow-[0_1px_3px_rgba(11,42,91,.08),0_14px_30px_rgba(11,42,91,.07)] transition hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(11,42,91,.12),0_20px_40px_rgba(11,42,91,.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2a5b]"
+      className="mb-[18px] cursor-pointer break-inside-avoid overflow-hidden rounded-3xl bg-white shadow-[0_1px_3px_rgba(11,42,91,.08),0_14px_30px_rgba(11,42,91,.07)] transition duration-200 hover:-translate-y-[3px] hover:shadow-[0_2px_4px_rgba(11,42,91,.1),0_22px_40px_rgba(11,42,91,.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2a5b]"
     >
-      <div className="relative flex h-36 items-end overflow-hidden p-5" style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}>
+      <div
+        className="relative flex items-end overflow-hidden px-[18px] py-4"
+        style={{ height, backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+      >
         <div className="absolute -right-6 -top-8 h-32 w-32 rounded-full bg-white/20" />
         <div className="absolute bottom-[-2.5rem] right-16 h-24 w-24 rounded-full bg-white/10" />
         <span className="relative text-5xl font-extrabold tracking-tight text-white">{initials(project.name)}</span>
       </div>
 
-      <div className="p-5">
-        <h3 className="text-lg font-bold text-[#0f1b33]">{project.name}</h3>
-        <p className="mb-3 text-sm text-[#55627a]">{group ? group.name : 'No group yet'}</p>
+      <div className="px-[18px] pb-[18px] pt-3.5">
+        <h3 className="text-[17px] font-bold text-[#0f1b33]">{project.name}</h3>
+        <p className="mb-2.5 mt-0.5 text-[13px] text-[#55627a]">
+          {group ? group.name : 'No group yet'}{scrum ? ` · Scrum master: ${scrum}` : ''}
+        </p>
 
-        <div className="flex items-center justify-between">
-          <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${group ? 'bg-[#dff3e7] text-[#1f8a4c]' : 'bg-[#fdeccf] text-[#b86200]'}`}>
-            {group ? 'Active' : 'Pending'}
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${BADGE[status]}`}>{status}</span>
           <div className="flex">
             {project.members.slice(0, shown).map((member, i) => (
               <span key={member.internId} title={`${member.name}${member.role ? ` – ${member.role}` : ''}`} className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-white text-[11px] font-semibold text-white first:ml-0" style={{ background: AVATARS[i % AVATARS.length] }}>
@@ -186,10 +180,10 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
           </div>
         </div>
 
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#d5dbe6]">
+        <div className="mb-1.5 mt-3 h-1.5 overflow-hidden rounded-full bg-[#d5dbe6]">
           <div className="h-full rounded-full bg-[#0b2a5b]" style={{ width: `${project.progress}%` }} />
         </div>
-        <div className="mt-1.5 flex justify-between text-xs text-[#55627a]">
+        <div className="flex justify-between text-[13px] text-[#55627a]">
           <span>{project.progress > 0 ? `${project.progress}% complete` : 'Not started'}</span>
           <span>{members > 0 ? `${members} members` : 'No members'}</span>
         </div>
@@ -228,6 +222,8 @@ export function ProjectsPage() {
   const [editing, setEditing] = useState<Project | null>(null)
   const [deleting, setDeleting] = useState<Project | null>(null)
   const [deleteError, setDeleteError] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | Status>('all')
 
   // Saved to the database; each assigned intern is notified of their group and role.
   const handleCreate = async (input: NewProject) => {
@@ -270,10 +266,35 @@ export function ProjectsPage() {
     }
   }
 
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return projects
+      .map((project, index) => ({ project, index }))
+      .filter(({ project }) => {
+        if (q && !project.name.toLowerCase().includes(q) && !(project.groupName ?? '').toLowerCase().includes(q)) return false
+        if (statusFilter !== 'all' && statusOf(project, groupOf(project)) !== statusFilter) return false
+        return true
+      })
+  }, [projects, search, statusFilter])
+
   return (
     <PageScaffoldWithChildren title="Projects">
-      <div className="mb-6 flex justify-end">
-        <CreateProjectButton onCreate={handleCreate} />
+      <div className="mb-6 flex flex-wrap items-center gap-2.5">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by project or group name"
+          aria-label="Search projects"
+          className={`${pill} min-w-[180px] flex-1`}
+        />
+        <select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | Status)} className={pill}>
+          <option value="all">All statuses</option>
+          <option value="Active">Active</option>
+          <option value="Pending">Pending</option>
+          <option value="Completed">Completed</option>
+        </select>
+        <CreateProjectFlow onCreate={handleCreate} />
       </div>
 
       {isLoading ? (
@@ -287,19 +308,21 @@ export function ProjectsPage() {
         <p className="rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">
           No projects yet. Click <b>Create project</b> to add one.
         </p>
+      ) : visible.length === 0 ? (
+        <p className="rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">No projects match your filters.</p>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p, i) => {
-            const group = groupOf(p)
+        <div className="columns-1 gap-[18px] sm:columns-2 lg:columns-3">
+          {visible.map(({ project, index }) => {
+            const group = groupOf(project)
             return (
               <ProjectCard
-                key={p.id}
-                project={p}
-                index={i}
+                key={project.id}
+                project={project}
+                index={index}
                 group={group}
-                onOpen={() => navigate(`${pathname.replace(/\/$/, '')}/${p.id}`, { state: { project: p, group } })}
-                onEdit={() => setEditing(p)}
-                onDelete={() => { setDeleteError(''); setDeleting(p) }}
+                onOpen={() => navigate(`${pathname.replace(/\/$/, '')}/${project.id}`, { state: { project, group } })}
+                onEdit={() => setEditing(project)}
+                onDelete={() => { setDeleteError(''); setDeleting(project) }}
               />
             )
           })}
