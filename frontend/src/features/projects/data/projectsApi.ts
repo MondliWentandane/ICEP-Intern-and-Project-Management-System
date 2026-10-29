@@ -73,7 +73,7 @@ export async function fetchProjects() {
 
 export function useProjects() {
   return useQuery({
-    queryKey: PROJECTS_KEY,
+    queryKey: [...PROJECTS_KEY, tokenStorage.getUser()?.id ?? null],
     queryFn: fetchProjects,
     enabled: signedIn(),
   })
@@ -151,3 +151,4 @@ export function useDeleteProject() {
 export async function fetchProject(id: string) {
   return toRecord((await apiClient.get<ApiProject>(`${endpoints.projects}/${encodeURIComponent(id)}`)).data)
 }
+
