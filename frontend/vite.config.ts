@@ -7,15 +7,11 @@ import { defineConfig, loadEnv } from 'vite'
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootDir, '')
-  const target = env.VITE_API_PROXY_TARGET
-
-  // ADD THESE TWO LINES:
-  console.log("=== CHECKING VITE PROXY ===")
-  console.log("TARGET IS:", target)
+  const target = env.VITE_API_PROXY_TARGET || 'http://localhost:5000'
 
   return {
     plugins: [react(), tailwindcss() as any],
     resolve: { alias: { '@': path.resolve(rootDir, 'src') } },
-    server: { proxy: target ? { '/api': { target, changeOrigin: true } } : undefined },
+    server: { proxy: { '/api': { target, changeOrigin: true } } },
   }
 })

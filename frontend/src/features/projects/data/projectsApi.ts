@@ -30,6 +30,7 @@ export interface ProjectRecord {
   groupName: string | null
   members: ProjectMember[]
   progress: number
+  canManage: boolean
 }
 
 /** An intern who can be put in a group, with the groups they are already in. */
@@ -48,6 +49,7 @@ interface ApiProject {
   groupName: string | null
   description: string | null
   progress: number
+  supervisor?: { user?: { id: string } } | null
   assignments?: { internId: string; projectRole: string | null; intern?: { user?: { fullName: string } } }[]
 }
 
@@ -57,6 +59,7 @@ const toRecord = (project: ApiProject): ProjectRecord => ({
   problemStatement: project.description ?? '',
   groupName: project.groupName,
   progress: project.progress ?? 0,
+  canManage: project.supervisor?.user?.id === tokenStorage.getUser()?.id,
   members: (project.assignments ?? []).map((a) => ({ internId: a.internId, name: a.intern?.user?.fullName ?? 'Intern', role: a.projectRole })),
 })
 
@@ -64,10 +67,14 @@ const PROJECTS_KEY = ['projects', 'mine'] as const
 const INTERNS_KEY = ['projects', 'team-candidates'] as const
 const signedIn = () => Boolean(tokenStorage.get())
 
+export async function fetchProjects() {
+  return (await apiClient.get<ApiProject[]>(endpoints.projects)).data.map(toRecord)
+}
+
 export function useProjects() {
   return useQuery({
     queryKey: PROJECTS_KEY,
-    queryFn: async () => (await apiClient.get<ApiProject[]>(endpoints.projects)).data.map(toRecord),
+    queryFn: fetchProjects,
     enabled: signedIn(),
   })
 }
