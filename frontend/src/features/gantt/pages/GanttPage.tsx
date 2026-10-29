@@ -183,7 +183,8 @@ function getTaskColumnSpan(task: GanttTaskItem, columns: TimelineColumn[]) {
   return { start: first, end: last }
 }
 
-export function GanttPage() {
+// CHANGED (a): accepts an optional projectId so it can be embedded in ProjectDetailPage
+export function GanttPage({ projectId }: { projectId?: string }) {
   const { user } = useAuth()
   const [tasks, setTasks] = useState<GanttTaskItem[]>([])
   const [activeView, setActiveView] = useState<'Days' | 'Weeks' | 'Months'>('Weeks')
@@ -191,7 +192,8 @@ export function GanttPage() {
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedProject, setSelectedProject] = useState('')
+  // CHANGED (b): start on the given project when one is passed in
+  const [selectedProject, setSelectedProject] = useState(projectId ?? '')
   const [projectsList, setProjectsList] = useState<Array<{
     id: string
     name: string
@@ -408,12 +410,13 @@ export function GanttPage() {
           user?.role !== 'MENTOR' || project.supervisor?.user?.id === user.id,
         )
         setProjectsList(data)
-        if (data.length > 0) {
+        // CHANGED (c): don't override the project passed in by the parent
+        if (data.length > 0 && !projectId) {
           setSelectedProject(data[0].id)
         }
       })
       .catch(err => console.error("Failed to load projects:", err))
-  }, [user?.id, user?.role])
+  }, [user?.id, user?.roleprojectId])
 
   return (
     <main className={styles.page}>
@@ -473,21 +476,24 @@ export function GanttPage() {
             />
           </div>
 
-          <div className={styles.selectWrapper}>
-            <select
-              className={styles.filterSelect}
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              aria-label="Filter by project"
-            >
-              {projectsList.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
-          </div>
+          {/* CHANGED (d): the project dropdown is hidden when a project is fixed by the parent */}
+          {!projectId && (
+            <div className={styles.selectWrapper}>
+              <select
+                className={styles.filterSelect}
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                aria-label="Filter by project"
+              >
+                {projectsList.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
+            </div>
+          )}
 
           <div className={styles.selectWrapper}>
             <select

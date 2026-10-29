@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useProjects } from '@/features/projects/data/projectsApi'
 import styles from '@/features/dashboard/pages/DashboardPages.module.css'
+import { useMyProjects } from '@/features/projects/data/useMyProjects'
 
 export function MyProjectPage() {
   const { data: projects = [], isLoading, isError, refetch } = useProjects()
