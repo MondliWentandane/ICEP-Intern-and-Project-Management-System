@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, endpoints } from '@/api'
 import { Interns } from '@/api/services/interns.service'
 import { tokenStorage } from '@/utils/tokenStorage'
+import type { ProjectStatus } from './newProject'
 
 /** Roles a mentor can give a group member. */
 export const PROJECT_ROLES = ['Backend Developer', 'Frontend Developer', 'Scrum Master', 'UI/UX Designer', 'Tester'] as const
@@ -31,6 +32,8 @@ export interface ProjectRecord {
   members: ProjectMember[]
   progress: number
   canManage: boolean
+  status: ProjectStatus
+  endDate: string | null
 }
 
 /** An intern who can be put in a group, with the groups they are already in. */
@@ -49,6 +52,8 @@ interface ApiProject {
   groupName: string | null
   description: string | null
   progress: number
+  status: ProjectStatus
+  endDate: string | null
   supervisor?: { user?: { id: string } } | null
   assignments?: { internId: string; projectRole: string | null; intern?: { user?: { fullName: string } } }[]
 }
@@ -60,6 +65,8 @@ const toRecord = (project: ApiProject): ProjectRecord => ({
   groupName: project.groupName,
   progress: project.progress ?? 0,
   canManage: project.supervisor?.user?.id === tokenStorage.getUser()?.id,
+  status: project.status,
+  endDate: project.endDate,
   members: (project.assignments ?? []).map((a) => ({ internId: a.internId, name: a.intern?.user?.fullName ?? 'Intern', role: a.projectRole })),
 })
 

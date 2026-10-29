@@ -51,6 +51,7 @@
   box-shadow: 0 1px 3px rgba(18, 40, 63, 0.15);
   transition: all 0.15s ease;
   font-family: inherit;
+  text-decoration: none;
 }
 
 .newProjectButton:hover {
