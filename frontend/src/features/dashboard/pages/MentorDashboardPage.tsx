@@ -22,7 +22,6 @@ import {
   DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, PROJECT_STATUS_LABELS, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
   type ProjectStatus,
 } from '@/features/projects/data/newProject'
-import { IcepLogo } from '@/components/brand/IcepLogo'
 import { downloadBlob } from '@/utils/format'
 import styles from './MentorDashboardPage.module.css'
 
@@ -265,10 +264,6 @@ export function MentorDashboardPage() {
 
   return (
     <main className={styles.page}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <IcepLogo />
-      </div>
-
       {/* Top Bar Actions */}
       <section className={styles.topBar} aria-label="Dashboard controls">
         <button
