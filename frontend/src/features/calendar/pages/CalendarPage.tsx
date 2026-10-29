@@ -1,4 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { Tasks } from '@/api/services/tasks.service'
+import { Projects } from '@/api/services/projects.service'
+import { useAuth } from '@/hooks/useAuth'
 import {
   Alert,
   DialogContent,
@@ -9,110 +12,68 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Share,
+  Share
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { useAuth } from '@/hooks/useAuth'
 import styles from './CalendarPage.module.css'
 
-export type EventColor = 'blue' | 'blue-meeting' | 'green' | 'amber' | 'red'
+export type EventColor = 'blue' | 'green' | 'amber' | 'red'
 
 export interface CalendarEventItem {
   id: string
   title: string
-  date: string // format 'YYYY-MM-DD'
-  time?: string
+  date: string
   project: string
+  projectName: string
   assignee: string
   status: string
   color: EventColor
 }
 
-const initialEvents: CalendarEventItem[] = [
-  {
-    id: 'ev-1',
-    title: 'Kickoff Meeting',
-    date: '2026-09-28',
-    time: '09:00',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'Completed',
-    color: 'blue-meeting',
-  },
-  {
-    id: 'ev-2',
-    title: 'Schema V1',
-    date: '2026-09-30',
-    project: 'Software Dev Alpha',
-    assignee: 'Sarah Johnson',
-    status: 'Completed',
-    color: 'green',
-  },
-  {
-    id: 'ev-3',
-    title: 'Core APIs',
-    date: '2026-09-30',
-    project: 'Software Dev Alpha',
-    assignee: 'Thabo Molefe',
-    status: 'Completed',
-    color: 'green',
-  },
-  {
-    id: 'ev-4',
-    title: 'Gather Specs',
-    date: '2026-10-01',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'Completed',
-    color: 'blue',
-  },
-  {
-    id: 'ev-5',
-    title: 'Schema Review',
-    date: '2026-10-05',
-    project: 'Software Dev Alpha',
-    assignee: 'Morgan Mentor',
-    status: 'On Track',
-    color: 'green',
-  },
-  {
-    id: 'ev-6',
-    title: 'Build UI',
-    date: '2026-10-08',
-    project: 'Software Dev Alpha',
-    assignee: 'Sarah Johnson',
-    status: 'In Progress',
-    color: 'amber',
-  },
-  {
-    id: 'ev-7',
-    title: 'Build UI',
-    date: '2026-10-09',
-    project: 'Software Dev Alpha',
-    assignee: 'Sarah Johnson',
-    status: 'In Progress',
-    color: 'amber',
-  },
-  {
-    id: 'ev-8',
-    title: 'Security Check',
-    date: '2026-10-10',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'At Risk',
-    color: 'red',
-  },
-  {
-    id: 'ev-9',
-    title: 'Beta Launch',
-    date: '2026-10-14',
-    project: 'Software Dev Alpha',
-    assignee: 'Pat Naidoo',
-    status: 'Pending Review',
-    color: 'amber',
-  },
-]
+interface ApiCalendarTask {
+  id: string
+  title: string
+  projectId: string
+  projectName: string
+  assignedToId?: string | null
+  assigneeName?: string | null
+  startDate?: string | null
+  dueDate?: string | null
+  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+  approvedAt?: string | null
+}
+
+function toCalendarEvent(task: ApiCalendarTask): CalendarEventItem | null {
+  const date = task.dueDate ?? task.startDate
+  if (!date) return null
+
+  const status = task.status === 'TODO'
+    ? 'To Do'
+    : task.status === 'IN_PROGRESS'
+      ? 'In Progress'
+      : task.approvedAt
+        ? 'Completed'
+        : 'Submitted'
+  const color: EventColor = task.status === 'TODO'
+    ? 'blue'
+    : task.status === 'IN_PROGRESS'
+      ? 'green'
+      : task.approvedAt
+        ? 'blue'
+        : 'amber'
+
+  return {
+    id: task.id,
+    title: task.title,
+    date: date.slice(0, 10),
+    project: task.projectId,
+    projectName: task.projectName,
+    assignee: task.assigneeName || 'Unassigned',
+    status,
+    color,
+  }
+}
 
 interface CalendarCell {
   dateString: string
@@ -122,9 +83,17 @@ interface CalendarCell {
   badgeValue?: number
 }
 
+interface CalendarProject {
+  id: string
+  name: string
+  assignments?: Array<{
+    projectRole?: string | null
+    intern?: { user?: { id?: string } }
+  }>
+}
+
 // Fixed 35 days matching the October 2026 mockup
 const october2026Cells: CalendarCell[] = [
-  // Week 1
   { dateString: '2026-09-28', dayNumber: 28, isCurrentMonth: false },
   { dateString: '2026-09-29', dayNumber: 29, isCurrentMonth: false },
   { dateString: '2026-09-30', dayNumber: 30, isCurrentMonth: false, hasBadge: true, badgeValue: 6 },
@@ -132,8 +101,6 @@ const october2026Cells: CalendarCell[] = [
   { dateString: '2026-10-02', dayNumber: 2, isCurrentMonth: true },
   { dateString: '2026-10-03', dayNumber: 3, isCurrentMonth: true },
   { dateString: '2026-10-04', dayNumber: 4, isCurrentMonth: true },
-
-  // Week 2
   { dateString: '2026-10-05', dayNumber: 5, isCurrentMonth: true },
   { dateString: '2026-10-06', dayNumber: 6, isCurrentMonth: true },
   { dateString: '2026-10-07', dayNumber: 7, isCurrentMonth: true },
@@ -141,8 +108,6 @@ const october2026Cells: CalendarCell[] = [
   { dateString: '2026-10-09', dayNumber: 9, isCurrentMonth: true },
   { dateString: '2026-10-10', dayNumber: 10, isCurrentMonth: true },
   { dateString: '2026-10-11', dayNumber: 11, isCurrentMonth: true },
-
-  // Week 3
   { dateString: '2026-10-12', dayNumber: 12, isCurrentMonth: true },
   { dateString: '2026-10-13', dayNumber: 13, isCurrentMonth: true },
   { dateString: '2026-10-14', dayNumber: 14, isCurrentMonth: true },
@@ -150,8 +115,6 @@ const october2026Cells: CalendarCell[] = [
   { dateString: '2026-10-16', dayNumber: 16, isCurrentMonth: true },
   { dateString: '2026-10-17', dayNumber: 17, isCurrentMonth: true },
   { dateString: '2026-10-18', dayNumber: 18, isCurrentMonth: true },
-
-  // Week 4
   { dateString: '2026-10-19', dayNumber: 19, isCurrentMonth: true },
   { dateString: '2026-10-20', dayNumber: 20, isCurrentMonth: true },
   { dateString: '2026-10-21', dayNumber: 21, isCurrentMonth: true },
@@ -159,8 +122,6 @@ const october2026Cells: CalendarCell[] = [
   { dateString: '2026-10-23', dayNumber: 23, isCurrentMonth: true },
   { dateString: '2026-10-24', dayNumber: 24, isCurrentMonth: true },
   { dateString: '2026-10-25', dayNumber: 25, isCurrentMonth: true },
-
-  // Week 5
   { dateString: '2026-10-26', dayNumber: 26, isCurrentMonth: true },
   { dateString: '2026-10-27', dayNumber: 27, isCurrentMonth: true },
   { dateString: '2026-10-28', dayNumber: 28, isCurrentMonth: true },
@@ -172,14 +133,13 @@ const october2026Cells: CalendarCell[] = [
 
 export function CalendarPage() {
   const { user } = useAuth()
-  const isIntern = user?.role === 'intern'
-
-  const [events, setEvents] = useState<CalendarEventItem[]>(initialEvents)
+  const [events, setEvents] = useState<CalendarEventItem[]>([])
   const [currentMonthName, setCurrentMonthName] = useState('October 2026')
   const [currentView, setCurrentView] = useState<'Month' | 'Week' | 'Day'>('Month')
 
   // Top Filters
-  const [selectedProject, setSelectedProject] = useState('Software Dev Alpha')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [projectsList, setProjectsList] = useState<CalendarProject[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState('All Assignees')
   const [selectedStatus, setSelectedStatus] = useState('All Statuses')
 
@@ -191,11 +151,22 @@ export function CalendarPage() {
   // Form State
   const [newEventTitle, setNewEventTitle] = useState('')
   const [newEventDate, setNewEventDate] = useState('2026-10-15')
-  const [newEventTime, setNewEventTime] = useState('')
-  const [newEventType, setNewEventType] = useState<EventColor>('blue')
-  const [newEventProject, setNewEventProject] = useState('Software Dev Alpha')
+  const [newEventProject, setNewEventProject] = useState('')
 
-  // Filtered Events
+  const canManageAllProjects = user?.role === 'ADMIN' || user?.role === 'MENTOR'
+  const managedProjectIds = useMemo(() => new Set(projectsList
+    .filter((project) => project.assignments?.some((assignment) =>
+      assignment.intern?.user?.id === user?.id && assignment.projectRole === 'Scrum Master',
+    ))
+    .map((project) => project.id)), [projectsList, user?.id])
+  const canManageTasks = canManageAllProjects || (user?.role === 'INTERN' && managedProjectIds.size > 0)
+  const canManageNewEventProject = canManageAllProjects || managedProjectIds.has(newEventProject)
+  const canDeleteSelectedEvent = canManageAllProjects ||
+    (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
+  const availableProjectsForNewEvent = canManageAllProjects
+    ? projectsList
+    : projectsList.filter((project) => managedProjectIds.has(project.id))
+
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
       if (selectedProject !== 'All Projects' && ev.project !== selectedProject) return false
@@ -209,39 +180,68 @@ export function CalendarPage() {
     setToastMessage(`Calendar for ${currentMonthName} exported successfully.`)
   }
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!canManageNewEventProject) return
     if (!newEventTitle.trim()) return
 
-    const createdEvent: CalendarEventItem = {
-      id: `ev-${Date.now()}`,
+    const payload = {
       title: newEventTitle.trim(),
-      date: newEventDate,
-      time: newEventTime.trim() || undefined,
-      project: newEventProject,
-      assignee: 'Pat Naidoo',
-      status: 'On Track',
-      color: newEventTime ? 'blue-meeting' : newEventType,
+      projectId: newEventProject,
+      dueDate: newEventDate,
+      priority: 'MEDIUM',
+      status: 'TODO',
     }
 
-    setEvents((prev) => [...prev, createdEvent])
-    setIsAddModalOpen(false)
-    setNewEventTitle('')
-    setNewEventTime('')
-    setToastMessage(`Event "${createdEvent.title}" added to calendar.`)
+    try {
+      await Tasks.create(payload)
+      const data = await Tasks.getCalendarEvents()
+      setEvents((data as ApiCalendarTask[]).map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null))
+      
+      setIsAddModalOpen(false)
+      setNewEventTitle('')
+      setToastMessage('Task saved and added to the calendar.')
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage(error.response?.data?.message || 'Permission Denied: You do not have Scrum Master rights for this project.')
+    }
   }
 
-  const handleDeleteEvent = (id: string) => {
-    setEvents((prev) => prev.filter((ev) => ev.id !== id))
-    setSelectedEvent(null)
-    setToastMessage('Event removed.')
+  const handleDeleteEvent = async (id: string) => {
+    if (!canManageAllProjects && !(user?.role === 'INTERN' && managedProjectIds.has(events.find((event) => event.id === id)?.project ?? ''))) return
+    try {
+      await Tasks.delete(id)
+      setEvents((prev) => prev.filter((ev) => ev.id !== id))
+      setSelectedEvent(null)
+      setToastMessage('Event deleted from database.')
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage('Permission Denied: Cannot delete this event.')
+    }
   }
+
+  useEffect(() => {
+    Projects.list()
+      .then((response) => {
+        const data = (Array.isArray(response) ? response : (response as any).data) as CalendarProject[]
+        setProjectsList(data)
+        if (data.length > 0) {
+          setSelectedProject(data[0].id)
+          setNewEventProject(data[0].id)
+        }
+      })
+      .catch(err => console.error("Failed to load projects:", err))
+  }, [])
+
+  useEffect(() => {
+    Tasks.getCalendarEvents()
+      .then((data) => setEvents((data as ApiCalendarTask[]).map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null)))
+      .catch(err => console.error("Failed to load calendar events:", err))
+  }, [])
 
   return (
     <main className={styles.page}>
-      {/* Top Controls Section */}
       <section className={styles.topSection} aria-label="Calendar controls">
-        {/* Action Buttons Row */}
         <div className={styles.actionRow}>
           <button
             type="button"
@@ -253,22 +253,25 @@ export function CalendarPage() {
             <span>Export</span>
           </button>
 
-          {!isIntern && (
+          {canManageTasks && (
             <button
               type="button"
               className={styles.addEventButton}
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                if (user?.role === 'INTERN' && !managedProjectIds.has(newEventProject)) {
+                  setNewEventProject(availableProjectsForNewEvent[0]?.id ?? '')
+                }
+                setIsAddModalOpen(true)
+              }}
               id="calendar-add-event-btn"
             >
               <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
-              <span>Add Event</span>
+              <span>Add Task</span>
             </button>
           )}
         </div>
 
-        {/* Filters Row */}
         <div className={styles.filtersRow}>
-          {/* Project Filter */}
           <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
@@ -276,16 +279,15 @@ export function CalendarPage() {
               onChange={(e) => setSelectedProject(e.target.value)}
               aria-label="Filter by project"
             >
-              <option value="Software Dev Alpha">Software Dev Alpha</option>
-              <option value="Network Security Audit">Network Security Audit</option>
-              <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-              <option value="Mobile App Beta">Mobile App Beta</option>
-              <option value="All Projects">All Projects</option>
+              {projectsList.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
 
-          {/* Assignees Filter */}
           <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
@@ -294,15 +296,13 @@ export function CalendarPage() {
               aria-label="Filter by assignee"
             >
               <option value="All Assignees">All Assignees</option>
-              <option value="Pat Naidoo">Pat Naidoo</option>
-              <option value="Morgan Mentor">Morgan Mentor</option>
-              <option value="Sarah Johnson">Sarah Johnson</option>
-              <option value="Thabo Molefe">Thabo Molefe</option>
+              {[...new Set(events.map((event) => event.assignee))].map((assignee) => (
+                <option key={assignee} value={assignee}>{assignee}</option>
+              ))}
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
 
-          {/* Statuses Filter */}
           <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
@@ -311,20 +311,18 @@ export function CalendarPage() {
               aria-label="Filter by status"
             >
               <option value="All Statuses">All Statuses</option>
-              <option value="On Track">On Track</option>
+              <option value="To Do">To Do</option>
               <option value="In Progress">In Progress</option>
+              <option value="Submitted">Submitted</option>
               <option value="Completed">Completed</option>
-              <option value="Pending Review">Pending Review</option>
-              <option value="At Risk">At Risk</option>
+              <option value="Blocked">Blocked</option>
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
           </div>
         </div>
       </section>
 
-      {/* Main Calendar Card */}
       <section className={styles.calendarCard} aria-labelledby="calendar-month-heading">
-        {/* Calendar Card Toolbar */}
         <div className={styles.calendarToolbar}>
           <div className={styles.navigationControls}>
             <div className={styles.navButtonGroup}>
@@ -359,7 +357,6 @@ export function CalendarPage() {
             </button>
           </div>
 
-          {/* View Switcher Tabs */}
           <div className={styles.viewSwitcher} role="tablist" aria-label="Calendar view selector">
             {(['Month', 'Week', 'Day'] as const).map((view) => (
               <button
@@ -376,10 +373,8 @@ export function CalendarPage() {
           </div>
         </div>
 
-        {/* View Content */}
         {currentView === 'Month' ? (
           <div>
-            {/* Days Header */}
             <div className={styles.daysHeader} role="row">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
                 <div key={day} className={styles.dayLabel} role="columnheader">
@@ -387,8 +382,6 @@ export function CalendarPage() {
                 </div>
               ))}
             </div>
-
-            {/* 35 Calendar Cells */}
             <div className={styles.monthGrid} role="grid">
               {october2026Cells.map((cell) => {
                 const cellEvents = filteredEvents.filter((ev) => ev.date === cell.dateString)
@@ -408,29 +401,14 @@ export function CalendarPage() {
 
                     <div className={styles.eventList}>
                       {cellEvents.map((ev) => {
-                        if (ev.color === 'blue-meeting') {
-                          return (
-                            <button
-                              key={ev.id}
-                              type="button"
-                              className={`${styles.eventPill} ${styles.eventBlueMeeting}`}
-                              onClick={() => setSelectedEvent(ev)}
-                              title={`${ev.time ? `${ev.time} ` : ''}${ev.title}`}
-                            >
-                              <span className={styles.meetingDot} aria-hidden="true" />
-                              <span>{ev.time ? `${ev.time} ` : ''}{ev.title}</span>
-                            </button>
-                          )
-                        }
-
                         const colorClass =
                           ev.color === 'green'
                             ? styles.eventGreen
                             : ev.color === 'amber'
-                            ? styles.eventAmber
-                            : ev.color === 'red'
-                            ? styles.eventRed
-                            : styles.eventBlue
+                              ? styles.eventAmber
+                              : ev.color === 'red'
+                                ? styles.eventRed
+                                : styles.eventBlue
 
                         return (
                           <button
@@ -451,7 +429,6 @@ export function CalendarPage() {
             </div>
           </div>
         ) : currentView === 'Week' ? (
-          /* Week View */
           <div className={styles.weekContainer}>
             <div className={styles.weekHeader}>
               {['Mon 5', 'Tue 6', 'Wed 7', 'Thu 8', 'Fri 9', 'Sat 10', 'Sun 11'].map((dayStr, index) => {
@@ -466,18 +443,17 @@ export function CalendarPage() {
                         <button
                           key={ev.id}
                           type="button"
-                          className={`${styles.eventPill} ${
-                            ev.color === 'green'
-                              ? styles.eventGreen
-                              : ev.color === 'amber'
+                          className={`${styles.eventPill} ${ev.color === 'green'
+                            ? styles.eventGreen
+                            : ev.color === 'amber'
                               ? styles.eventAmber
                               : ev.color === 'red'
-                              ? styles.eventRed
-                              : styles.eventBlue
-                          }`}
+                                ? styles.eventRed
+                                : styles.eventBlue
+                            }`}
                           onClick={() => setSelectedEvent(ev)}
                         >
-                          {ev.time ? `${ev.time} ` : ''}{ev.title}
+                          {ev.title}
                         </button>
                       ))}
                     </div>
@@ -487,7 +463,6 @@ export function CalendarPage() {
             </div>
           </div>
         ) : (
-          /* Day View */
           <div className={styles.weekContainer}>
             <div style={{ maxWidth: 500, margin: '0 auto', width: '100%' }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
@@ -509,7 +484,7 @@ export function CalendarPage() {
                     >
                       <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>{ev.title}</h4>
                       <p style={{ margin: '4px 0 0', fontSize: 12, color: '#718096' }}>
-                        Project: {ev.project} • Assignee: {ev.assignee} • Status: {ev.status}
+                        Project: {ev.projectName} • Assignee: {ev.assignee} • Status: {ev.status}
                       </p>
                     </div>
                   ))}
@@ -519,11 +494,10 @@ export function CalendarPage() {
         )}
       </section>
 
-      {/* Add Event Modal */}
       <Modal
         open={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Add Calendar Event"
+        title="Add Task to Calendar"
         maxWidth="sm"
         fullWidth
         actions={
@@ -532,7 +506,7 @@ export function CalendarPage() {
               Cancel
             </Button>
             <Button appearance="primary" onClick={handleAddEvent}>
-              Save Event
+              Save Task
             </Button>
           </div>
         }
@@ -541,13 +515,13 @@ export function CalendarPage() {
           <form className={styles.modalForm} onSubmit={handleAddEvent} id="new-event-form">
             <div className={styles.formGroup}>
               <label htmlFor="event-title-input" className={styles.formLabel}>
-                Event Title
+                Task Title
               </label>
               <input
                 id="event-title-input"
                 type="text"
                 className={styles.formInput}
-                placeholder="e.g. Design Review Meeting"
+                placeholder="e.g. Build the login page"
                 value={newEventTitle}
                 onChange={(e) => setNewEventTitle(e.target.value)}
                 required
@@ -569,18 +543,6 @@ export function CalendarPage() {
                 />
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="event-time-input" className={styles.formLabel}>
-                  Time (Optional)
-                </label>
-                <input
-                  id="event-time-input"
-                  type="time"
-                  className={styles.formInput}
-                  value={newEventTime}
-                  onChange={(e) => setNewEventTime(e.target.value)}
-                />
-              </div>
             </div>
 
             <div className={styles.formGroup}>
@@ -593,34 +555,18 @@ export function CalendarPage() {
                 value={newEventProject}
                 onChange={(e) => setNewEventProject(e.target.value)}
               >
-                <option value="Software Dev Alpha">Software Dev Alpha</option>
-                <option value="Network Security Audit">Network Security Audit</option>
-                <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-                <option value="Mobile App Beta">Mobile App Beta</option>
+                {availableProjectsForNewEvent.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="event-type-select" className={styles.formLabel}>
-                Category / Color
-              </label>
-              <select
-                id="event-type-select"
-                className={styles.modalSelect}
-                value={newEventType}
-                onChange={(e) => setNewEventType(e.target.value as EventColor)}
-              >
-                <option value="blue">Blue (Specs / General)</option>
-                <option value="green">Green (Schema / API)</option>
-                <option value="amber">Amber (UI / Milestone)</option>
-                <option value="red">Red (Security / Critical)</option>
-              </select>
-            </div>
           </form>
         </DialogContent>
       </Modal>
 
-      {/* Event Details Modal */}
       {selectedEvent && (
         <Modal
           open={Boolean(selectedEvent)}
@@ -629,8 +575,8 @@ export function CalendarPage() {
           maxWidth="xs"
           fullWidth
           actions={
-            <div style={{ display: 'flex', gap: '10px', justifyContent: isIntern ? 'flex-end' : 'space-between', width: '100%' }}>
-              {!isIntern && (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: canDeleteSelectedEvent ? 'space-between' : 'flex-end', width: '100%' }}>
+              {canDeleteSelectedEvent && (
                 <Button appearance="danger" onClick={() => handleDeleteEvent(selectedEvent.id)}>
                   Delete
                 </Button>
@@ -643,11 +589,10 @@ export function CalendarPage() {
         >
           <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0', fontSize: '13.5px' }}>
             <p style={{ margin: '0 0 10px' }}>
-              <strong>Project:</strong> {selectedEvent.project}
+              <strong>Project:</strong> {selectedEvent.projectName}
             </p>
             <p style={{ margin: '0 0 10px' }}>
               <strong>Date:</strong> {selectedEvent.date}
-              {selectedEvent.time ? ` at ${selectedEvent.time}` : ''}
             </p>
             <p style={{ margin: '0 0 10px' }}>
               <strong>Assignee:</strong> {selectedEvent.assignee}
@@ -659,7 +604,6 @@ export function CalendarPage() {
         </Modal>
       )}
 
-      {/* Snackbar feedback notification */}
       <Snackbar
         open={Boolean(toastMessage)}
         autoHideDuration={3500}
@@ -668,7 +612,7 @@ export function CalendarPage() {
       >
         <Alert
           onClose={() => setToastMessage(null)}
-          severity="success"
+          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') ? 'error' : 'success'}
           sx={{ width: '100%', borderRadius: '8px' }}
         >
           {toastMessage}

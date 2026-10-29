@@ -51,6 +51,22 @@ export class EmailController {
         }
     };
 
+    public static sendForgotPasswordOTP = async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                res.status(400).json({ error: 'Email address is required in body.' });
+                return;
+            }
+
+            await EmailController.emailService.sendForgotPasswordOTP(email);
+
+            res.status(200).json({ message: `If that email is in our system, an OTP has been sent.` });
+        } catch (error: any) {
+            res.status(500).json({ error: error.message || 'Failed to send OTP.' });
+        }
+    }
+
     public static getNotifications = async (req: Request, res: Response): Promise<void> => {
         try {
             const userId = (req as any).user?.id;
@@ -115,6 +131,32 @@ export class EmailController {
         }
     };
 
+
+    /** Deletes one of the caller's own notifications (the bell and the Notifications page). */
+    public static deleteNotification = async (req: Request, res: Response): Promise<void> => {
+        try {
+            const userId = (req as any).user?.id;
+            const notificationId = req.params.id;
+
+            if (!userId) {
+                res.status(401).json({ error: 'Unauthorized' });
+                return;
+            }
+
+            const deleted = await prisma.notification.deleteMany({
+                where: { id: notificationId as string, userId }
+            });
+
+            if (deleted.count === 0) {
+                res.status(404).json({ error: 'Notification not found or access denied.' });
+                return;
+            }
+
+            res.status(200).json({ message: 'Notification deleted.' });
+        } catch (error: any) {
+            res.status(500).json({ error: error.message || 'Failed to delete notification.' });
+        }
+    };
 
     public static sendContactMessage = async (req: Request, res: Response): Promise<void> => {
         try {
@@ -206,4 +248,6 @@ export class EmailController {
             res.status(500).json({ error: error.message || 'Failed to fetch email logs.' });
         }
     };
+
+
 }

@@ -161,6 +161,8 @@ model User {
   reviewedApplications Application[]       @relation("ApplicationReviewer")
   createdPositions     Position[]          @relation("PositionCreator")
   createdProjects      Project[]           @relation("ProjectCreator")
+    createdTeams         Team[]              @relation("TeamCreator")
+    createdTeams         Team[]              @relation("TeamCreator")
   assignmentsMade      ProjectAssignment[] @relation("AssignmentMadeBy")
   createdTasks         Task[]              @relation("TaskCreator")
   approvedTasks        Task[]              @relation("TaskApprover")
@@ -396,6 +398,7 @@ model Intern {
   skills      InternSkill[]
   documents   Document[]
   assignments ProjectAssignment[]
+    teamMemberships TeamMember[]
   tasks       Task[]              @relation("TaskAssignee")
   evaluations Evaluation[]
 
@@ -439,6 +442,35 @@ model Mentor {
 
   @@index([departmentId])
   @@map("mentors")
+}
+
+/// Team Builder: a reusable group of interns a mentor assembles before creating a project.
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User?        @relation("TeamCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members   TeamMember[]
+
+  @@index([createdById])
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String   @id @default(uuid())
+  teamId   String
+  internId String
+  addedAt  DateTime @default(now())
+
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, internId])
+  @@index([internId])
+  @@map("team_members")
 }
 
 model Project {

@@ -70,6 +70,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <AdminDashboardPage /> }, { path: 'applicants', element: <ApplicantsPage /> }, { path: 'interns', element: <InternsPage /> },
       { path: 'interns/:internId', element: <InternProfilePage /> }, { path: 'campuses', element: <CampusesIntakesPage /> }, { path: 'past-interns', element: <PastInternsPage /> },
       { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'team-builder/:projectId', element: <TeamBuilderPage /> },
+      { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'team-builder', element: <TeamBuilderPage /> },
       { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> }, { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> },
       { path: 'reports', element: <ReportsPage /> }, { path: 'users', element: <UsersPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'emails', element: <EmailTemplatesPage /> },
       { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
@@ -80,12 +81,15 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <MentorDashboardPage /> }, { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> },
       { path: 'team-builder/:projectId', element: <TeamBuilderPage /> }, { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> },
       { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+      { path: 'dashboard', element: <MentorDashboardPage /> }, { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> },
+    { path: 'team-builder', element: <TeamBuilderPage /> }, { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> },
     ]
   },
   {
     path: '/intern', element: guarded(['INTERN'], <DashboardLayout />), children: [
       { path: 'project', element: <MyProjectPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'tasks', element: <InternTaskBoardPage /> },
-      { path: 'calendar', element: <CalendarPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+      { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> }, { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
     ]
   },
   { path: '/403', element: <NotFoundPage /> }, { path: '*', element: <NotFoundPage /> },

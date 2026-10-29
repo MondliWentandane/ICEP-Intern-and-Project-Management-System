@@ -9,6 +9,9 @@ import {
   deleteProject,
   assignProjectMember,
   removeProjectMember,
+  listProjectMembers,
+  setProjectMembers,
+  updateProjectMember,
 } from "../controllers/ProjectController";
 import { AuthMiddleware, notImplemented } from "./guards";
 
@@ -34,12 +37,15 @@ router.post("/projects/assign", adminOrMentor, notImplemented("POST /projects/as
 router.get("/projects/:id", anyRole, ownershipCheck, getProject);
 router.put("/projects/:id", adminOrMentor, ownershipCheck, updateProject);
 router.put("/projects/:id/status", adminOrMentor, ownershipCheck, updateProject);
-router.delete("/projects/:id", adminOnly, deleteProject);
+// Mentors can delete the projects they supervise (ownershipCheck); admins can delete any.
+router.delete("/projects/:id", adminOrMentor, ownershipCheck, deleteProject);
 
 // ---- Project team (members + their roles) ---------------------------------------------
-router.get("/projects/:id/members", anyRole, ownershipCheck, notImplemented("GET /projects/:id/members"));
+router.get("/projects/:id/members", anyRole, ownershipCheck, listProjectMembers);
+// Sets the whole team at once: body { members: [{ internId, projectRole }] }. An intern can be in several groups.
+router.put("/projects/:id/members", adminOrMentor, ownershipCheck, setProjectMembers);
 router.post("/projects/:id/members", adminOrMentor, ownershipCheck, assignProjectMember);
-router.put("/projects/:id/members/:internId", adminOrMentor, ownershipCheck, notImplemented("PUT /projects/:id/members/:internId"));
+router.put("/projects/:id/members/:internId", adminOrMentor, ownershipCheck, updateProjectMember);
 router.delete("/projects/:id/members/:internId", adminOrMentor, ownershipCheck, removeProjectMember);
 
 // ---- Mentors (supervisor dropdown) -------------------------------------------------------

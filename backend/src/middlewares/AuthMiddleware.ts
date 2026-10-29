@@ -3,11 +3,14 @@ import type { NextFunction, Response } from "express";
 import type { Request } from "express";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { authRepository } from "../repositories/AuthRepository";
+import internService from "../services/InternService";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     role: string;
+    name: string;
+    email: string;
   };
 }
 
@@ -75,9 +78,21 @@ export const verifyToken = async (
       return;
     }
 
+    if (
+  user.role === "INTERN" &&
+  (await internService.hasInternshipEnded(user.id))
+) {
+  res.status(403).json({
+    message: "Your internship has ended. Access is no longer permitted.",
+  });
+  return;
+}
+
     req.user = {
       id: user.id,
       role: user.role,
+      name: user.fullName,
+      email: user.email,
     };
 
     next();

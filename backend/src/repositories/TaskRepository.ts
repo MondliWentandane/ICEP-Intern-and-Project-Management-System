@@ -21,6 +21,33 @@ export class TaskRepository {
   static async getTasks(where: Prisma.TaskWhereInput = {}) {
     return prisma.task.findMany({
       where,
+      include: {
+        project: { select: { name: true } },
+        assignedTo: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { createdAt: "desc" }
+    });
+  }
+
+  static async getInternBoardTasks(internId: string) {
+    return prisma.task.findMany({
+      where: {
+        project: {
+          assignments: {
+            some: { internId, leftAt: null }
+          }
+        }
+      },
+      include: {
+        project: true,
+        assignedTo: {
+          include: {
+            user: {
+              select: { fullName: true }
+            }
+          }
+        }
+      },
       orderBy: { createdAt: "desc" }
     });
   }
@@ -28,7 +55,10 @@ export class TaskRepository {
   static async getProjectTasks(projectId: string) {
     return prisma.task.findMany({
       where: { projectId },
-      include: { subtasks: true },
+      include: {
+        subtasks: true,
+        assignedTo: { include: { user: { select: { fullName: true } } } },
+      },
       orderBy: { position: "asc" }
     });
   }
@@ -75,6 +105,25 @@ export class TaskRepository {
         approvedAt: new Date(),
         approvedById
       }
+    });
+  }
+
+  static async requestTaskChanges(id: string, authorId: string, feedback: string) {
+    return prisma.$transaction(async (transaction) => {
+      const result = await transaction.task.updateMany({
+        where: { id, status: "COMPLETED", approvedAt: null },
+        data: { status: "IN_PROGRESS", completedAt: null }
+      });
+
+      if (result.count !== 1) {
+        throw new Error("Task is no longer waiting for review");
+      }
+
+      await transaction.taskComment.create({
+        data: { taskId: id, authorId, body: feedback }
+      });
+
+      return transaction.task.findUniqueOrThrow({ where: { id } });
     });
   }
 

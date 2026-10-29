@@ -1,5 +1,6 @@
-
+import { TaskStatus } from "@prisma/client";
 import { TaskRepository } from "../repositories/TaskRepository";
+import { notificationService } from "./NotificationService";
 
 type TaskUser = {
     id: string;
@@ -24,26 +25,41 @@ export class TaskService {
             return project;
         }
 
-        if (user.role !== "MENTOR") {
-            throw new Error("Permission denied");
+        if (user.role === "MENTOR") {
+            const mentor = await TaskRepository.getMentorByUserId(user.id);
+            if (!mentor || project.supervisorId !== mentor.id) {
+                throw new Error("You are not authorized to manage this project");
+            }
+            return project;
         }
 
-        // Find the mentor record linked to this user
-        const mentor = await TaskRepository.getMentorByUserId(user.id);
+        // ENFORCE SCRUM MASTER RULE
+        if (user.role === "INTERN") {
+            const intern = await TaskRepository.getInternByUserId(user.id);
+            if (!intern) throw new Error("Permission denied");
 
-        if (!mentor || project.supervisorId !== mentor.id) {
-            throw new Error("You are not authorized to manage this project");
+            const assignment = await TaskRepository.getProjectAssignment(projectId, intern.id);
+
+            // The intern must be on the team AND have the Scrum Master role
+            if (!assignment || assignment.leftAt !== null || assignment.projectRole !== "Scrum Master") {
+                throw new Error("You must be the designated Scrum Master to manage tasks for this project.");
+            }
+            return project;
         }
 
-        return project;
+        throw new Error("Permission denied");
     }
 
     // Create a new task
     static async createTask(data: {
         title: string;
         projectId: string;
-        description?: string;
-        assignedToId?: string;
+        description?: string | null;
+        priority?: "LOW" | "MEDIUM" | "HIGH";
+        status?: TaskStatus;
+        startDate?: string | Date | null;
+        dueDate?: string | Date | null;
+        assignedToId?: string | null;
         createdById: string;
     }, user: TaskUser) {
 
@@ -53,6 +69,27 @@ export class TaskService {
 
         if (typeof data.projectId !== "string" || !data.projectId.trim()) {
             throw new Error("Project ID is required");
+        }
+
+        if (data.priority !== undefined &&
+            !["LOW", "MEDIUM", "HIGH"].includes(data.priority)) {
+            throw new Error("Invalid task priority");
+        }
+
+        const parseOptionalDate = (value: string | Date | null | undefined, label: string) => {
+            if (value == null || value === "") return null;
+            const parsed = value instanceof Date ? value : new Date(value);
+            if (Number.isNaN(parsed.getTime())) throw new Error(label + " must be a valid date");
+            return parsed;
+        };
+        const startDate = parseOptionalDate(data.startDate, "Start date");
+        const dueDate = parseOptionalDate(data.dueDate, "Due date");
+
+        if (startDate && dueDate && dueDate < startDate) {
+            throw new Error("Due date must be on or after the start date");
+        }
+        if (data.status && !Object.values(TaskStatus).includes(data.status)) {
+            throw new Error("Invalid task status");
         }
 
         await this.checkProjectAccess(data.projectId, user);
@@ -75,16 +112,22 @@ export class TaskService {
             }
         }
 
-        return TaskRepository.createTask({
+        const task = await TaskRepository.createTask({
             title: data.title.trim(),
             projectId: data.projectId,
             description: data.description,
-            assignedToId: data.assignedToId,
+            priority: data.priority,
+            status: data.status ?? TaskStatus.TODO,
+            startDate,
+            dueDate,
+            assignedToId: data.assignedToId || null,
             createdById: user.id
         });
+        if (data.assignedToId) await notificationService.taskAssigned(task.id);
+        return task;
     }
 
-    
+
     // Retrieve a task with authorization
     static async getTask(id: string, user: TaskUser) {
 
@@ -118,8 +161,8 @@ export class TaskService {
 
         throw new Error("Permission denied");
     }
- 
-     
+
+
     // Retrieve all tasks visible to a user
     static async getTasks(user: TaskUser) {
         if (user.role === "ADMIN") {
@@ -147,9 +190,14 @@ export class TaskService {
                 throw new Error("Permission denied");
             }
 
-            return TaskRepository.getTasks({
-                assignedToId: intern.id
-            });
+            const tasks = await TaskRepository.getInternBoardTasks(intern.id);
+            return tasks.map(task => ({
+                ...task,
+                canUpdateStatus:
+                    task.assignedToId === intern.id &&
+                    task.project.status !== "COMPLETED" &&
+                    task.status !== "COMPLETED"
+            }));
         }
 
         throw new Error("Permission denied");
@@ -182,10 +230,8 @@ export class TaskService {
                 throw new Error("Permission denied");
             }
 
-            return TaskRepository.getTasks({
-                projectId,
-                assignedToId: intern.id
-            });
+            // Return ALL project tasks so the intern can see the team's progress
+            return TaskRepository.getProjectTasks(projectId);
         }
 
         throw new Error("Permission denied");
@@ -215,14 +261,16 @@ export class TaskService {
 
         throw new Error("Permission denied");
     }
-   
+
     static async updateTask(
         id: string,
         data: {
             title?: string;
-            description?: string;
+            description?: string | null;
             priority?: "LOW" | "MEDIUM" | "HIGH";
             progress?: number;
+            dueDate?: string | Date | null;
+            assignedToId?: string | null;
         },
         user: TaskUser
     ) {
@@ -241,12 +289,44 @@ export class TaskService {
 
         if (data.progress !== undefined &&
             (!Number.isInteger(data.progress) ||
-             data.progress < 0 ||
-             data.progress > 100)) {
+                data.progress < 0 ||
+                data.progress > 100)) {
             throw new Error("Progress must be between 0 and 100");
         }
 
-        return TaskRepository.updateTask(id, {
+        if (data.priority !== undefined &&
+            !["LOW", "MEDIUM", "HIGH"].includes(data.priority)) {
+            throw new Error("Invalid task priority");
+        }
+
+        const dueDate = data.dueDate === undefined
+            ? undefined
+            : data.dueDate === null || data.dueDate === ""
+                ? null
+                : data.dueDate instanceof Date
+                    ? data.dueDate
+                    : new Date(data.dueDate);
+
+        if (dueDate && Number.isNaN(dueDate.getTime())) {
+            throw new Error("Due date must be a valid date");
+        }
+
+        if (data.assignedToId !== undefined && data.assignedToId !== null) {
+            if (typeof data.assignedToId !== "string" || !data.assignedToId.trim()) {
+                throw new Error("Invalid intern ID");
+            }
+
+            const intern = await TaskRepository.getIntern(data.assignedToId);
+            const assignment = intern
+                ? await TaskRepository.getProjectAssignment(task.projectId, intern.id)
+                : null;
+
+            if (!assignment || assignment.leftAt !== null) {
+                throw new Error("Intern is not actively assigned to this project");
+            }
+        }
+
+        const updatedTask = await TaskRepository.updateTask(id, {
             ...(data.title !== undefined && {
                 title: data.title.trim()
             }),
@@ -258,8 +338,20 @@ export class TaskService {
             }),
             ...(data.progress !== undefined && {
                 progress: data.progress
+            }),
+            ...(dueDate !== undefined && {
+                dueDate
+            }),
+            ...(data.assignedToId !== undefined && {
+                assignedToId: data.assignedToId
             })
         });
+
+        if (data.assignedToId && data.assignedToId !== task.assignedToId) {
+            await notificationService.taskAssigned(id);
+        }
+
+        return updatedTask;
     }
 
     static async deleteTask(id: string, user: TaskUser) {
@@ -285,16 +377,49 @@ export class TaskService {
             throw new Error("Task not found");
         }
 
-        await this.checkProjectAccess(task.projectId, user);
-
         if (!["TODO", "IN_PROGRESS", "COMPLETED"].includes(status)) {
             throw new Error("Invalid task status");
         }
 
-        return TaskRepository.updateTaskStatus(id, status);
+        if (user.role === "INTERN") {
+            const intern = await TaskRepository.getInternByUserId(user.id);
+            const assignment = intern
+                ? await TaskRepository.getProjectAssignment(task.projectId, intern.id)
+                : null;
+
+            if (
+                !intern ||
+                task.assignedToId !== intern.id ||
+                !assignment ||
+                assignment.leftAt !== null
+            ) {
+                throw new Error("Permission denied");
+            }
+
+            if (task.project.status === "COMPLETED") {
+                throw new Error("Tasks in completed projects cannot be changed");
+            }
+
+            const nextStatus =
+                task.status === "TODO" ? "IN_PROGRESS" :
+                    task.status === "IN_PROGRESS" ? "COMPLETED" : null;
+
+            if (status !== nextStatus) {
+                throw new Error("Interns can only advance their own tasks from TODO to IN_PROGRESS to COMPLETED");
+            }
+        } else {
+            await this.checkProjectAccess(task.projectId, user);
+        }
+
+        const updated = await TaskRepository.updateTaskStatus(id, status);
+        // An intern finishing their task asks the supervising mentor to review it.
+        if (status === "COMPLETED" && task.status !== "COMPLETED" && user.role === "INTERN") {
+            await notificationService.taskSubmitted(id);
+        }
+        return updated;
     }
-    
-    
+
+
     // Gantt chart data for a project
     static async getGanttData(
         projectId: string,
@@ -305,10 +430,16 @@ export class TaskService {
         return tasks.map(task => ({
             id: task.id,
             title: task.title,
+            description: task.description,
+            category: task.category,
+            projectId: task.projectId,
+            assignedToId: task.assignedToId,
+            assigneeName: task.assignedTo?.user.fullName ?? null,
             startDate: task.startDate,
             endDate: task.dueDate,
             progress: task.progress,
             status: task.status,
+            approvedAt: task.approvedAt,
             parentId: task.parentId
         }));
     }
@@ -323,13 +454,17 @@ export class TaskService {
                 id: task.id,
                 title: task.title,
                 projectId: task.projectId,
+                projectName: task.project.name,
+                assignedToId: task.assignedToId,
+                assigneeName: task.assignedTo?.user.fullName ?? null,
                 startDate: task.startDate,
                 dueDate: task.dueDate,
-                status: task.status
+                status: task.status,
+                approvedAt: task.approvedAt
             }));
     }
-   
-    
+
+
     // Assign or unassign an intern
     static async assignTo(
         id: string,
@@ -368,7 +503,9 @@ export class TaskService {
             }
         }
 
-        return TaskRepository.assignTask(id, internId);
+        const assigned = await TaskRepository.assignTask(id, internId);
+        if (internId) await notificationService.taskAssigned(id);
+        return assigned;
     }
 
     // Approve a completed task
@@ -391,7 +528,9 @@ export class TaskService {
             throw new Error("Task already approved");
         }
 
-        return TaskRepository.approveTask(id, user.id);
+        const approved = await TaskRepository.approveTask(id, user.id);
+        await notificationService.taskApproved(id);
+        return approved;
     }
 
     // Retrieve subtasks
@@ -474,5 +613,5 @@ export class TaskService {
         );
     }
 
-    
+
 }

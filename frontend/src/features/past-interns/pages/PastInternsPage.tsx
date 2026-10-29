@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Avatar, Box, Button as MuiButton, Chip, IconButton, InputAdornment, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
+import { Avatar, Box, Button as MuiButton, Chip, InputAdornment, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
+import { keyframes } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Archive, CircleCheck, Clock, Download, FileX, Search } from 'lucide-react'
+import { Archive, CircleCheck, Clock, Download, FileX, Search } from 'lucide-react'
 import { Link as RouterLink } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { TableEmpty, TableError, TableLoading } from '@/components/data/TableStates'
@@ -34,6 +35,34 @@ function FilterSelect({ label, value, onChange, all, options }: { label: string;
 
 const headCellSx = { fontSize: 12, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '.03em', whiteSpace: 'nowrap' } as const
 
+const rowRise = keyframes`
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+`
+/** Rows rise in one by one and pop out in ICEP navy on hover (same as Applicants and Interns). */
+const rowSx = (index: number) => ({
+  animation: `${rowRise} .4s cubic-bezier(.2,.8,.2,1) ${index * 45}ms backwards`,
+  transition: 'background-color .25s ease, transform .3s cubic-bezier(.2,.8,.2,1), filter .3s ease',
+  '&.MuiTableRow-hover:hover': {
+    position: 'relative', zIndex: 1, bgcolor: 'primary.main',
+    transform: 'scale(1.006, 1.04)', filter: 'drop-shadow(0 8px 14px rgba(27,58,92,.3))',
+  },
+  '&:hover .MuiTableCell-root, &:hover .MuiTypography-root': { color: '#fff', borderBottomColor: 'transparent' },
+  '&:hover .muted': { color: '#C8D5E6' },
+  '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,.16)', color: '#fff' },
+  '&:hover .view-profile': { borderColor: '#fff' },
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none', '&.MuiTableRow-hover:hover': { transform: 'none' } },
+})
+
+/** Same "View profile" button as the Interns page: white, navy text, navy fill on hover. */
+const viewProfileSx = {
+  textTransform: 'none', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 13, px: 1.75, py: 1, lineHeight: 1.2,
+  bgcolor: '#fff', color: 'primary.main', border: '1px solid', borderColor: 'var(--icep-border)', borderRadius: 'var(--icep-radius-md)',
+  transition: 'background-color .2s, color .2s, border-color .2s',
+  '&:hover': { bgcolor: 'primary.main', color: '#fff', borderColor: 'primary.main' },
+  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+} as const
+
 export function PastInternsPage() {
   const { data: records = [], isLoading, isError, refetch } = useQuery({ queryKey: ['past-interns'], queryFn: fetchPastInterns })
   const [search, setSearch] = useState('')
@@ -64,7 +93,7 @@ export function PastInternsPage() {
   return (
     <Box sx={{ display: 'grid', gap: 2.5 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        <Typography sx={{ color: 'text.secondary' }}>Archive of completed internships and final records.</Typography>
+        <Typography sx={{ color: 'text.secondary' }}>Internships that have ended: completed, resigned or terminated. Ended interns can no longer log in.</Typography>
         <Button appearance="secondary" startIcon={<Download size={18} />} onClick={exportCsv} disabled={isLoading || !filtered.length}>Export CSV</Button>
       </Box>
 
@@ -73,7 +102,7 @@ export function PastInternsPage() {
           <StatTile icon={<Archive size={20} />} tint={{ bgcolor: '#DBEAFE', color: '#1D4ED8' }} value={String(stats.completed)} label="Completed internships" />
           <StatTile icon={<CircleCheck size={20} />} tint={{ bgcolor: 'var(--icep-active-tint)', color: '#166534' }} value={`${stats.completionRate}%`} label="Completion rate" />
           <StatTile icon={<Clock size={20} />} tint={{ bgcolor: 'var(--icep-pending-tint)', color: '#B45309' }} value={`${stats.averageMonths} mo`} label="Average duration" />
-          <StatTile icon={<FileX size={20} />} tint={{ bgcolor: 'var(--icep-rejected-tint)', color: '#B91C1C' }} value={String(stats.missingReports)} label="Missing final reports" />
+          <StatTile icon={<FileX size={20} />} tint={{ bgcolor: 'var(--icep-rejected-tint)', color: '#B91C1C' }} value={String(stats.endedEarly)} label="Ended early" />
         </Box>
       )}
 
@@ -94,26 +123,29 @@ export function PastInternsPage() {
             <Table aria-label="Past interns">
               <TableHead><TableRow>
                 {['Intern', 'Campus', 'Project', 'Mentor', 'Period', 'Outcome'].map((heading) => <TableCell key={heading} sx={headCellSx}>{heading}</TableCell>)}
-                <TableCell sx={headCellSx}><Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>Open</Box></TableCell>
+                <TableCell sx={headCellSx}>Profile</TableCell>
               </TableRow></TableHead>
               <TableBody>
-                {pageRows.map((record) => (
-                  <TableRow key={record.id} hover>
+                {pageRows.map((record, index) => (
+                  <TableRow key={record.id} hover sx={rowSx(index)}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 700, bgcolor: '#E4E9F1', color: 'primary.main' }}>{initials(record.name)}</Avatar>
-                        <Box><Typography sx={{ fontSize: 14 }}>{record.name}</Typography><Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{record.email}</Typography></Box>
+                        <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 700, bgcolor: '#E2E8F0', color: '#718096' }}>{initials(record.name)}</Avatar>
+                        <Box><Typography sx={{ fontSize: 14 }}>{record.name}</Typography><Typography className="muted" sx={{ fontSize: 12, color: 'text.secondary' }}>{record.email}</Typography></Box>
                       </Box>
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{record.campus}</TableCell>
-                    <TableCell>{record.project}</TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{record.mentor}</TableCell>
+                    <TableCell>{record.project ?? '—'}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{record.mentor ?? '—'}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatPeriod(record)}</TableCell>
-                    <TableCell><Chip size="small" label={record.outcome} sx={{ fontWeight: 650, ...outcomeColors[record.outcome] }} /></TableCell>
-                    <TableCell align="right">
-                      <IconButton component={RouterLink} to={`../interns/${record.id}`} relative="path" aria-label={`Open ${record.name}'s record`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                        <ArrowRight size={18} />
-                      </IconButton>
+                    <TableCell>
+                      <Chip size="small" label={record.outcome} sx={{ fontWeight: 650, ...outcomeColors[record.outcome] }} />
+                      {record.reason && <Typography className="muted" sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5, maxWidth: 220 }}>{record.reason}</Typography>}
+                    </TableCell>
+                    <TableCell>
+                      <MuiButton component={RouterLink} to={`../interns/${record.id}`} relative="path" className="view-profile" aria-label={`View ${record.name}'s profile`} sx={viewProfileSx}>
+                        View profile
+                      </MuiButton>
                     </TableCell>
                   </TableRow>
                 ))}

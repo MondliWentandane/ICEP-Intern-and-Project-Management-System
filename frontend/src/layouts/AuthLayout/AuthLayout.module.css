@@ -18,8 +18,8 @@
   border-radius: 10px;
   box-shadow: 0 10px 28px rgba(31, 49, 71, .22);
 }
-.brandPanel { display: grid; place-items: center; min-width: 0; background: #12283F; }
-.brandContent { display: flex; flex-direction: column; align-items: center; gap: 22px; transform: translateY(-7px); }
+.brandPanel { position: relative; overflow: hidden; display: grid; place-items: center; min-width: 0; background: #12283F; }
+.brandContent { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 22px; transform: translateY(-7px); }
 .welcome { color: #fff; font-size: 24px; font-weight: 500; letter-spacing: 3px; }
 .brandArtwork { display: block; width: 240px; height: 121px; object-fit: contain; filter: grayscale(1) brightness(0) invert(1); }
 .formPanel { position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 36px 30px; box-sizing: border-box; background: #fff; }
@@ -40,6 +40,9 @@
 .formPanel :global(.auth-submit) { min-height: 48px; border-radius: 8px; background: #1B3A5C; color: #fff; font-size: 15px; font-weight: 600; }
 .formPanel :global(.auth-submit:hover) { background: #12283F; }
 .formPanel :global(.auth-login-footer) { position: absolute; right: 0; bottom: 0; left: 0; display: flex; justify-content: center; gap: 5px; color: #475569; font-size: 12px; }
+.formPanel :global(.auth-back) { position: absolute; top: 0; left: 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; border: 0; border-radius: 8px; background: transparent; color: #1B3A5C; font: 600 14px Inter, Arial, sans-serif; cursor: pointer; transition: background-color .2s ease; }
+.formPanel :global(.auth-back:hover) { background: #E8EEF5; }
+.formPanel :global(.auth-back:focus-visible) { outline: 2px solid #1B3A5C; outline-offset: 2px; }
 .formPanel :global(.auth-footer-link) { color: #1B3A5C; font-weight: 600; text-decoration: none; }
 .formPanel :global(.auth-footer-link:hover) { text-decoration: underline; }
 .formPanel :global(.auth-create-password-form) { gap: 0; }

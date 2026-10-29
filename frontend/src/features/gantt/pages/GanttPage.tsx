@@ -1,4 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { Tasks } from '@/api/services/tasks.service'
+import { Projects } from '@/api/services/projects.service'
+import { useAuth } from '@/hooks/useAuth'
 import {
   Alert,
   DialogContent,
@@ -21,7 +24,14 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import styles from './GanttPage.module.css'
 
-export type GanttStatus = 'Completed' | 'Active' | 'Pending' | 'Rejected' | 'Blocked'
+export type GanttStatus = 'To Do' | 'In Progress' | 'Submitted' | 'Completed' | 'Blocked'
+type NewTaskStatus = 'To Do' | 'In Progress' | 'Completed'
+type ApiTaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+
+interface ProjectTeamMember {
+  id: string
+  name: string
+}
 
 export interface GanttTaskItem {
   id: string
@@ -32,108 +42,163 @@ export interface GanttTaskItem {
   assigneeAvatarColor?: 'slate' | 'blue' | 'default'
   status: GanttStatus
   project: string
-  // Column span indices in the 6 visible columns:
-  // 0: Mon 05, 1: Tue 06, 2: Wed 07, 3: Thu 08, 4: Fri 09, 5: Mon 12
-  startCol?: number
-  endCol?: number
+  startDate: string | null
+  endDate: string | null
+  progress: number
   barLabel?: string
   barProgress?: string
   barColor?: 'blue' | 'green'
 }
 
-const initialTasks: GanttTaskItem[] = [
-  {
-    id: 'task-1',
-    name: 'Project Kickoff',
-    phase: 'Phase 1',
-    assigneeName: 'Moeez S.',
-    assigneeInitials: 'MS',
-    status: 'Completed',
-    project: 'Software Dev Alpha',
-    startCol: 0,
-    endCol: 1,
-    barLabel: 'Kickoff Meeting',
-    barProgress: '100%',
-    barColor: 'blue',
-  },
-  {
-    id: 'task-2',
-    name: 'Requirements Gathering',
-    phase: 'Phase 1',
-    assigneeName: 'Thabo M.',
-    assigneeInitials: 'TM',
-    status: 'Completed',
-    project: 'Software Dev Alpha',
-    startCol: 2,
-    endCol: 4,
-    barLabel: 'Gather Specs',
-    barProgress: '100%',
-    barColor: 'blue',
-  },
-  {
-    id: 'task-3',
-    name: 'Database Schema Design',
-    phase: 'Phase 2',
-    assigneeName: 'Moeez S.',
-    assigneeInitials: 'MS',
-    status: 'Active',
-    project: 'Software Dev Alpha',
-    startCol: 5,
-    endCol: 5,
-    barLabel: 'Schema V1',
-    barColor: 'green',
-  },
-  {
-    id: 'task-4',
-    name: 'Develop API Endpoints',
-    phase: 'Phase 2',
-    assigneeName: 'Jane S.',
-    assigneeInitials: 'JS',
-    assigneeAvatarColor: 'blue',
-    status: 'Active',
-    project: 'Software Dev Alpha',
-    startCol: 5,
-    endCol: 5,
-    barLabel: 'Core APIs',
-    barColor: 'green',
-  },
-  {
-    id: 'task-5',
-    name: 'Frontend UI Integration',
-    phase: 'Phase 3',
-    assigneeName: 'Thabo M.',
-    assigneeInitials: 'TM',
-    status: 'Pending',
-    project: 'Software Dev Alpha',
-  },
-  {
-    id: 'task-6',
-    name: 'Security Audit',
-    phase: 'Reviews',
-    assigneeName: 'Ron J.',
-    assigneeInitials: 'RJ',
-    assigneeAvatarColor: 'slate',
-    status: 'Rejected',
-    project: 'Software Dev Alpha',
-  },
-]
+interface ApiGanttTask {
+  id: string
+  title: string
+  description?: string | null
+  category?: string
+  projectId?: string
+  assignedToId?: string | null
+  assigneeName?: string | null
+  status: ApiTaskStatus
+  approvedAt?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  dueDate?: string | null
+  progress?: number
+}
 
-const timelineColumns = [
-  { key: 'col-0', label: 'Mon 05', isToday: false },
-  { key: 'col-1', label: 'Tue 06', isToday: false },
-  { key: 'col-2', label: 'Wed 07', isToday: false },
-  { key: 'col-3', label: 'Thu 08', isToday: false },
-  { key: 'col-4', label: 'Fri 09', isToday: false },
-  { key: 'col-5', label: 'Mon 12', isToday: true },
-]
+interface TimelineColumn {
+  key: string
+  label: string
+  isToday: boolean
+  startDate: Date
+  endDate: Date
+}
 
-export function GanttPage() {
-  const [tasks, setTasks] = useState<GanttTaskItem[]>(initialTasks)
+function parseLocalDate(value?: string | null): Date | null {
+  if (!value) return null
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
+}
+
+function initialsFor(name: string): string {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
+}
+
+function toGanttTask(task: ApiGanttTask, projectId: string): GanttTaskItem {
+  const status: GanttStatus = task.status === 'TODO'
+    ? 'To Do'
+    : task.status === 'IN_PROGRESS'
+      ? 'In Progress'
+      : task.approvedAt
+        ? 'Completed'
+        : 'Submitted'
+  const assigneeName = task.assigneeName || 'Unassigned'
+  const progress = task.status === 'COMPLETED' ? 100 : task.progress ?? 0
+
+  return {
+    id: task.id,
+    name: task.title,
+    phase: task.description || task.category || 'Task',
+    assigneeName,
+    assigneeInitials: initialsFor(assigneeName),
+    status,
+    project: projectId,
+    startDate: task.startDate ?? task.dueDate ?? null,
+    endDate: task.endDate ?? task.dueDate ?? null,
+    progress,
+    barLabel: task.title,
+    barProgress: String(progress) + '%',
+    barColor: status === 'Completed' || status === 'Submitted' ? 'blue' : 'green',
+  }
+}
+
+function buildTimelineColumns(tasks: GanttTaskItem[], view: 'Days' | 'Weeks' | 'Months'): TimelineColumn[] {
+  const taskDates = tasks.flatMap((task) => [parseLocalDate(task.startDate), parseLocalDate(task.endDate)])
+    .filter((date): date is Date => date !== null)
+    .sort((a, b) => a.getTime() - b.getTime())
+  const today = new Date()
+  let from = taskDates[0] ?? new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  let to = taskDates[taskDates.length - 1] ?? new Date(from)
+
+  if (view === 'Weeks') {
+    from = new Date(from)
+    from.setDate(from.getDate() - ((from.getDay() + 6) % 7))
+    to = new Date(to)
+    to.setDate(to.getDate() + (6 - ((to.getDay() + 6) % 7)))
+    if (!taskDates.length) to.setDate(from.getDate() + 34)
+  } else if (view === 'Months') {
+    from = new Date(from.getFullYear(), from.getMonth(), 1)
+    to = new Date(to.getFullYear(), to.getMonth() + 1, 0)
+    if (!taskDates.length) to = new Date(from.getFullYear(), from.getMonth() + 5, 0)
+  } else if (!taskDates.length) {
+    to.setDate(to.getDate() + 5)
+  }
+
+  const columns: TimelineColumn[] = []
+  let cursor = new Date(from)
+  while (cursor <= to) {
+    const startDate = new Date(cursor)
+    let endDate = new Date(cursor)
+    let label = ''
+
+    if (view === 'Days') {
+      label = startDate.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })
+      cursor.setDate(cursor.getDate() + 1)
+    } else if (view === 'Weeks') {
+      endDate.setDate(endDate.getDate() + 6)
+      label = startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' - ' + endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+      cursor.setDate(cursor.getDate() + 7)
+    } else {
+      endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0)
+      label = startDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+      cursor = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1)
+    }
+
+    columns.push({
+      key: 'timeline-' + columns.length,
+      label,
+      isToday: today >= startDate && today <= endDate,
+      startDate,
+      endDate,
+    })
+  }
+  return columns
+}
+
+function getTaskColumnSpan(task: GanttTaskItem, columns: TimelineColumn[]) {
+  const start = parseLocalDate(task.startDate)
+  const end = parseLocalDate(task.endDate ?? task.startDate)
+  if (!start || !end) return null
+
+  const first = columns.findIndex((column) => column.endDate >= start)
+  let last = -1
+  for (let index = columns.length - 1; index >= 0; index -= 1) {
+    if (columns[index].startDate <= end) {
+      last = index
+      break
+    }
+  }
+  if (first < 0 || last < first) return null
+  return { start: first, end: last }
+}
+
+// CHANGED (a): accepts an optional projectId so it can be embedded in ProjectDetailPage
+export function GanttPage({ projectId }: { projectId?: string }) {
+  const { user } = useAuth()
+  const [tasks, setTasks] = useState<GanttTaskItem[]>([])
   const [activeView, setActiveView] = useState<'Days' | 'Weeks' | 'Months'>('Weeks')
+  const timelineColumns = useMemo(() => buildTimelineColumns(tasks, activeView), [tasks, activeView])
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedProject, setSelectedProject] = useState('Software Dev Alpha')
+  // CHANGED (b): start on the given project when one is passed in
+  const [selectedProject, setSelectedProject] = useState(projectId ?? '')
+  const [projectsList, setProjectsList] = useState<Array<{
+    id: string
+    name: string
+    assignments?: Array<{ projectRole?: string | null; intern?: { user?: { id?: string } } }>
+  }>>([])
   const [selectedStatus, setSelectedStatus] = useState('All statuses')
   const [selectedDate, setSelectedDate] = useState('Select date')
   const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
@@ -146,13 +211,13 @@ export function GanttPage() {
   // New task form state
   const [newTaskName, setNewTaskName] = useState('')
   const [newTaskPhase, setNewTaskPhase] = useState('Phase 1')
-  const [newTaskAssignee, setNewTaskAssignee] = useState('Moeez S.')
-  const [newTaskStatus, setNewTaskStatus] = useState<GanttStatus>('Active')
-  const [newTaskStartCol, setNewTaskStartCol] = useState('0')
-  const [newTaskEndCol, setNewTaskEndCol] = useState('1')
+  const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([])
+  const [newTaskAssignee, setNewTaskAssignee] = useState('')
+  const [newTaskStatus, setNewTaskStatus] = useState<NewTaskStatus>('To Do')
+  const [newTaskStartDate, setNewTaskStartDate] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [newTabBarLabel, setNewTabBarLabel] = useState('')
 
-  // Derived filtered tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       if (selectedProject !== 'All Projects' && task.project !== selectedProject) return false
@@ -168,62 +233,164 @@ export function GanttPage() {
     })
   }, [tasks, selectedProject, selectedStatus, searchQuery])
 
-  // Computed metrics
-  const totalTasksCount = tasks.length === 6 ? 24 : tasks.length
-  const activeNowCount = tasks.filter((t) => t.status === 'Active').length + (tasks.length === 6 ? 6 : 0)
-  const pendingCount = tasks.filter((t) => t.status === 'Pending').length + (tasks.length === 6 ? 11 : 0)
-  const blockedCount = tasks.filter((t) => t.status === 'Rejected' || t.status === 'Blocked').length + (tasks.length === 6 ? 3 : 0)
+  const totalTasksCount = tasks.length
+  const activeNowCount = tasks.filter((t) => t.status === 'In Progress').length
+  const pendingCount = tasks.filter((t) => t.status === 'To Do').length
+  const blockedCount = tasks.filter((t) => t.status === 'Blocked').length
+
+  const isProjectScrumMaster = projectsList
+    .find((project) => project.id === selectedProject)?.assignments?.some((assignment) =>
+      assignment.intern?.user?.id === user?.id && assignment.projectRole === 'Scrum Master',
+    ) ?? false
+  const canManageTasks = user?.role === 'ADMIN' || user?.role === 'MENTOR' ||
+    (user?.role === 'INTERN' && isProjectScrumMaster)
 
   const handleExport = () => {
     setToastMessage(`Timeline for ${selectedProject} exported successfully.`)
   }
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!canManageTasks) return
     if (!newTaskName.trim()) return
 
-    const initials = newTaskAssignee
-      .split(' ')
-      .map((p) => p[0])
-      .join('')
-      .toUpperCase()
-
-    const start = Number(newTaskStartCol)
-    const end = Number(newTaskEndCol)
-
-    const newTask: GanttTaskItem = {
-      id: `task-${Date.now()}`,
-      name: newTaskName.trim(),
-      phase: newTaskPhase,
-      assigneeName: newTaskAssignee,
-      assigneeInitials: initials,
-      status: newTaskStatus,
-      project: selectedProject === 'All Projects' ? 'Software Dev Alpha' : selectedProject,
-      startCol: start,
-      endCol: end,
-      barLabel: newTabBarLabel.trim() || newTaskName.trim(),
-      barProgress: newTaskStatus === 'Completed' ? '100%' : '50%',
-      barColor: newTaskStatus === 'Completed' ? 'blue' : 'green',
+    const selectedMember = teamMembers.find((member) => member.id === newTaskAssignee)
+    if (!selectedProject || !selectedMember) {
+      setToastMessage('Choose a project team member to assign this task to.')
+      return
+    }
+    if (!newTaskStartDate || !newTaskDueDate) {
+      setToastMessage('Choose a start date and due date.')
+      return
+    }
+    if (newTaskDueDate < newTaskStartDate) {
+      setToastMessage('The due date must be on or after the start date.')
+      return
     }
 
-    setTasks((prev) => [...prev, newTask])
-    setIsAddModalOpen(false)
-    setNewTaskName('')
-    setNewTabBarLabel('')
-    setToastMessage(`Task "${newTask.name}" added to Gantt timeline.`)
+    const apiStatus: Record<NewTaskStatus, ApiTaskStatus> = {
+      'To Do': 'TODO',
+      'In Progress': 'IN_PROGRESS',
+      Completed: 'COMPLETED',
+    }
+    const payload = {
+      title: newTaskName.trim(),
+      projectId: selectedProject,
+      assignedToId: selectedMember.id,
+      description: newTaskPhase.trim() || undefined,
+      priority: 'MEDIUM',
+      status: apiStatus[newTaskStatus],
+      startDate: newTaskStartDate,
+      dueDate: newTaskDueDate,
+    }
+
+    try {
+      const savedTask = await Tasks.create(payload)
+      const ganttTask = toGanttTask({
+        ...savedTask,
+        assigneeName: selectedMember.name,
+      } as ApiGanttTask, selectedProject)
+      setTasks((prev) => [...prev, {
+        ...ganttTask,
+        barLabel: newTabBarLabel.trim() || newTaskName.trim(),
+      }])
+
+      setIsAddModalOpen(false)
+      setNewTaskName('')
+      setNewTaskPhase('Phase 1')
+      setNewTaskAssignee('')
+      setNewTaskStatus('To Do')
+      setNewTaskStartDate('')
+      setNewTaskDueDate('')
+      setNewTabBarLabel('')
+      setToastMessage('Task successfully saved to database!')
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage(error.response?.data?.message || 'Unable to create task. Check the project role and required fields.')
+    }
   }
 
-  const handleDeleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
-    setSelectedTask(null)
-    setToastMessage('Task deleted.')
+  // WIRED TO BACKEND DELETE API
+  const handleDeleteTask = async (id: string) => {
+    if (!canManageTasks) return
+    try {
+      await Tasks.delete(id)
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+      setSelectedTask(null)
+      setToastMessage('Task deleted from database.')
+    } catch (error: any) {
+      console.error(error)
+      setToastMessage('Permission Denied: Cannot delete this task.')
+    }
   }
+
+  useEffect(() => {
+    if (!selectedProject || selectedProject === 'All Projects') {
+      setTeamMembers([])
+      setNewTaskAssignee('')
+      return
+    }
+
+    let cancelled = false
+    Projects.get(selectedProject)
+      .then((response) => {
+        if (cancelled) return
+        const project = response.data as unknown as {
+          assignments?: Array<{
+            internId: string
+            projectRole?: string | null
+            intern?: { user?: { id?: string; fullName?: string } }
+          }>
+        }
+        const members = (project.assignments ?? [])
+          .filter((assignment) => assignment.internId && assignment.intern?.user?.fullName)
+          .map((assignment) => ({
+            id: assignment.internId,
+            name: assignment.intern!.user!.fullName!,
+          }))
+        setTeamMembers(members)
+        setNewTaskAssignee((current) =>
+          members.some((member) => member.id === current) ? current : members[0]?.id ?? '',
+        )
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setTeamMembers([])
+          setNewTaskAssignee('')
+          console.error('Failed to load project team:', err)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [selectedProject, user?.id])
+
+  useEffect(() => {
+    if (selectedProject === 'All Projects' || !selectedProject) return;
+
+    Tasks.getGanttData(selectedProject)
+      .then((data) => setTasks((data as ApiGanttTask[]).map((task) => toGanttTask(task, selectedProject))))
+      .catch((err) => {
+        setTasks([])
+        console.error("Failed to load Gantt data:", err)
+      })
+  }, [selectedProject])
+
+  useEffect(() => {
+    Projects.list()
+      .then((response) => {
+        const data = Array.isArray(response) ? response : (response as any).data;
+        setProjectsList(data)
+        // CHANGED (c): don't override the project passed in by the parent
+        if (data.length > 0 && !projectId) {
+          setSelectedProject(data[0].id)
+        }
+      })
+      .catch(err => console.error("Failed to load projects:", err))
+  }, [projectId])
 
   return (
     <main className={styles.page}>
-      {/* 4 Summary / Metric Cards */}
       <section className={styles.metricsGrid} aria-label="Task metrics summary">
-        {/* Metric 1: Total Tasks */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconBlue}`}>
             <Check size={20} strokeWidth={2.5} aria-hidden="true" />
@@ -234,7 +401,6 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 2: Active now */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconGreen}`}>
             <Play size={18} fill="currentColor" strokeWidth={0} aria-hidden="true" />
@@ -245,7 +411,6 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 3: Pending */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconAmber}`}>
             <FileText size={20} strokeWidth={2} aria-hidden="true" />
@@ -256,22 +421,19 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Metric 4: Blocked/Rejected */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconRed}`}>
             <AlertTriangle size={20} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className={styles.statContent}>
             <p className={styles.statValue}>{blockedCount}</p>
-            <p className={styles.statLabel}>Blocked/Rejected</p>
+            <p className={styles.statLabel}>Blocked</p>
           </div>
         </div>
       </section>
 
-      {/* Control Bar: Filters & Actions */}
       <section className={styles.controlBar} aria-label="Gantt timeline controls">
         <div className={styles.filterGroup}>
-          {/* Search Tasks Input */}
           <div className={styles.searchInputWrapper}>
             <Search size={16} className={styles.searchIcon} aria-hidden="true" />
             <input
@@ -284,24 +446,25 @@ export function GanttPage() {
             />
           </div>
 
-          {/* Project Dropdown */}
-          <div className={styles.selectWrapper}>
-            <select
-              className={styles.filterSelect}
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              aria-label="Filter by project"
-            >
-              <option value="Software Dev Alpha">Software Dev Alpha</option>
-              <option value="Network Security Audit">Network Security Audit</option>
-              <option value="Data Migration Phase 2">Data Migration Phase 2</option>
-              <option value="Mobile App Beta">Mobile App Beta</option>
-              <option value="All Projects">All Projects</option>
-            </select>
-            <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
-          </div>
+          {/* CHANGED (d): the project dropdown is hidden when a project is fixed by the parent */}
+          {!projectId && (
+            <div className={styles.selectWrapper}>
+              <select
+                className={styles.filterSelect}
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                aria-label="Filter by project"
+              >
+                {projectsList.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
+            </div>
+          )}
 
-          {/* Status Dropdown */}
           <div className={styles.selectWrapper}>
             <select
               className={styles.filterSelect}
@@ -310,22 +473,20 @@ export function GanttPage() {
               aria-label="Filter by status"
             >
               <option value="All statuses">All statuses</option>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Submitted">Submitted</option>
               <option value="Completed">Completed</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Rejected">Rejected</option>
+              <option value="Blocked">Blocked</option>
             </select>
             <ChevronDown size={16} className={styles.selectChevron} aria-hidden="true" />
           </div>
 
-          {/* Date Picker Button */}
           <button
             type="button"
             className={styles.datePickerButton}
             onClick={(e) => setDateAnchorEl(e.currentTarget)}
             aria-label="Select date"
-            aria-haspopup="true"
-            aria-expanded={Boolean(dateAnchorEl)}
           >
             <Calendar size={16} strokeWidth={2} aria-hidden="true" />
             <span>{selectedDate}</span>
@@ -334,15 +495,7 @@ export function GanttPage() {
             anchorEl={dateAnchorEl}
             open={Boolean(dateAnchorEl)}
             onClose={() => setDateAnchorEl(null)}
-            slotProps={{
-              paper: {
-                sx: {
-                  borderRadius: '10px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                  minWidth: 150,
-                },
-              },
-            }}
+            slotProps={{ paper: { sx: { borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', minWidth: 150 } } }}
           >
             {['Select date', 'Oct 05 - Oct 09', 'Oct 12 - Oct 16', 'Oct 19 - Oct 23', 'Oct 2026'].map((dateOption) => (
               <MenuItem
@@ -361,7 +514,6 @@ export function GanttPage() {
           </Menu>
         </div>
 
-        {/* Action Buttons */}
         <div className={styles.actionsGroup}>
           <button
             type="button"
@@ -373,27 +525,26 @@ export function GanttPage() {
             <span>Export</span>
           </button>
 
-          <button
-            type="button"
-            className={styles.addTaskButton}
-            onClick={() => setIsAddModalOpen(true)}
-            id="gantt-add-task-btn"
-          >
-            <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
-            <span>Add New Task</span>
-          </button>
+          {canManageTasks && (
+            <button
+              type="button"
+              className={styles.addTaskButton}
+              onClick={() => setIsAddModalOpen(true)}
+              id="gantt-add-task-btn"
+            >
+              <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
+              <span>Add New Task</span>
+            </button>
+          )}
         </div>
       </section>
 
-      {/* Gantt Timeline Card */}
       <section className={styles.timelineCard} aria-labelledby="timeline-card-title">
-        {/* Timeline Header */}
         <div className={styles.timelineHeader}>
           <h2 id="timeline-card-title" className={styles.timelineTitle}>
-            {selectedProject === 'All Projects' ? 'Software Dev Alpha' : selectedProject} Timeline
+            Project Timeline
           </h2>
 
-          {/* View Switcher (Days, Weeks, Months) */}
           <div className={styles.viewSwitcher} role="tablist" aria-label="Timeline view granularity">
             {(['Days', 'Weeks', 'Months'] as const).map((view) => (
               <button
@@ -410,7 +561,6 @@ export function GanttPage() {
           </div>
         </div>
 
-        {/* Gantt Table & Grid */}
         <div className={styles.ganttScrollWrapper}>
           <table className={styles.ganttTable}>
             <thead>
@@ -433,32 +583,30 @@ export function GanttPage() {
             <tbody>
               {filteredTasks.map((task) => {
                 const statusClass =
-                  task.status === 'Completed'
+                  task.status === 'Completed' || task.status === 'Submitted'
                     ? styles.statusCompleted
-                    : task.status === 'Active'
-                    ? styles.statusActive
-                    : task.status === 'Pending'
-                    ? styles.statusPending
-                    : styles.statusRejected
+                    : task.status === 'In Progress'
+                      ? styles.statusActive
+                      : task.status === 'To Do'
+                        ? styles.statusPending
+                        : styles.statusRejected
 
                 const avatarColorClass =
                   task.assigneeAvatarColor === 'blue'
                     ? styles.avatarBlue
                     : task.assigneeAvatarColor === 'slate'
-                    ? styles.avatarSlate
-                    : ''
+                      ? styles.avatarSlate
+                      : ''
 
-                const hasBar = task.startCol !== undefined && task.endCol !== undefined
+                const taskSpan = getTaskColumnSpan(task, timelineColumns)
 
                 return (
                   <tr key={task.id} className={styles.taskRow}>
-                    {/* Task Meta */}
                     <td className={styles.taskMetaCell}>
                       <p className={styles.taskName}>{task.name}</p>
                       <p className={styles.taskPhase}>{task.phase}</p>
                     </td>
 
-                    {/* Assignee */}
                     <td className={styles.assigneeCell}>
                       <div className={styles.assigneeWrapper}>
                         <span className={`${styles.assigneeAvatar} ${avatarColorClass}`}>
@@ -468,30 +616,23 @@ export function GanttPage() {
                       </div>
                     </td>
 
-                    {/* Status */}
                     <td className={styles.statusCell}>
                       <span className={`${styles.statusPill} ${statusClass}`}>
                         {task.status}
                       </span>
                     </td>
 
-                    {/* 6 Timeline Day Columns */}
                     {timelineColumns.map((col, colIndex) => {
-                      // Check if a bar starts at this column
-                      const isBarStart = hasBar && task.startCol === colIndex
-                      const colSpan = hasBar ? task.endCol! - task.startCol! + 1 : 1
-
-                      // Calculate span width in percentage
-                      // (100% * colSpan) with small margin
+                      const isBarStart = taskSpan !== null && taskSpan.start === colIndex
+                      const colSpan = taskSpan !== null ? taskSpan.end - taskSpan.start + 1 : 1
                       const barWidth = `calc(${colSpan * 100}% - 12px)`
 
                       return (
                         <td key={col.key} className={styles.timelineCell}>
                           {isBarStart && (
                             <div
-                              className={`${styles.timelineBar} ${
-                                task.barColor === 'green' ? styles.barGreen : styles.barBlue
-                              }`}
+                              className={`${styles.timelineBar} ${task.barColor === 'green' ? styles.barGreen : styles.barBlue
+                                }`}
                               style={{ width: barWidth }}
                               onClick={() => setSelectedTask(task)}
                               title={`${task.name}: ${task.barLabel ?? ''}`}
@@ -516,149 +657,142 @@ export function GanttPage() {
       </section>
 
       {/* Add New Task Modal */}
-      <Modal
-        open={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        title="Add New Gantt Task"
-        maxWidth="sm"
-        fullWidth
-        actions={
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
-            <Button appearance="secondary" onClick={() => setIsAddModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button appearance="primary" onClick={handleCreateTask}>
-              Add Task
-            </Button>
-          </div>
-        }
-      >
-        <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
-          <form className={styles.modalForm} onSubmit={handleCreateTask} id="new-gantt-task-form">
-            <div className={styles.formGroup}>
-              <label htmlFor="task-name-input" className={styles.formLabel}>
-                Task Name
-              </label>
-              <input
-                id="task-name-input"
-                type="text"
-                className={styles.formInput}
-                placeholder="e.g. End-to-End Testing"
-                value={newTaskName}
-                onChange={(e) => setNewTaskName(e.target.value)}
-                required
-              />
+      {canManageTasks && (
+        <Modal
+          open={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          title="Add New Gantt Task"
+          maxWidth="sm"
+          fullWidth
+          actions={
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+              <Button appearance="secondary" onClick={() => setIsAddModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button appearance="primary" onClick={handleCreateTask}>
+                Add Task
+              </Button>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          }
+        >
+          <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
+            <form className={styles.modalForm} onSubmit={handleCreateTask} id="new-gantt-task-form">
               <div className={styles.formGroup}>
-                <label htmlFor="task-phase-input" className={styles.formLabel}>
-                  Phase / Category
+                <label htmlFor="task-name-input" className={styles.formLabel}>
+                  Task Name
                 </label>
                 <input
-                  id="task-phase-input"
+                  id="task-name-input"
                   type="text"
                   className={styles.formInput}
-                  placeholder="e.g. Phase 2"
-                  value={newTaskPhase}
-                  onChange={(e) => setNewTaskPhase(e.target.value)}
+                  placeholder="e.g. End-to-End Testing"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  required
                 />
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="task-assignee-select" className={styles.formLabel}>
-                  Assignee
-                </label>
-                <select
-                  id="task-assignee-select"
-                  className={styles.modalSelect}
-                  value={newTaskAssignee}
-                  onChange={(e) => setNewTaskAssignee(e.target.value)}
-                >
-                  <option value="Moeez S.">Moeez S.</option>
-                  <option value="Thabo M.">Thabo M.</option>
-                  <option value="Jane S.">Jane S.</option>
-                  <option value="Ron J.">Ron J.</option>
-                  <option value="Pat Naidoo">Pat Naidoo</option>
-                </select>
-              </div>
-            </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-phase-input" className={styles.formLabel}>
+                    Phase / Category
+                  </label>
+                  <input
+                    id="task-phase-input"
+                    type="text"
+                    className={styles.formInput}
+                    placeholder="e.g. Phase 2"
+                    value={newTaskPhase}
+                    onChange={(e) => setNewTaskPhase(e.target.value)}
+                  />
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div className={styles.formGroup}>
-                <label htmlFor="task-status-select" className={styles.formLabel}>
-                  Status
-                </label>
-                <select
-                  id="task-status-select"
-                  className={styles.modalSelect}
-                  value={newTaskStatus}
-                  onChange={(e) => setNewTaskStatus(e.target.value as GanttStatus)}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-assignee-select" className={styles.formLabel}>
+                    Assignee
+                  </label>
+                  <select
+                    id="task-assignee-select"
+                    className={styles.modalSelect}
+                    value={newTaskAssignee}
+                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                    required
+                    disabled={teamMembers.length === 0}
+                  >
+                    <option value="">Choose a project team member</option>
+                    {teamMembers.map((member) => (
+                      <option key={member.id} value={member.id}>{member.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="task-bar-label" className={styles.formLabel}>
-                  Bar Label (Optional)
-                </label>
-                <input
-                  id="task-bar-label"
-                  type="text"
-                  className={styles.formInput}
-                  placeholder="e.g. Test Suite V1"
-                  value={newTabBarLabel}
-                  onChange={(e) => setNewTabBarLabel(e.target.value)}
-                />
-              </div>
-            </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-status-select" className={styles.formLabel}>
+                    Status
+                  </label>
+                  <select
+                    id="task-status-select"
+                    className={styles.modalSelect}
+                    value={newTaskStatus}
+                    onChange={(e) => setNewTaskStatus(e.target.value as NewTaskStatus)}
+                  >
+                    <option value="To Do">To Do</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div className={styles.formGroup}>
-                <label htmlFor="task-start-col" className={styles.formLabel}>
-                  Timeline Start Day
-                </label>
-                <select
-                  id="task-start-col"
-                  className={styles.modalSelect}
-                  value={newTaskStartCol}
-                  onChange={(e) => setNewTaskStartCol(e.target.value)}
-                >
-                  <option value="0">Mon 05</option>
-                  <option value="1">Tue 06</option>
-                  <option value="2">Wed 07</option>
-                  <option value="3">Thu 08</option>
-                  <option value="4">Fri 09</option>
-                  <option value="5">Mon 12</option>
-                </select>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-bar-label" className={styles.formLabel}>
+                    Bar Label (Optional)
+                  </label>
+                  <input
+                    id="task-bar-label"
+                    type="text"
+                    className={styles.formInput}
+                    placeholder="e.g. Test Suite V1"
+                    value={newTabBarLabel}
+                    onChange={(e) => setNewTabBarLabel(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="task-end-col" className={styles.formLabel}>
-                  Timeline End Day
-                </label>
-                <select
-                  id="task-end-col"
-                  className={styles.modalSelect}
-                  value={newTaskEndCol}
-                  onChange={(e) => setNewTaskEndCol(e.target.value)}
-                >
-                  <option value="0">Mon 05</option>
-                  <option value="1">Tue 06</option>
-                  <option value="2">Wed 07</option>
-                  <option value="3">Thu 08</option>
-                  <option value="4">Fri 09</option>
-                  <option value="5">Mon 12</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-start-col" className={styles.formLabel}>
+                    Timeline Start Day
+                  </label>
+                  <input
+                    id="task-start-col"
+                    type="date"
+                    className={styles.formInput}
+                    value={newTaskStartDate}
+                    onChange={(e) => setNewTaskStartDate(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="task-end-col" className={styles.formLabel}>
+                    Timeline End Day
+                  </label>
+                  <input
+                    id="task-end-col"
+                    type="date"
+                    className={styles.formInput}
+                    value={newTaskDueDate}
+                    onChange={(e) => setNewTaskDueDate(e.target.value)}
+                    min={newTaskStartDate || undefined}
+                    required
+                  />
+                </div>
               </div>
-            </div>
-          </form>
-        </DialogContent>
-      </Modal>
+            </form>
+          </DialogContent>
+        </Modal>
+      )}
 
       {/* Task Details Modal */}
       {selectedTask && (
@@ -669,10 +803,12 @@ export function GanttPage() {
           maxWidth="xs"
           fullWidth
           actions={
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', width: '100%' }}>
-              <Button appearance="danger" onClick={() => handleDeleteTask(selectedTask.id)}>
-                Delete Task
-              </Button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: canManageTasks ? 'space-between' : 'flex-end', width: '100%' }}>
+              {canManageTasks && (
+                <Button appearance="danger" onClick={() => handleDeleteTask(selectedTask.id)}>
+                  Delete Task
+                </Button>
+              )}
               <Button appearance="secondary" onClick={() => setSelectedTask(null)}>
                 Close
               </Button>
@@ -701,7 +837,6 @@ export function GanttPage() {
         </Modal>
       )}
 
-      {/* Snackbar Notification */}
       <Snackbar
         open={Boolean(toastMessage)}
         autoHideDuration={3500}
@@ -710,7 +845,7 @@ export function GanttPage() {
       >
         <Alert
           onClose={() => setToastMessage(null)}
-          severity="success"
+          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') ? 'error' : 'success'}
           sx={{ width: '100%', borderRadius: '8px' }}
         >
           {toastMessage}

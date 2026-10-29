@@ -127,7 +127,7 @@ export function CampusesIntakesPage() {
                   <Box sx={{ overflowX: 'auto' }}>
                     <Table size="small">
                       <TableHead>
-                        <TableRow><TableCell>Intake</TableCell><TableCell>Start</TableCell><TableCell>End</TableCell><TableCell>Status</TableCell><TableCell align="right">Interns</TableCell></TableRow>
+                        <TableRow><TableCell>Intake</TableCell><TableCell>Start</TableCell><TableCell>End</TableCell><TableCell>Status</TableCell><TableCell align="right">Positions</TableCell><TableCell align="right">Interns</TableCell></TableRow>
                       </TableHead>
                       <TableBody>
                         {visibleIntakes.map((intake) => {
@@ -139,6 +139,7 @@ export function CampusesIntakesPage() {
                               <TableCell>{formatDate(intake.startDate)}</TableCell>
                               <TableCell>{formatDate(intake.endDate)}</TableCell>
                               <TableCell><Chip size="small" variant="outlined" label={phase} color={phaseColor[phase]} /></TableCell>
+                              <TableCell align="right">{intake.positionCount ?? '—'}</TableCell>
                               <TableCell align="right">{count}</TableCell>
                             </TableRow>
                           )

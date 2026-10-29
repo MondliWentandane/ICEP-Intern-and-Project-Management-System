@@ -35,6 +35,10 @@ export interface ApiApplication {
   }
   skills: Array<{ skill: { name: string } }>
   documents: Array<{ id: string; type: 'CV' | 'ID_COPY' | 'ACADEMIC_RECORD' | string; fileName: string; mimeType?: string | null; sizeBytes?: number | null; uploadedAt?: string }>
+  /** The intern profile created on acceptance (null before that). ACTIVE until the internship ends. */
+  intern?: { id: string; status: 'ACTIVE' | 'COMPLETED' | 'WITHDRAWN'; startDate: string | null; endDate: string | null } | null
+  /** Returned after an interview or rejection: whether the email to the applicant went out. */
+  emailSent?: boolean
 }
 
 export const fetchApplications = async () => (await apiClient.get<ApiApplication[]>(endpoints.applicants)).data
@@ -48,6 +52,18 @@ export const acceptApplication = async (id: string) => (await apiClient.put<ApiA
 
 export const rejectApplication = async (id: string, rejectionReason: string) =>
   (await apiClient.put<ApiApplication>(url(id, 'reject'), { rejectionReason })).data
+
+/** How an internship ended. RESIGNED and DISMISSED are stored as WITHDRAWN (Past Interns shows Withdrawn / Terminated). */
+export type InternshipOutcome = 'COMPLETED' | 'RESIGNED' | 'DISMISSED'
+const internStatusUrl = (internId: string) => `${endpoints.interns}/${encodeURIComponent(internId)}/status`
+
+/** Ends an active internship: the intern can no longer log in and moves to Past Interns. */
+export const endInternship = async (internId: string, outcome: InternshipOutcome, endDate: string, reason: string) =>
+  (await apiClient.put(internStatusUrl(internId), { outcome, endDate, reason })).data
+
+/** Makes an ended internship active again with a new end date (ended by mistake, or extended). */
+export const reinstateInternship = async (internId: string, endDate: string) =>
+  (await apiClient.put(internStatusUrl(internId), { outcome: 'REINSTATE', endDate })).data
 
 /** Downloads one uploaded document by id and saves it in the browser. */
 export async function downloadDocumentById(applicationId: string, documentId: string, fileName: string) {

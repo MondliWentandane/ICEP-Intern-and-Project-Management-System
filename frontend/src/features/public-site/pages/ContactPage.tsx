@@ -1,7 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Paper, Typography } from '@mui/material'
+import { Box, Paper, Typography } from '@mui/material'
 import { CursorFollower } from '../story/CursorFollower'
-import { HeroWaves } from '../story/HeroMotion'
 import { RevealTitle } from '../story/Reveal'
 import { riseSx, useReveal } from '../story/useScrollProgress'
 import { introSx } from '../story/motion'
@@ -10,56 +9,39 @@ import { introSx } from '../story/motion'
 
 const navy = '#1E3A5F'
 
-const CAMPUS = {
-  name: 'Tshwane University of Technology - Soshanguve South Campus - TUT',
-  address: 'Block K, 2 Aubrey Matlakala St, Soshanguve - K, Soshanguve, 0152',
-  embedUrl: 'https://maps.google.com/maps?q=-25.5401753,28.0968938&z=17&hl=en&output=embed', // live map, no API key
-  mapsUrl:
-    'https://www.google.com/maps/place/Tshwane+University+of+Technology+-+Soshanguve+South+Campus+-+TUT/@-25.5401753,28.0968938,17z/data=!3m1!4b1!4m6!3m5!1s0x1ebfcf9c4eedb233:0x9e2de5e61f9e48e7!8m2!3d-25.5401753!4d28.0968938!16s%2Fm%2F0dkfwvn?entry=ttu&g_ep=EgoyMDI2MTAxNC4wIKXMDSoASAFQAw%3D%3D' +
-    encodeURIComponent('Tshwane University of Technology Soshanguve South Campus'),
-}
+const MAPS_URL = 'https://www.google.com/maps/place/Tshwane+University+of+Technology+-+Soshanguve+South+Campus+-+TUT/@-25.5401753,28.0968938,17z/data=!3m1!4b1!4m6!3m5!1s0x1ebfcf9c4eedb233:0x9e2de5e61f9e48e7!8m2!3d-25.5401753!4d28.0968938!16s%2Fm%2F0dkfwvn?entry=ttu'
 
 const CSS = `
 .cp{--p:var(--mui-palette-primary-main,#1f3a68);--t:var(--mui-palette-text-primary,#0f1a2b);--m:var(--mui-palette-text-secondary,#5b6678);--b:var(--mui-palette-background-paper,#fff);--l:var(--mui-palette-divider,#d9dee7);--e:cubic-bezier(.65,0,.35,1);color:var(--t)}
 .cp-w{max-width:1200px;margin:0 auto;display:grid;gap:32px}
-.cp-c,.cp-mc{background:var(--b);border:1px solid var(--l);border-radius:16px;padding:12px}
+.cp-c{background:var(--b);border:1px solid var(--l);border-radius:16px;padding:12px}
 .cp-cols{display:grid;gap:24px}
-.cp-i{position:relative;overflow:hidden;background:var(--p);color:#fff;border-radius:12px;padding:24px;min-height:440px}
-.cp-i h2{margin:0 0 32px;font-size:26px;position:relative;z-index:1}
+.cp-i{position:relative;overflow:hidden;background:${navy};color:#fff;border-radius:12px;padding:24px;min-height:440px}
+.cp-i h2{margin:0 0 32px;font-size:26px}
 .cp-rows{display:grid;gap:32px;position:relative;z-index:1}
 .cp-r{display:flex;gap:20px;align-items:flex-start}
 .cp-ic{width:44px;height:44px;flex:none;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center}
-.cp-r b{display:block;font-weight:600}
-.cp-r div div{color:rgba(255,255,255,.85);line-height:1.6}
+.cp-link{color:inherit;text-decoration:none;display:block;transition:opacity 0.2s}
+.cp-link:hover{opacity:0.85}
+.cp-link b{display:block;font-weight:600}
+.cp-link div{color:rgba(255,255,255,.85);line-height:1.6}
 .cp-o{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);right:-60px;bottom:-150px;width:300px;height:300px}
-.cp-o+.cp-o{right:90px;width:190px;height:190px;background:rgba(255,255,255,.06);animation-duration:22s;animation-delay:-6s}
-/* Same slow drift as the circles in the home page hero */
-.cp-o{animation:cp-float 18s ease-in-out infinite}
-@keyframes cp-float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-24px,18px) scale(1.05)}}
-@media(prefers-reduced-motion:reduce){.cp-o{animation:none}}
+.cp-o+.cp-o{right:90px;width:190px;height:190px;background:rgba(255,255,255,.06)}
 .cp-f{display:grid;gap:20px;align-content:start;padding:12px}
 .cp-2{display:grid;gap:20px}
 .cp label{display:block;margin-bottom:8px}
-.cp-in{width:100%;font:inherit;color:var(--t);background:var(--b);border:1px solid var(--l);border-radius:8px;padding:14px}
+.cp-in{width:100%;font:inherit;color:var(--t);background:var(--b);border:1px solid var(--l);border-radius:8px;padding:14px;box-sizing:border-box}
 .cp-in:focus{outline:2px solid var(--p);border-color:transparent}
 .cp-in[aria-invalid=true]{border-color:#d32f2f}
 textarea.cp-in{min-height:170px;resize:vertical}
 .cp-er{color:#d32f2f;font-size:13px;margin-top:4px}
 .cp-al{padding:12px 16px;border-radius:8px;background:#e6f4ea;color:#1e4620}
 .cp-al.e{background:#fdecea;color:#611a15}
-.cp-bt{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 32px;border:0;border-radius:8px;background:var(--p);color:#fff;font:inherit;font-size:16px;font-weight:600;cursor:pointer;text-decoration:none}
+.cp-bt{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 32px;border:0;border-radius:8px;background:var(--p);color:#fff;font:inherit;font-size:16px;font-weight:600;cursor:pointer;text-decoration:none;transition:background 0.2s}
+.cp-bt:hover{background:var(--mui-palette-primary-dark, #15294a)}
 .cp-bt:disabled{opacity:.6;cursor:default}
-.cp-bt.s{height:42px;padding:0 18px}
-.cp-mc{display:flex;flex-direction:column}
-.cp-mp{position:relative;flex:1;min-height:360px;border-radius:12px;overflow:hidden;background:#e8ebf0}
-.cp-mp iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-.cp-sh{position:absolute;inset:0;z-index:1;cursor:pointer;display:flex;align-items:flex-end;justify-content:flex-end;padding:16px}
-.cp-sh span{font-size:13px;color:#fff;background:rgba(15,26,43,.75);padding:4px 12px;border-radius:8px}
-.cp-pp{position:absolute;z-index:2;top:20px;left:20px;max-width:calc(100% - 40px);padding:20px;border-radius:12px;background:var(--b);border:1px solid var(--l)}
-.cp-pp h3{margin:0 0 8px;font-size:18px;line-height:1.3}
-.cp-pp p{margin:0 0 12px;color:var(--m);font-size:15px}
 @media(min-width:600px){.cp-2{grid-template-columns:1fr 1fr}}
-@media(min-width:900px){.cp-cols{gap:32px;grid-template-columns:1fr 1.15fr}.cp-i{padding:32px}.cp-f{padding:24px 24px 0 0}.cp-mp{min-height:450px}.cp-pp{max-width:400px}}
+@media(min-width:900px){.cp-cols{gap:32px;grid-template-columns:1fr 1.15fr}.cp-i{padding:32px}.cp-f{padding:24px 24px 0 0}}
 `
 
 const Ic = ({ children, s = 20 }: { children: ReactNode; s?: number }) => (
@@ -67,11 +49,11 @@ const Ic = ({ children, s = 20 }: { children: ReactNode; s?: number }) => (
        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
 )
 
-const ROWS: [ReactNode, string, ReactNode][] = [
+const ROWS: [ReactNode, string, ReactNode, string][] = [
   [<Ic><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></Ic>, 'Location',
-    <>02 Aubrey Matlala Road, Block K, Soshanguve<br />Building 18, TUT Soshanguve South Campus<br />Pretoria, Gauteng<br />South Africa</>],
-  [<Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></Ic>, 'Email', 'admin@icep.co.za'],
-  [<Ic><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></Ic>, 'Call', '012 382 9598'],
+    <>02 Aubrey Matlala Road, Block K, Soshanguve<br />Building 18, TUT Soshanguve South Campus<br />Pretoria, Gauteng<br />South Africa</>, MAPS_URL],
+  [<Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></Ic>, 'Email', 'admin@icep.co.za', 'mailto:admin@icep.co.za'],
+  [<Ic><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></Ic>, 'Call', '012 382 9598', 'tel:+27123829598'],
 ]
 
 export interface ContactMessage { name: string; email: string; subject: string; message: string }
@@ -99,7 +81,7 @@ function ContactForm({ onSubmit }: { onSubmit?: (m: ContactMessage) => Promise<v
     try { await onSubmit?.(v); setV(EMPTY); setSt('sent') } catch { setSt('error') }
   }
 
-  const field = ([k, label, ph, ac]: (typeof FIELDS)[number]) => {
+  const field = ([k, label, ph, ac]: (typeof FIELDS)[number], index: number) => {
     const id = `contact-${k}`
     const p = {
       id, className: 'cp-in', placeholder: ph, value: v[k], 'aria-invalid': !!err[k],
@@ -107,42 +89,26 @@ function ContactForm({ onSubmit }: { onSubmit?: (m: ContactMessage) => Promise<v
       onChange: (e: { target: { value: string } }) => setV((o) => ({ ...o, [k]: e.target.value })),
     }
     return (
-      <div key={k}>
+      <Box key={k} sx={introSx(600 + index * 100)}>
         <label htmlFor={id}>{label}</label>
         {k === 'message' ? <textarea {...p} /> : <input {...p} type={k === 'email' ? 'email' : 'text'} autoComplete={ac || undefined} />}
         {err[k] && <div className="cp-er" id={`${id}-e`}>{err[k]}</div>}
-      </div>
+      </Box>
     )
   }
 
   return (
     <form className="cp-f" onSubmit={submit} noValidate>
-      <div className="cp-2">{FIELDS.slice(0, 2).map(field)}</div>
-      {FIELDS.slice(2).map(field)}
-      {st === 'sent' && <div className="cp-al" role="status">Message sent. The ICEP team will get back to you.</div>}
-      {st === 'error' && <div className="cp-al e" role="alert">Your message was not sent. Check your connection and try again.</div>}
-      <div><button className="cp-bt" type="submit" disabled={st === 'sending'}>{st === 'sending' ? 'Sending…' : 'Send message'}</button></div>
+      <div className="cp-2">{FIELDS.slice(0, 2).map((f, i) => field(f, i))}</div>
+      {FIELDS.slice(2).map((f, i) => field(f, i + 1))}
+      
+      {st === 'sent' && <Box sx={introSx(900)}><div className="cp-al" role="status">Message sent. The ICEP team will get back to you.</div></Box>}
+      {st === 'error' && <Box sx={introSx(900)}><div className="cp-al e" role="alert">Your message was not sent. Check your connection and try again.</div></Box>}
+      
+      <Box sx={introSx(900)}>
+        <button className="cp-bt" type="submit" disabled={st === 'sending'}>{st === 'sending' ? 'Sending…' : 'Send message'}</button>
+      </Box>
     </form>
-  )
-}
-
-function MapCard() {
-  // The live map would capture the mouse wheel and trap page scrolling, so it is interactive only after a click.
-  const [on, setOn] = useState(false)
-  return (
-    <div className="cp-mc">
-      <div className="cp-mp" onMouseLeave={() => setOn(false)}>
-        <iframe src={CAMPUS.embedUrl} title="Map of TUT Soshanguve South Campus" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
-        {!on && <div className="cp-sh" onClick={() => setOn(true)}><span>Click the map to zoom and move</span></div>}
-        <div className="cp-pp">
-          <h3>{CAMPUS.name}</h3>
-          <p>{CAMPUS.address}</p>
-          <a className="cp-bt s" href={CAMPUS.mapsUrl} target="_blank" rel="noopener noreferrer">
-            <Ic s={18}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></Ic> Open in Maps
-          </a>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -210,25 +176,25 @@ export function ContactPage({ onSendMessage }: { onSendMessage?: (m: ContactMess
         <div className="cp-c">
           <div className="cp-cols">
             <div className="cp-i">
-              {/* Smoky waves drifting behind the panel, as in the home page hero */}
-              <HeroWaves />
-              <h2>Contact information</h2>
+              <Box sx={introSx(600)}>
+                <h2>Contact information</h2>
+              </Box>
               <div className="cp-rows">
-                {ROWS.map(([icon, title, text]) => (
-                  <div className="cp-r" key={title}>
+                {ROWS.map(([icon, title, text, url], i) => (
+                  <Box className="cp-r" key={title} sx={introSx(700 + i * 100)}>
                     <div className="cp-ic">{icon}</div>
-                    <div><b>{title}</b><div>{text}</div></div>
-                  </div>
+                    <a href={url as string} target="_blank" rel="noopener noreferrer" className="cp-link">
+                      <b>{title}</b><div>{text}</div>
+                    </a>
+                  </Box>
                 ))}
               </div>
               <div className="cp-o" aria-hidden="true" /><div className="cp-o" aria-hidden="true" />
             </div>
+            
             <ContactForm onSubmit={onSendMessage} />
           </div>
         </div>
-        
-        <MapCard />
-        
       </div>
     </section>
   )
