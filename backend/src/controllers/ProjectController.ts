@@ -28,15 +28,16 @@ const parseDate = (value: unknown) => {
 
 export async function listProjects(req: Request, res: Response) {
   try {
-    // Admin / WIL Handler see every project; a mentor sees the projects they supervise; an intern sees their own.
+    // Admins, WIL Handlers, and mentors see all projects; interns see their own.
     const user = actor(req);
-    let supervisorId = req.query.supervisorId as string | undefined;
     let internUserId: string | undefined;
-    if (user?.role === "MENTOR") supervisorId = (await service.mentorFor(user.id))?.id ?? "no-mentor-profile";
     if (user?.role === "INTERN") internUserId = user.id;
     return res.json(await service.list({
-      status: req.query.status as string, departmentId: req.query.departmentId as string,
-      supervisorId, internUserId,
+      status: req.query.status as string,
+      ...(user?.role === "ADMIN" || user?.role === "WIL_HANDLER"
+        ? { departmentId: req.query.departmentId as string | undefined, supervisorId: req.query.supervisorId as string | undefined }
+        : {}),
+      internUserId,
     }));
   } catch (error) { return sendError(res, error); }
 }

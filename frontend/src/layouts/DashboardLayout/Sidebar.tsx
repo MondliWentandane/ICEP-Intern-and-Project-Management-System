@@ -1,10 +1,11 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Box, IconButton, InputBase, Typography } from '@mui/material'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, Building2, CalendarDays, ChartNoAxesGantt, ClipboardList, FolderKanban, History, LayoutDashboard, LogOut, Search, Users, X } from 'lucide-react'
 import { getNavigation, type NavigationItem, type NavigationSection } from '@/config/navigation'
 import icepLogo from '@/assets/icep-logo-b&w.png'
 import { useAuth } from '@/hooks/useAuth'
+import { homeByRole } from '@/routes/paths'
 import styles from './DashboardLayout.module.css'
 
 const icons: Record<string, typeof LayoutDashboard> = {
@@ -56,7 +57,9 @@ export function Sidebar({ mobileOpen, collapsed, onClose }: { mobileOpen: boolea
     {mobileOpen && <button className={styles.scrim} aria-label="Close navigation" onClick={onClose} />}
     <Box component="aside" id="dashboard-sidebar" className={`${styles.sidebar} ${mobileOpen ? styles['sidebar-open'] : ''}`}>
       <Box className={styles['sidebar-brand']}>
-        <Box component="img" src={icepLogo} alt="ICEP" className={styles['brand-logo']} />
+        <Box component={RouterLink} to={homeByRole[user.role]} aria-label="Go to dashboard" className={styles['brand-link']} onClick={onClose}>
+          <Box component="img" src={icepLogo} alt="ICEP" className={styles['brand-logo']} />
+        </Box>
         <IconButton className={styles['mobile-close']} aria-label="Close menu" onClick={onClose}><X size={20} /></IconButton>
       </Box>
       <Box className={styles['sidebar-search']}>

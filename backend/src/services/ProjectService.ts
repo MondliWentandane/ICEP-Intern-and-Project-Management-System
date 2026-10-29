@@ -48,9 +48,22 @@ export class ProjectService {
       throw Object.assign(new Error("Invalid project status"), { statusCode: 400 });
     }
     const project = await repository.create({ ...data, name: data.name.trim() });
-    if (members?.length) await this.setMembers(project.id, members, data.createdById);
-    await notificationService.projectCreated(project.id, data.createdById);
-    return members?.length ? this.get(project.id) : project;
+    // setMembers already returns the saved project with its assignments. Reuse that result so a
+    // redundant follow-up read cannot make a successfully persisted create look like a failure.
+    const savedProject = members?.length
+      ? await this.setMembers(project.id, members, data.createdById, false)
+      : project;
+    // Notifications run after the write and must not hold the HTTP response open. The frontend
+    // has a bounded request timeout; a notification query that is slow should not make a saved
+    // project look like a failed create.
+    void notificationService.projectCreated(project.id, data.createdById);
+    if (members?.length) {
+      const uniqueMembers = new Map(members.map((member) => [member.internId, member]));
+      for (const member of uniqueMembers.values()) {
+        void notificationService.projectAssigned(project.id, member.internId, member.projectRole, data.createdById);
+      }
+    }
+    return savedProject;
   }
   async update(id: string, input: Parameters<ProjectRepository["update"]>[1] & { members?: MemberInput[] }, actorUserId?: string) {
     const { members, ...data } = input;
@@ -114,7 +127,7 @@ export class ProjectService {
    * interns left out are removed. An intern can be on several projects' teams at once.
    * Every intern affected gets a notification saying what changed.
    */
-  async setMembers(projectId: string, members: MemberInput[], actorUserId?: string) {
+  async setMembers(projectId: string, members: MemberInput[], actorUserId?: string, notify = true) {
     if (!Array.isArray(members)) throw badRequest("members must be a list of { internId, projectRole }");
     const wanted = new Map<string, string | null>();
     for (const member of members) {
@@ -128,16 +141,16 @@ export class ProjectService {
     for (const [internId, role] of wanted) {
       if (!current.has(internId)) {
         await repository.assign(projectId, internId, role, actorUserId);
-        await notificationService.projectAssigned(projectId, internId, role, actorUserId);
+        if (notify) await notificationService.projectAssigned(projectId, internId, role, actorUserId);
       } else if (current.get(internId) !== role) {
         await repository.updateRole(projectId, internId, role);
-        await notificationService.projectRoleChanged(projectId, internId, current.get(internId) ?? null, role, actorUserId);
+        if (notify) await notificationService.projectRoleChanged(projectId, internId, current.get(internId) ?? null, role, actorUserId);
       }
     }
     for (const internId of current.keys()) {
       if (!wanted.has(internId)) {
         await repository.removeAssignment(projectId, internId);
-        await notificationService.projectRemoved(projectId, internId, actorUserId);
+        if (notify) await notificationService.projectRemoved(projectId, internId, actorUserId);
       }
     }
     return this.get(projectId);

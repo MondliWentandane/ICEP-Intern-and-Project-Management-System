@@ -19,6 +19,7 @@ export default function CreateProjectButton({ onCreate }: Props) {
   const [showTeamErrors, setShowTeamErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [createdProjectName, setCreatedProjectName] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
 
   const nameError = name.trim().length < 3 ? "Enter a project name (at least 3 characters)." : "";
@@ -65,7 +66,9 @@ export default function CreateProjectButton({ onCreate }: Props) {
         groupName: groupName.trim(),
         members, // empty = no group yet
       });
+      const savedName = name.trim();
       close();
+      setCreatedProjectName(savedName);
     } catch (error) {
       const message = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
       setSaveError(message?.error ?? message?.message ?? "The project could not be saved. Please try again.");
@@ -84,6 +87,21 @@ export default function CreateProjectButton({ onCreate }: Props) {
       >
         Create project
       </button>
+
+      {createdProjectName && (
+        <div className="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && setCreatedProjectName("")}>
+          <div role="dialog" aria-modal="true" aria-labelledby="project-created-title" className="w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-2xl">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-3xl font-bold text-emerald-700" aria-hidden="true">✓</div>
+            <h2 id="project-created-title" className="mt-5 text-2xl font-bold text-[#0f1b33]">Project created successfully</h2>
+            <p className="mt-2 text-sm text-[#55627a]">
+              <span className="font-semibold text-[#0f1b33]">{createdProjectName}</span> has been saved and is now in your projects list.
+            </p>
+            <button type="button" onClick={() => setCreatedProjectName("")} className="mt-6 rounded-full bg-[#0b2a5b] px-7 py-3 text-sm font-semibold text-white transition hover:bg-[#13397d] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2a5b] focus-visible:ring-offset-2">
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div

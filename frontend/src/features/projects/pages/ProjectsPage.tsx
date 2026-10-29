@@ -6,7 +6,7 @@ import CreateProjectButton, { type Group, type NewProject } from '@/components/u
 import { TeamMemberPicker } from '@/features/projects/components/TeamMemberPicker'
 import {
   teamError, useCreateProject, useDeleteProject, useProjects, useUpdateProject,
-  type ProjectRecord, type TeamMemberInput,
+  fetchProjects, type ProjectRecord, type TeamMemberInput,
 } from '@/features/projects/data/projectsApi'
 
 const PageScaffoldWithChildren = PageScaffold as unknown as (props: {
@@ -196,7 +196,7 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
 
         <p className="mt-3 line-clamp-2 text-sm text-[#55627a]">{project.problemStatement}</p>
 
-        <div className="mt-4 flex gap-2 border-t border-[#e7ecf4] pt-4">
+        {project.canManage && <div className="mt-4 flex gap-2 border-t border-[#e7ecf4] pt-4">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onEdit() }}
@@ -211,7 +211,7 @@ function ProjectCard({ project, index, group, onOpen, onEdit, onDelete }: {
           >
             Delete
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   )
@@ -230,7 +230,29 @@ export function ProjectsPage() {
   const [deleteError, setDeleteError] = useState('')
 
   // Saved to the database; each assigned intern is notified of their group and role.
-  const handleCreate = (project: NewProject) => createProject.mutateAsync(project)
+  const handleCreate = async (input: NewProject) => {
+    const matchesInput = (project: Project) =>
+      project.name === input.name &&
+      project.problemStatement === input.problemStatement &&
+      project.groupName === (input.groupName.trim() || null) &&
+      project.members.length === input.members.length &&
+      input.members.every((member) => project.members.some((saved) => saved.internId === member.internId && saved.role === member.projectRole))
+    const previousMatches = projects.filter(matchesInput).length
+
+    try {
+      await createProject.mutateAsync(input)
+    } catch (error) {
+      // A timeout can happen after the server committed the write. Confirm against a fresh GET
+      // before telling the user that a persisted project failed to save.
+      try {
+        const latestProjects = await fetchProjects()
+        if (latestProjects.filter(matchesInput).length > previousMatches) return
+      } catch {
+        // Keep the original create error when the follow-up check is unavailable.
+      }
+      throw error
+    }
+  }
 
   const handleSave = async (updated: NewProject & { id: string }) => {
     await updateProject.mutateAsync(updated)
