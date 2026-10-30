@@ -447,6 +447,7 @@ model Mentor {
 model Team {
   id          String   @id @default(uuid())
   name        String
+  description String?  @db.VarChar(1000)
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -459,10 +460,11 @@ model Team {
 }
 
 model TeamMember {
-  id       String   @id @default(uuid())
-  teamId   String
-  internId String
-  addedAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  teamId      String
+  internId    String
+  projectRole String?
+  addedAt     DateTime @default(now())
 
   team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
   intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
