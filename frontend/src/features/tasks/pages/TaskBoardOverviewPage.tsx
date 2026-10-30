@@ -25,18 +25,20 @@ type TaskForm = {
   assignedToId: string
 }
 
-const statuses: TaskWorkflowStatus[] = ['TO_DO', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED']
+const statuses: TaskWorkflowStatus[] = ['TO_DO', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED', 'BLOCKED']
 const statusLabels: Record<TaskWorkflowStatus, string> = {
   TO_DO: 'To do',
   IN_PROGRESS: 'In progress',
   SUBMITTED: 'Submitted',
   COMPLETED: 'Completed',
+  BLOCKED: 'Blocked',
 }
 const statusDescriptions: Record<TaskWorkflowStatus, string> = {
   TO_DO: 'Not started.',
   IN_PROGRESS: 'Being worked on.',
   SUBMITTED: 'The intern says the work is ready for review.',
   COMPLETED: 'The reviewer accepts the work.',
+  BLOCKED: 'Work is paused until a blocker is resolved.',
 }
 const statusColors: Record<TaskWorkflowStatus, 'default' | 'warning' | 'info' | 'success' | 'error'> = {
   TO_DO: 'default', IN_PROGRESS: 'warning', SUBMITTED: 'info', COMPLETED: 'success',
@@ -181,6 +183,7 @@ export function TaskBoardOverviewPage() {
             </Stack>
             {!compact && <Typography variant="caption" color="text.secondary">{task.project?.name ?? projectNames.get(task.projectId)}</Typography>}
             {task.description && <Typography variant="body2" color="text.secondary">{task.description}</Typography>}
+            {task.status === 'BLOCKED' && task.blockedReason && <Typography variant="body2" color="error.main"><strong>Blocker:</strong> {task.blockedReason}</Typography>}
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center', rowGap: 1 }}>
               <Chip size="small" variant="outlined" color={priorityColors[task.priority]} label={task.priority.toLowerCase() + ' priority'} />
               <Typography variant="caption" color="text.secondary">Due {formatDate(task.dueDate)}</Typography>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import {
   Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress,
   Dialog, DialogActions, DialogContent, DialogTitle, FormControl,
@@ -7,7 +7,9 @@ import {
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import { isAxiosError } from 'axios'
+import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { Projects } from '@/api/services/projects.service'
 import {
   Tasks,
   type InternBoardTask,
@@ -15,8 +17,9 @@ import {
   type TaskPriority,
 } from '@/api/services/tasks.service'
 import type { ApiTaskStatus } from '@/types'
+import type { Project } from '@/types'
 
-type InternBoardStatus = InternTaskStatus | 'BLOCKED'
+type InternBoardStatus = InternTaskStatus
 type InternBoardTaskWithBlocked = Omit<InternBoardTask, 'status'> & {
   status: InternBoardStatus
   blockedReason?: string
@@ -73,6 +76,7 @@ function canMoveTaskToStatus(task: InternBoardTaskWithBlocked, target: InternBoa
 
 export function InternTaskBoardPage() {
   const { user } = useAuth()
+  const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<InternBoardTaskWithBlocked[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -86,7 +90,20 @@ export function InternTaskBoardPage() {
   const [blockReason, setBlockReason] = useState('')
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<InternBoardStatus | null>(null)
-  const localBlockReasons = useRef(new Map<string, string>())
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<InternBoardTaskWithBlocked | null>(null)
+  const [taskForm, setTaskForm] = useState({ projectId: '', title: '', description: '', priority: 'MEDIUM' as TaskPriority, dueDate: '', assignedToId: '' })
+  const [taskSaving, setTaskSaving] = useState(false)
+  const [taskError, setTaskError] = useState('')
+
+  const scrumMasterProjects = useMemo(() => projects.filter((project) => project.assignments?.some((assignment) =>
+    assignment.projectRole === 'Scrum Master' && assignment.intern?.user?.id === user?.id,
+  )), [projects, user?.id])
+  const scrumMasterProjectIds = useMemo(() => new Set(scrumMasterProjects.map((project) => project.id)), [scrumMasterProjects])
+
+  useEffect(() => {
+    Projects.list().then(({ data }) => setProjects(data)).catch(() => setProjects([]))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -99,11 +116,7 @@ export function InternTaskBoardPage() {
       try {
         const response = await Tasks.listForInternBoard()
         if (!cancelled) {
-          const boardTasks = response.data.tasks as InternBoardTaskWithBlocked[]
-          setTasks(boardTasks.map((task) => {
-            const reason = localBlockReasons.current.get(task.id)
-            return reason ? { ...task, status: 'BLOCKED', blockedReason: reason } : task
-          }))
+          setTasks(response.data.tasks as InternBoardTaskWithBlocked[])
         }
       } catch (loadError) {
         if (!cancelled) setError(errorMessage(loadError, 'Could not load tasks for your project teams.'))
@@ -149,7 +162,58 @@ export function InternTaskBoardPage() {
     return result
   }, [tasks])
 
-  const updateStatus = async (task: InternBoardTaskWithBlocked, status: InternTaskStatus) => {
+  const teamMembersFor = (projectId: string) => {
+    const project = projects.find((item) => item.id === projectId)
+    return (project?.assignments ?? []).flatMap((assignment) => assignment.internId && assignment.intern?.user?.fullName
+      ? [{ id: assignment.internId, name: assignment.intern.user.fullName }]
+      : [])
+  }
+
+  const openCreateTask = () => {
+    setEditingTask(null)
+    setTaskError('')
+    setTaskForm({ projectId: scrumMasterProjects[0]?.id ?? '', title: '', description: '', priority: 'MEDIUM', dueDate: '', assignedToId: '' })
+    setTaskDialogOpen(true)
+  }
+
+  const openEditTask = (task: InternBoardTaskWithBlocked) => {
+    setEditingTask(task)
+    setTaskError('')
+    setTaskForm({
+      projectId: task.projectId,
+      title: task.title,
+      description: task.description ?? '',
+      priority: task.priority,
+      dueDate: task.dueDate?.slice(0, 10) ?? '',
+      assignedToId: task.assignedToId ?? '',
+    })
+    setTaskDialogOpen(true)
+  }
+
+  const saveManagedTask = async () => {
+    if (!taskForm.projectId || !taskForm.title.trim()) return
+    setTaskSaving(true)
+    setTaskError('')
+    try {
+      const payload = {
+        title: taskForm.title.trim(),
+        description: taskForm.description.trim() || null,
+        priority: taskForm.priority,
+        dueDate: taskForm.dueDate || null,
+        assignedToId: taskForm.assignedToId || null,
+      }
+      if (editingTask) await Tasks.update(editingTask.id, payload)
+      else await Tasks.create({ ...payload, projectId: taskForm.projectId })
+      setTaskDialogOpen(false)
+      setReloadKey((key) => key + 1)
+    } catch (saveError) {
+      setTaskError(errorMessage(saveError, 'Could not save this task.'))
+    } finally {
+      setTaskSaving(false)
+    }
+  }
+
+  const updateStatus = async (task: InternBoardTaskWithBlocked, status: InternTaskStatus, blockedReason?: string): Promise<boolean> => {
     setError('')
     setUpdatingIds((current) => new Set(current).add(task.id))
     try {
@@ -158,10 +222,12 @@ export function InternTaskBoardPage() {
         : status === 'SUBMITTED'
           ? 'COMPLETED'
           : status
-      await Tasks.updateStatus(task.id, apiStatus)
+      await Tasks.updateStatus(task.id, apiStatus, blockedReason ?? null)
       setReloadKey((key) => key + 1)
+      return true
     } catch (updateError) {
       setError(errorMessage(updateError, 'Could not update this task.'))
+      return false
     } finally {
       setUpdatingIds((current) => {
         const next = new Set(current)
@@ -186,11 +252,9 @@ export function InternTaskBoardPage() {
     if (!blockDialogTask || !reason || !blockDialogTask.canUpdateStatus) return
     if (blockDialogTask.status !== 'TO_DO' && blockDialogTask.status !== 'IN_PROGRESS') return
 
-    localBlockReasons.current.set(blockDialogTask.id, reason)
-    setTasks((current) => current.map((task) => task.id === blockDialogTask.id
-      ? { ...task, status: 'BLOCKED', blockedReason: reason }
-      : task))
-    closeBlockDialog()
+    void updateStatus(blockDialogTask, 'BLOCKED', reason).then((saved) => {
+      if (saved) closeBlockDialog()
+    })
   }
 
   const moveTaskToStatus = async (task: InternBoardTaskWithBlocked, target: InternBoardStatus) => {
@@ -200,10 +264,7 @@ export function InternTaskBoardPage() {
       return
     }
     if (task.status === 'BLOCKED' && target === 'IN_PROGRESS') {
-      localBlockReasons.current.delete(task.id)
-      setTasks((current) => current.map((item) => item.id === task.id
-        ? { ...item, status: 'IN_PROGRESS', blockedReason: undefined }
-        : item))
+      await updateStatus(task, 'IN_PROGRESS')
       return
     }
     await updateStatus(task, target)
@@ -299,10 +360,13 @@ export function InternTaskBoardPage() {
               </Stack>
             )}
             {task.status === 'SUBMITTED' && (
-              <Typography variant="caption" color="info.main">Waiting for mentor review</Typography>
+              <Typography variant="caption" color="info.main">Waiting for mentor or Scrum Master review</Typography>
             )}
             {!task.canUpdateStatus && task.project.status === 'COMPLETED' && (
               <Typography variant="caption" color="text.secondary">Completed project · read only</Typography>
+            )}
+            {scrumMasterProjectIds.has(task.projectId) && (
+              <Button size="small" variant="outlined" onClick={() => openEditTask(task)}>Edit task / assignment</Button>
             )}
           </Stack>
         </CardContent>
@@ -324,7 +388,13 @@ export function InternTaskBoardPage() {
           <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>My Task Board</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>See your project teams’ work and update only tasks assigned to you.</Typography>
         </Box>
-        <Avatar aria-label={displayName} sx={{ width: 36, height: 36, bgcolor: 'secondary.main', alignSelf: { xs: 'flex-start', sm: 'auto' } }}>{initials(displayName)}</Avatar>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          {scrumMasterProjects.length > 0 && <>
+            <Button component={RouterLink} to="/intern/tasks/review" variant="outlined">Review submissions</Button>
+            <Button variant="contained" onClick={openCreateTask}>Add task</Button>
+          </>}
+          <Avatar aria-label={displayName} sx={{ width: 36, height: 36, bgcolor: 'secondary.main' }}>{initials(displayName)}</Avatar>
+        </Stack>
       </Stack>
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2.5 }, borderRadius: 3 }}>
@@ -446,6 +516,7 @@ export function InternTaskBoardPage() {
             multiline
             minRows={3}
             label="Reason for blocking"
+            inputProps={{ maxLength: 1000 }}
             value={blockReason}
             onChange={(event) => setBlockReason(event.target.value)}
             helperText="Enter why you cannot continue with this task."
@@ -453,8 +524,50 @@ export function InternTaskBoardPage() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={closeBlockDialog}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={confirmBlockTask} disabled={!blockReason.trim()}>
-            Block task
+          <Button variant="contained" color="error" onClick={confirmBlockTask} disabled={!blockReason.trim() || Boolean(blockDialogTask && updatingIds.has(blockDialogTask.id))}>
+            {blockDialogTask && updatingIds.has(blockDialogTask.id) ? 'Saving…' : 'Block task'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={taskDialogOpen} onClose={() => !taskSaving && setTaskDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editingTask ? 'Edit task and assignment' : 'Create team task'}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Manage tasks only for projects where you are the designated Scrum Master.
+          </Typography>
+          {taskError && <Alert severity="error" sx={{ mb: 2 }}>{taskError}</Alert>}
+          <Stack spacing={2} sx={{ pt: 0.5 }}>
+            <FormControl fullWidth required>
+              <InputLabel id="scrum-task-project-label">Project</InputLabel>
+              <Select<string> labelId="scrum-task-project-label" label="Project" value={taskForm.projectId} disabled={Boolean(editingTask)} onChange={(event) => setTaskForm((current) => ({ ...current, projectId: event.target.value, assignedToId: '' }))}>
+                {scrumMasterProjects.map((project) => <MenuItem key={project.id} value={project.id}>{project.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TextField label="Task title" required autoFocus value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} fullWidth />
+            <TextField label="Description" multiline minRows={3} value={taskForm.description} onChange={(event) => setTaskForm((current) => ({ ...current, description: event.target.value }))} fullWidth />
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <FormControl fullWidth>
+                <InputLabel id="scrum-task-priority-label">Priority</InputLabel>
+                <Select<TaskPriority> labelId="scrum-task-priority-label" label="Priority" value={taskForm.priority} onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value }))}>
+                  <MenuItem value="LOW">Low</MenuItem><MenuItem value="MEDIUM">Medium</MenuItem><MenuItem value="HIGH">High</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField label="Due date" type="date" value={taskForm.dueDate} onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))} fullWidth slotProps={{ inputLabel: { shrink: true } }} />
+            </Stack>
+            <FormControl fullWidth>
+              <InputLabel id="scrum-task-assignee-label">Assignee</InputLabel>
+              <Select<string> labelId="scrum-task-assignee-label" label="Assignee" value={taskForm.assignedToId} onChange={(event) => setTaskForm((current) => ({ ...current, assignedToId: event.target.value }))}>
+                <MenuItem value="">Unassigned</MenuItem>
+                {teamMembersFor(taskForm.projectId).map((member) => <MenuItem key={member.id} value={member.id}>{member.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setTaskDialogOpen(false)} disabled={taskSaving}>Cancel</Button>
+          <Button variant="contained" onClick={() => void saveManagedTask()} disabled={taskSaving || !taskForm.title.trim() || !taskForm.projectId}>
+            {taskSaving ? 'Saving…' : editingTask ? 'Save changes' : 'Create task'}
           </Button>
         </DialogActions>
       </Dialog>

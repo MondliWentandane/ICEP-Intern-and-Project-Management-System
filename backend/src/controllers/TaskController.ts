@@ -301,7 +301,8 @@ const task = await TaskService.getTask(
             const task = await TaskService.updateTaskStatus(
                 id,
                 req.body.status,
-                req.user
+                req.user,
+                req.body.blockedReason
             );
 
             res.status(200).json({

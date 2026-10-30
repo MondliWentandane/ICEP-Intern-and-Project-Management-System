@@ -9,6 +9,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import { Link as RouterLink } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import { Tasks, type MentorTaskRecord } from '@/api/services/tasks.service'
+import { useAuth } from '@/hooks/useAuth'
 
 type ReviewTask = MentorTaskRecord & { projectName: string; assigneeName: string }
 
@@ -32,6 +33,8 @@ function hydrateTasks(tasks: MentorTaskRecord[]): ReviewTask[] {
 }
 
 export function ReviewQueuePage() {
+  const { user } = useAuth()
+  const taskBoardPath = user?.role === 'INTERN' ? '/intern/tasks' : '/mentor/tasks'
   const [tasks, setTasks] = useState<ReviewTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -128,9 +131,9 @@ export function ReviewQueuePage() {
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 3 }}>
         <Box>
           <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Task Review Queue</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Review work interns have submitted for acceptance.</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Review work submitted for acceptance on projects you supervise or Scrum Master.</Typography>
         </Box>
-        <Button component={RouterLink} to="/mentor/tasks" variant="outlined">Back to task board</Button>
+        <Button component={RouterLink} to={taskBoardPath} variant="outlined">Back to task board</Button>
       </Stack>
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2.5 }, borderRadius: 3 }}>

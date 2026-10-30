@@ -26,7 +26,7 @@ import styles from './GanttPage.module.css'
 
 export type GanttStatus = 'To Do' | 'In Progress' | 'Submitted' | 'Completed' | 'Blocked'
 type NewTaskStatus = 'To Do' | 'In Progress' | 'Completed'
-type ApiTaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+type ApiTaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED'
 type ApiTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
 interface ProjectTeamMember {
@@ -41,6 +41,7 @@ export interface GanttTaskItem {
   assigneeName: string
   assignedToId?: string | null
   description?: string | null
+  blockedReason?: string | null
   priority?: ApiTaskPriority
   assigneeInitials: string
   assigneeAvatarColor?: 'slate' | 'blue' | 'default'
@@ -49,9 +50,10 @@ export interface GanttTaskItem {
   startDate: string | null
   endDate: string | null
   progress: number
+  position: number
   barLabel?: string
   barProgress?: string
-  barColor?: 'blue' | 'green'
+  barColor?: 'blue' | 'green' | 'red'
 }
 
 interface ApiGanttTask {
@@ -63,12 +65,14 @@ interface ApiGanttTask {
   assignedToId?: string | null
   assigneeName?: string | null
   status: ApiTaskStatus
+  blockedReason?: string | null
   approvedAt?: string | null
   startDate?: string | null
   endDate?: string | null
   dueDate?: string | null
   priority?: ApiTaskPriority
   progress?: number
+  position?: number
 }
 
 interface TimelineColumn {
@@ -95,11 +99,13 @@ function toGanttTask(task: ApiGanttTask, projectId: string): GanttTaskItem {
     ? 'To Do'
     : task.status === 'IN_PROGRESS'
       ? 'In Progress'
-      : task.approvedAt
+      : task.status === 'BLOCKED'
+        ? 'Blocked'
+        : task.approvedAt
         ? 'Completed'
         : 'Submitted'
   const assigneeName = task.assigneeName || 'Unassigned'
-  const progress = task.status === 'TODO' ? 0 : task.status === 'IN_PROGRESS' ? 50 : 100
+  const progress = task.status === 'TODO' ? 0 : task.status === 'IN_PROGRESS' || task.status === 'BLOCKED' ? 50 : 100
 
   return {
     id: task.id,
@@ -108,6 +114,7 @@ function toGanttTask(task: ApiGanttTask, projectId: string): GanttTaskItem {
     assigneeName,
     assignedToId: task.assignedToId,
     description: task.description,
+    blockedReason: task.blockedReason,
     priority: task.priority,
     assigneeInitials: initialsFor(assigneeName),
     status,
@@ -115,9 +122,10 @@ function toGanttTask(task: ApiGanttTask, projectId: string): GanttTaskItem {
     startDate: task.startDate ?? task.dueDate ?? null,
     endDate: task.endDate ?? task.dueDate ?? null,
     progress,
+    position: task.position ?? 0,
     barLabel: task.title,
     barProgress: String(progress) + '%',
-    barColor: status === 'Completed' || status === 'Submitted' ? 'blue' : 'green',
+    barColor: status === 'Blocked' ? 'red' : status === 'Completed' || status === 'Submitted' ? 'blue' : 'green',
   }
 }
 
@@ -220,6 +228,8 @@ export function GanttPage({ projectId }: { projectId?: string }) {
   const [editTaskAssignee, setEditTaskAssignee] = useState('')
   const [editTaskPriority, setEditTaskPriority] = useState<ApiTaskPriority>('MEDIUM')
   const [editTaskDueDate, setEditTaskDueDate] = useState('')
+  const [editTaskStartDate, setEditTaskStartDate] = useState('')
+  const [editTaskPosition, setEditTaskPosition] = useState(1)
   const [editTeamMembers, setEditTeamMembers] = useState<ProjectTeamMember[]>([])
   const [loadingEditTeam, setLoadingEditTeam] = useState(false)
   const [savingEditTask, setSavingEditTask] = useState(false)
@@ -347,7 +357,9 @@ export function GanttPage({ projectId }: { projectId?: string }) {
     setEditTaskDescription(task.description ?? task.phase)
     setEditTaskAssignee(task.assignedToId ?? '')
     setEditTaskPriority(task.priority ?? 'MEDIUM')
-    setEditTaskDueDate(task.endDate ?? '')
+    setEditTaskDueDate(task.endDate?.slice(0, 10) ?? '')
+    setEditTaskStartDate(task.startDate?.slice(0, 10) ?? '')
+    setEditTaskPosition(task.position + 1)
     setEditTeamMembers([])
     setLoadingEditTeam(true)
 
@@ -378,8 +390,7 @@ export function GanttPage({ projectId }: { projectId?: string }) {
     event.preventDefault()
     if (!canManageTasks || !editingTask) return
     if (!editTaskName.trim()) return
-    const startDate = editingTask.startDate?.slice(0, 10)
-    if (startDate && editTaskDueDate && editTaskDueDate < startDate) {
+    if (editTaskStartDate && editTaskDueDate && editTaskDueDate < editTaskStartDate) {
       setToastMessage('The due date must be on or after the existing start date.')
       return
     }
@@ -391,12 +402,15 @@ export function GanttPage({ projectId }: { projectId?: string }) {
         description: editTaskDescription.trim(),
         assignedToId: editTaskAssignee || null,
         priority: editTaskPriority,
+        startDate: editTaskStartDate || null,
         dueDate: editTaskDueDate || null,
+        position: Math.max(0, editTaskPosition - 1),
       })
       const assigneeName = editTeamMembers.find((member) => member.id === editTaskAssignee)?.name
         ?? (editTaskAssignee === editingTask.assignedToId ? editingTask.assigneeName : 'Unassigned')
       const updatedTask = toGanttTask({ ...updated, assigneeName } as ApiGanttTask, editingTask.project)
-      setTasks((previous) => previous.map((task) => task.id === editingTask.id ? updatedTask : task))
+      setTasks((previous) => previous.map((task) => task.id === editingTask.id ? updatedTask : task)
+        .sort((left, right) => left.project.localeCompare(right.project) || left.position - right.position))
       setSelectedTask(updatedTask)
       setEditingTask(null)
       setToastMessage('Task updated successfully.')
@@ -745,7 +759,7 @@ export function GanttPage({ projectId }: { projectId?: string }) {
                         <td key={col.key} className={styles.timelineCell}>
                           {isBarStart && (
                             <div
-                              className={`${styles.timelineBar} ${task.barColor === 'green' ? styles.barGreen : styles.barBlue
+                              className={`${styles.timelineBar} ${task.barColor === 'red' ? styles.barRed : task.barColor === 'green' ? styles.barGreen : styles.barBlue
                                 }`}
                               style={{ width: barWidth }}
                               onClick={() => setSelectedTask(task)}
@@ -840,7 +854,6 @@ export function GanttPage({ projectId }: { projectId?: string }) {
                   </select>
                 </div>
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div className={styles.formGroup}>
                   <label htmlFor="task-status-select" className={styles.formLabel}>
@@ -978,6 +991,18 @@ export function GanttPage({ projectId }: { projectId?: string }) {
                   </select>
                 </div>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div className={styles.formGroup}>
+                <label htmlFor="edit-gantt-task-start-date" className={styles.formLabel}>Start Date</label>
+                <input
+                  id="edit-gantt-task-start-date"
+                  type="date"
+                  className={styles.formInput}
+                  value={editTaskStartDate}
+                  max={editTaskDueDate || undefined}
+                  onChange={(event) => setEditTaskStartDate(event.target.value)}
+                />
+              </div>
               <div className={styles.formGroup}>
                 <label htmlFor="edit-gantt-task-due-date" className={styles.formLabel}>Due Date</label>
                 <input
@@ -985,9 +1010,23 @@ export function GanttPage({ projectId }: { projectId?: string }) {
                   type="date"
                   className={styles.formInput}
                   value={editTaskDueDate}
-                  min={editingTask.startDate?.slice(0, 10) || undefined}
+                  min={editTaskStartDate || undefined}
                   onChange={(event) => setEditTaskDueDate(event.target.value)}
                 />
+              </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="edit-gantt-task-position" className={styles.formLabel}>Task order</label>
+                <input
+                  id="edit-gantt-task-position"
+                  type="number"
+                  min={1}
+                  max={Math.max(1, tasks.filter((task) => task.project === editingTask.project).length)}
+                  className={styles.formInput}
+                  value={editTaskPosition}
+                  onChange={(event) => setEditTaskPosition(Math.max(1, Number(event.target.value) || 1))}
+                />
+                <small className={styles.formHint}>Move this task earlier or later in the project sequence.</small>
               </div>
             </form>
           </DialogContent>
@@ -1030,6 +1069,9 @@ export function GanttPage({ projectId }: { projectId?: string }) {
             <p style={{ margin: '0 0 10px' }}>
               <strong>Status:</strong> {selectedTask.status}
             </p>
+            {selectedTask.status === 'Blocked' && selectedTask.blockedReason && (
+              <p style={{ margin: '0 0 10px' }}><strong>Block reason:</strong> {selectedTask.blockedReason}</p>
+            )}
             <p style={{ margin: '0 0 10px' }}>
               <strong>Project:</strong> {selectedTask.project}
             </p>

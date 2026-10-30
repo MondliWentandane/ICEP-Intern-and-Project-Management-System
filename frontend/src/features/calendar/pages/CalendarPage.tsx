@@ -36,20 +36,24 @@ function toCalendarEvent(task: CalendarTaskEvent): CalendarEventItem | null {
   const date = task.dueDate ?? task.startDate
   if (!date) return null
 
-  const status = task.status === 'TODO'
-    ? 'To Do'
-    : task.status === 'IN_PROGRESS'
-      ? 'In Progress'
-      : task.approvedAt
-        ? 'Completed'
-        : 'Submitted'
-  const color: EventColor = task.status === 'TODO'
-    ? 'blue'
-    : task.status === 'IN_PROGRESS'
-      ? 'green'
-      : task.approvedAt
-        ? 'blue'
-        : 'amber'
+  const status = task.status === 'BLOCKED'
+    ? 'Blocked'
+    : task.status === 'TODO'
+      ? 'To Do'
+      : task.status === 'IN_PROGRESS'
+        ? 'In Progress'
+        : task.approvedAt
+          ? 'Completed'
+          : 'Submitted'
+  const color: EventColor = task.status === 'BLOCKED'
+    ? 'red'
+    : task.status === 'TODO'
+      ? 'blue'
+      : task.status === 'IN_PROGRESS'
+        ? 'green'
+        : task.approvedAt
+          ? 'blue'
+          : 'amber'
 
   return {
     id: task.id,
@@ -121,6 +125,8 @@ export function CalendarPage() {
   // Modals & Feedback
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventItem | null>(null)
+  const [editedEventDate, setEditedEventDate] = useState('')
+  const [savingEventDate, setSavingEventDate] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Form State
@@ -137,6 +143,8 @@ export function CalendarPage() {
   const canManageTasks = canManageAllProjects || (user?.role === 'INTERN' && managedProjectIds.size > 0)
   const canManageNewEventProject = canManageAllProjects || managedProjectIds.has(newEventProject)
   const canDeleteSelectedEvent = canManageAllProjects ||
+    (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
+  const canEditSelectedEvent = canManageAllProjects ||
     (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
   const availableProjectsForNewEvent = canManageAllProjects
     ? projectsList
@@ -223,6 +231,21 @@ export function CalendarPage() {
     } catch (error: any) {
       console.error(error)
       setToastMessage('Permission Denied: Cannot delete this event.')
+    }
+  }
+
+  const handleUpdateEventDate = async () => {
+    if (!selectedEvent || !canEditSelectedEvent || !editedEventDate) return
+    setSavingEventDate(true)
+    try {
+      await Tasks.update(selectedEvent.id, { dueDate: editedEventDate })
+      setEvents((current) => current.map((event) => event.id === selectedEvent.id ? { ...event, date: editedEventDate } : event))
+      setSelectedEvent((current) => current ? { ...current, date: editedEventDate } : current)
+      setToastMessage('Task deadline updated.')
+    } catch (error: any) {
+      setToastMessage(error.response?.data?.message || 'Could not update this task date.')
+    } finally {
+      setSavingEventDate(false)
     }
   }
 
@@ -435,7 +458,7 @@ export function CalendarPage() {
                             key={ev.id}
                             type="button"
                             className={`${styles.eventPill} ${colorClass}`}
-                            onClick={() => setSelectedEvent(ev)}
+                            onClick={() => { setSelectedEvent(ev); setEditedEventDate(ev.date) }}
                             title={ev.title}
                           >
                             {ev.title}
@@ -473,7 +496,7 @@ export function CalendarPage() {
                                 ? styles.eventRed
                                 : styles.eventBlue
                             }`}
-                          onClick={() => setSelectedEvent(ev)}
+                          onClick={() => { setSelectedEvent(ev); setEditedEventDate(ev.date) }}
                         >
                           {ev.title}
                         </button>
@@ -595,12 +618,17 @@ export function CalendarPage() {
       {selectedEvent && (
         <Modal
           open={Boolean(selectedEvent)}
-          onClose={() => setSelectedEvent(null)}
+          onClose={() => { if (!savingEventDate) setSelectedEvent(null) }}
           title={selectedEvent.title}
           maxWidth="xs"
           fullWidth
           actions={
             <div style={{ display: 'flex', gap: '10px', justifyContent: canDeleteSelectedEvent ? 'space-between' : 'flex-end', width: '100%' }}>
+              {canEditSelectedEvent && (
+                <Button appearance="primary" onClick={() => void handleUpdateEventDate()} disabled={savingEventDate || !editedEventDate || editedEventDate === selectedEvent.date}>
+                  {savingEventDate ? 'Saving…' : 'Save date'}
+                </Button>
+              )}
               {canDeleteSelectedEvent && (
                 <Button appearance="danger" onClick={() => handleDeleteEvent(selectedEvent.id)}>
                   Delete
@@ -617,7 +645,10 @@ export function CalendarPage() {
               <strong>Project:</strong> {selectedEvent.projectName}
             </p>
             <p style={{ margin: '0 0 10px' }}>
-              <strong>Date:</strong> {selectedEvent.date}
+              <strong>Date:</strong>{' '}
+              {canEditSelectedEvent
+                ? <input aria-label="Task deadline" type="date" value={editedEventDate} onChange={(event) => setEditedEventDate(event.target.value)} disabled={savingEventDate} />
+                : selectedEvent.date}
             </p>
             <p style={{ margin: '0 0 10px' }}>
               <strong>Assignee:</strong> {selectedEvent.assignee}
@@ -637,7 +668,7 @@ export function CalendarPage() {
       >
         <Alert
           onClose={() => setToastMessage(null)}
-          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') ? 'error' : 'success'}
+          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') || toastMessage?.includes('Could not') || toastMessage?.includes('Unable') ? 'error' : 'success'}
           sx={{ width: '100%', borderRadius: '8px' }}
         >
           {toastMessage}

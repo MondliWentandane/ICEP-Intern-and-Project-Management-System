@@ -8,7 +8,7 @@ import type {
   TaskApiRecord,
 } from '@/types'
 
-export type InternTaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'SUBMITTED' | 'COMPLETED'
+export type InternTaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'SUBMITTED' | 'COMPLETED' | 'BLOCKED'
 export type TaskWorkflowStatus = InternTaskStatus
 export type TaskPriority = ApiTaskPriority
 
@@ -36,6 +36,7 @@ export type MentorTaskRecord = Omit<MentorBoardApiTask, 'status'> & {
 }
 
 function workflowStatus(task: Pick<TaskApiRecord, 'status' | 'approvedAt'>): TaskWorkflowStatus {
+  if (task.status === 'BLOCKED') return 'BLOCKED'
   if (task.status === 'TODO') return 'TO_DO'
   if (task.status === 'COMPLETED') return task.approvedAt ? 'COMPLETED' : 'SUBMITTED'
   return task.status
@@ -91,8 +92,8 @@ export const Tasks = {
   update: (id: string, payload: Partial<CreateTaskInput>) => apiClient
     .put<{ task: TaskApiRecord }>(`${endpoints.tasks}/${encodeURIComponent(id)}`, payload)
     .then(res => res.data.task),
-  updateStatus: (id: string, status: ApiTaskStatus) => apiClient
-    .put<{ task: TaskApiRecord }>(`${endpoints.tasks}/${encodeURIComponent(id)}/status`, { status })
+  updateStatus: (id: string, status: ApiTaskStatus, blockedReason?: string | null) => apiClient
+    .put<{ task: TaskApiRecord }>(`${endpoints.tasks}/${encodeURIComponent(id)}/status`, { status, blockedReason })
     .then(res => res.data.task),
   approve: (id: string) => apiClient
     .put<{ task: TaskApiRecord }>(`${endpoints.tasks}/${encodeURIComponent(id)}/approve`)

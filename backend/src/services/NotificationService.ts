@@ -194,6 +194,21 @@ export const notificationService = {
     });
   }),
 
+  /** The assigned intern: task details, dates, priority, or assignment changed. */
+  taskUpdated: (taskId: string) => safely("task updated", async () => {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { title: true, project: { select: { name: true } }, assignedTo: { select: { user: { select: { id: true, role: true } } } } },
+    });
+    if (!task?.assignedTo) return;
+    await send([task.assignedTo.user], {
+      type: "TASK_ASSIGNED",
+      title: "Task details updated",
+      message: `Details for "${task.title}" on ${task.project.name} have changed.`,
+      link: (base) => `${base}/tasks`,
+    });
+  }),
+
   /** The project's supervising mentor: an intern marked a task completed, ready for review. */
   taskSubmitted: (taskId: string) => safely("task submitted", async () => {
     const task = await prisma.task.findUnique({
@@ -201,14 +216,58 @@ export const notificationService = {
       select: {
         title: true,
         assignedTo: { select: { user: { select: { fullName: true } } } },
-        project: { select: { name: true, supervisor: { select: { user: { select: { id: true, role: true } } } } } },
+        project: {
+          select: {
+            name: true,
+            supervisor: { select: { user: { select: { id: true, role: true } } } },
+            assignments: {
+              where: { leftAt: null, projectRole: "Scrum Master" },
+              select: { intern: { select: { user: { select: { id: true, role: true } } } } },
+            },
+          },
+        },
       },
     });
-    if (!task?.project.supervisor) return;
-    await send([task.project.supervisor.user], {
+    if (!task) return;
+    const recipients: Recipient[] = [
+      ...(task.project.supervisor ? [task.project.supervisor.user] : []),
+      ...task.project.assignments.map((assignment) => assignment.intern.user),
+    ];
+    await send(recipients, {
       type: "SYSTEM", title: "Task ready for review",
       message: `${task.assignedTo?.user.fullName ?? "An intern"} completed "${task.title}" on ${task.project.name}.`,
       link: (base) => `${base}/tasks/review`,
+    });
+  }),
+
+  /** The supervising mentor and project Scrum Master: an intern blocked a task. */
+  taskBlocked: (taskId: string, reason: string, actorUserId: string) => safely("task blocked", async () => {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: {
+        title: true,
+        project: {
+          select: {
+            name: true,
+            supervisor: { select: { user: { select: { id: true, role: true } } } },
+            assignments: {
+              where: { leftAt: null, projectRole: "Scrum Master" },
+              select: { intern: { select: { user: { select: { id: true, role: true } } } } },
+            },
+          },
+        },
+      },
+    });
+    if (!task) return;
+    const recipients: Recipient[] = [
+      ...(task.project.supervisor ? [task.project.supervisor.user] : []),
+      ...task.project.assignments.map((assignment) => assignment.intern.user),
+    ].filter((recipient) => recipient.id !== actorUserId);
+    await send(recipients, {
+      type: "SYSTEM",
+      title: "Task blocked",
+      message: `A blocker was reported for "${task.title}" on ${task.project.name}: ${reason}`,
+      link: (base) => `${base}/tasks`,
     });
   }),
 
@@ -221,7 +280,7 @@ export const notificationService = {
     if (!task?.assignedTo) return;
     await send([task.assignedTo.user], {
       type: "TASK_APPROVED", title: "Task approved",
-      message: `Your mentor approved "${task.title}".`,
+      message: `Your reviewer approved "${task.title}".`,
       link: (base) => `${base}/tasks`,
     });
   }),
@@ -236,7 +295,7 @@ export const notificationService = {
     await send([task.assignedTo.user], {
       type: "SYSTEM",
       title: "Changes requested on task",
-      message: `Your mentor requested changes on "${task.title}" (${task.project.name}). It has been moved back to In Progress.`,
+      message: `Your reviewer requested changes on "${task.title}" (${task.project.name}). It has been moved back to In Progress.`,
       link: (base) => `${base}/tasks`,
     });
   }),

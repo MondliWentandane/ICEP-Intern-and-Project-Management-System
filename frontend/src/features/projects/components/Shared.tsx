@@ -4,8 +4,27 @@ export const FIELD =
   'w-full rounded-2xl border border-transparent bg-[#f1f4fa] px-4 py-3 text-sm text-[#0f1b33] focus:border-[#0b2a5b] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b2a5b]/20'
 
 export const errorText = (error: unknown, fallback: string) => {
-  const data = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data
-  return data?.error ?? data?.message ?? fallback
+  const requestError = error as {
+    message?: string
+    code?: string
+    response?: { status?: number; data?: unknown }
+  }
+  const data = requestError?.response?.data
+  if (data && typeof data === 'object') {
+    const body = data as { error?: unknown; message?: unknown }
+    if (typeof body.error === 'string' && body.error.trim()) return body.error
+    if (typeof body.message === 'string' && body.message.trim()) return body.message
+  }
+  if (typeof data === 'string' && data.trim()) return data
+
+  // Axios has no response when the backend cannot be reached or the request times out.
+  if (!requestError?.response && (requestError?.code === 'ECONNABORTED' || requestError?.code === 'ERR_NETWORK')) {
+    return 'Could not reach the backend. Check that it is running on port 5000 and can connect to the database, then try again.'
+  }
+  if (requestError?.response?.status) {
+    return `The server returned an error (${requestError.response.status}). Check the backend terminal for details.`
+  }
+  return requestError?.message || fallback
 }
 
 export function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {

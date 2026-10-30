@@ -6,10 +6,9 @@ import {
     authorizeRoles
 } from "../middlewares/AuthMiddleware";
 
-// Only administrators and mentors can manage tasks
-const adminOrMentor = [
+const adminMentorOrIntern = [
     authenticateToken,
-    authorizeRoles("ADMIN", "MENTOR")
+    authorizeRoles("ADMIN", "MENTOR", "INTERN")
 ];
 
 // All authenticated roles can access permitted task information
@@ -59,7 +58,7 @@ router.post("/tasks", anyRole, TaskController.createTask);
 // Completed tasks waiting for approval
 router.get(
     "/tasks/review",
-    adminOrMentor,
+    adminMentorOrIntern,
     TaskController.getReviewQueue
 );
 
@@ -83,10 +82,10 @@ router.put("/tasks/:id/status", anyRole, TaskController.updateTaskStatus);
 router.put("/tasks/:id/assign", anyRole, TaskController.assignTo);
 
 // Approve completed task
-router.put("/tasks/:id/approve", adminOrMentor, TaskController.approveTask);
+router.put("/tasks/:id/approve", adminMentorOrIntern, TaskController.approveTask);
 
 // Return a submitted task to the intern with review feedback
-router.put("/tasks/:id/request-changes", adminOrMentor, TaskController.requestTaskChanges);
+router.put("/tasks/:id/request-changes", adminMentorOrIntern, TaskController.requestTaskChanges);
 
 // ================= SUBTASKS =================
 

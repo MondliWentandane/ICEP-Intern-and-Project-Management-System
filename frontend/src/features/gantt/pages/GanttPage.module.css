@@ -479,6 +479,10 @@
   background: #15803D;
 }
 
+.barRed {
+  background: #DC2626;
+}
+
 .barTitle {
   overflow: hidden;
   text-overflow: ellipsis;

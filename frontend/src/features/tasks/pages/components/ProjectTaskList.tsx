@@ -7,15 +7,16 @@ interface ApiTask {
   title: string
   description?: string | null
   assigneeName?: string | null
-  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED'
+  blockedReason?: string | null
   approvedAt?: string | null
   dueDate?: string | null
   endDate?: string | null
 }
 
-const COLUMNS = ['To Do', 'In Progress', 'Done'] as const
+const COLUMNS = ['To Do', 'In Progress', 'Done', 'Blocked'] as const
 type Column = (typeof COLUMNS)[number]
-const columnOf = (t: ApiTask): Column => (t.status === 'TODO' ? 'To Do' : t.status === 'IN_PROGRESS' ? 'In Progress' : 'Done')
+const columnOf = (t: ApiTask): Column => (t.status === 'TODO' ? 'To Do' : t.status === 'IN_PROGRESS' ? 'In Progress' : t.status === 'BLOCKED' ? 'Blocked' : 'Done')
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
 const due = (t: ApiTask) => {
   const d = (t.dueDate ?? t.endDate)?.slice(0, 10)
@@ -71,6 +72,7 @@ export function ProjectTaskList({ projectId }: { projectId: string }) {
                 <div key={t.id} className="mb-2 rounded-xl bg-white p-3 shadow-sm">
                   <p className="text-sm font-semibold text-[#0f1b33]">{t.title}</p>
                   {t.description && <p className="text-xs text-[#55627a]">{t.description}</p>}
+                  {t.status === 'BLOCKED' && t.blockedReason && <p className="mt-2 text-xs font-medium text-red-700">Blocked: {t.blockedReason}</p>}
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[#55627a]">
                     <span className="flex items-center gap-1.5">
                       <span className="grid h-6 w-6 place-items-center rounded-full bg-[#0b2a5b] text-[10px] font-semibold text-white">

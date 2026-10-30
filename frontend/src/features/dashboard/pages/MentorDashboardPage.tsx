@@ -78,12 +78,13 @@ function initialsFor(name: string) {
 // ---------------------------------------------------------------------------
 
 // Same values as the TaskStatus enum in the Prisma schema.
-type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED'
 
 interface ProjectTask {
   id: string
   title: string
   status: TaskStatus
+  blockedReason?: string | null
   assignee?: string
   /** ISO date, e.g. 2026-10-15 */
   startDate: string | null
@@ -106,6 +107,7 @@ const columns: Array<{ status: TaskStatus; label: string; color: string }> = [
   { status: 'TODO', label: 'To do', color: '#94A3B8' },
   { status: 'IN_PROGRESS', label: 'In progress', color: 'var(--icep-completed, #3B82F6)' },
   { status: 'COMPLETED', label: 'Completed', color: 'var(--icep-active, #16A34A)' },
+  { status: 'BLOCKED', label: 'Blocked', color: '#EF4444' },
 ]
 const statusColor = Object.fromEntries(columns.map((c) => [c.status, c.color])) as Record<TaskStatus, string>
 
@@ -170,6 +172,7 @@ function TaskBoard({ tasks, now }: { tasks: ProjectTask[]; now: number }) {
                 return (
                   <Box key={task.id} sx={{ bgcolor: '#fff', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1.25 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{task.title}</Typography>
+                    {task.status === 'BLOCKED' && task.blockedReason && <Typography variant="caption" color="error.main">Blocked: {task.blockedReason}</Typography>}
                     <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
                       <Typography variant="caption" color="text.secondary">{task.assignee ?? 'Unassigned'}</Typography>
                       <Typography variant="caption" sx={{ color: overdue ? 'error.main' : 'text.secondary', fontWeight: overdue ? 700 : 400 }}>
@@ -267,6 +270,7 @@ function ProjectDetailDialog({ project, onClose }: { project: ProjectSummary; on
           id: task.id,
           title: task.title,
           status: task.status,
+          blockedReason: task.blockedReason,
           assignee: task.assignedTo?.user?.fullName ?? 'Unassigned',
           startDate: task.startDate?.slice(0, 10) ?? null,
           dueDate: task.dueDate?.slice(0, 10) ?? null,

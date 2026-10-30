@@ -1,7 +1,7 @@
 import type { ID } from './common'
 export interface Task { id: ID; title: string; status: 'todo' | 'in_progress' | 'completed'; projectId?: ID; dueAt?: string }
 
-export type ApiTaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+export type ApiTaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED'
 export type ApiTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
 export interface TaskApiRecord {
@@ -14,8 +14,10 @@ export interface TaskApiRecord {
   assigneeName?: string | null
   assignedTo?: { user?: { fullName?: string | null } | null } | null
   status: ApiTaskStatus
+  blockedReason?: string | null
   priority?: ApiTaskPriority
   progress?: number
+  position?: number
   startDate?: string | null
   dueDate?: string | null
   endDate?: string | null
@@ -37,4 +39,5 @@ export interface CreateTaskInput {
   status?: ApiTaskStatus
   startDate?: string | null
   dueDate?: string | null
+  position?: number
 }

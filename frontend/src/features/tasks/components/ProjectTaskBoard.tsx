@@ -19,16 +19,18 @@ import { useAuth } from '@/hooks/useAuth'
 import { BikeLoader } from '@/components/ui/BikeLoader'
 import type { ApiTaskStatus, Project, TaskApiRecord } from '@/types'
 
-const taskStatuses: ApiTaskStatus[] = ['TODO', 'IN_PROGRESS', 'COMPLETED']
+const taskStatuses: ApiTaskStatus[] = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'BLOCKED']
 const statusLabels: Record<ApiTaskStatus, string> = {
   TODO: 'To Do',
   IN_PROGRESS: 'In Progress',
   COMPLETED: 'Completed',
+  BLOCKED: 'Blocked',
 }
-const statusColors: Record<ApiTaskStatus, 'default' | 'warning' | 'success'> = {
+const statusColors: Record<ApiTaskStatus, 'default' | 'warning' | 'success' | 'error'> = {
   TODO: 'default',
   IN_PROGRESS: 'warning',
   COMPLETED: 'success',
+  BLOCKED: 'error',
 }
 const priorityLabels = { HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' } as const
 const refreshIntervalMs = 30_000
@@ -68,6 +70,7 @@ function allowedProjects(projects: Project[], role: string | undefined, userId: 
 function nextStatus(status: ApiTaskStatus): ApiTaskStatus | null {
   if (status === 'TODO') return 'IN_PROGRESS'
   if (status === 'IN_PROGRESS') return 'COMPLETED'
+  if (status === 'BLOCKED') return 'IN_PROGRESS'
   return null
 }
 
@@ -117,6 +120,9 @@ function TaskCard({
           </Typography>
         )}
       </Stack>
+      {task.status === 'BLOCKED' && task.blockedReason && (
+        <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 1 }}>Blocked: {task.blockedReason}</Typography>
+      )}
       {canAdvance && (
         <Button
           variant="outlined"
