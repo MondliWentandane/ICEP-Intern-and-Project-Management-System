@@ -3,6 +3,8 @@
   --muted: #63748b;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid #e1e8f0;
   border-radius: 20px;
   background: #fff;
@@ -20,7 +22,8 @@
 .hero {
   position: relative;
   display: flex;
-  min-height: 164px;
+  height: 220px;
+  min-height: 220px;
   align-items: center;
   justify-content: space-between;
   overflow: hidden;
@@ -41,7 +44,7 @@
 .waves span:nth-child(2) { top: 26px; left: -20%; opacity: .65; animation-duration: 9s; animation-direction: reverse; }
 .waves span:nth-child(3) { top: 35px; left: 0; opacity: .4; animation-duration: 11s; }
 
-.body { padding: 21px 24px 22px; }
+.body { display: flex; flex: 1; flex-direction: column; padding: 21px 24px 22px; }
 .description { display: -webkit-box; min-height: 42px; margin: 0 0 20px; overflow: hidden; color: var(--muted); font-size: 13px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .progressHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
 .progressHead strong { color: var(--navy); font-size: 13px; }
@@ -56,7 +59,7 @@
 .avatar:nth-child(2n) { background: #e2f4ed; color: #16734e; }
 .avatar:nth-child(3n) { background: #fff0d8; color: #9a5a11; }
 .teamNames { overflow: hidden; color: #44556b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.link { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; color: var(--navy); font-size: 13px; font-weight: 700; text-decoration: none; }
+.link { display: inline-flex; align-items: center; gap: 8px; width: fit-content; margin-top: auto; padding-top: 20px; color: var(--navy); font-size: 13px; font-weight: 700; text-decoration: none; }
 .link svg { transition: transform 200ms ease; }
 .link:hover { color: #187b69; }
 .link:hover svg { transform: translateX(4px); }
@@ -67,7 +70,7 @@
 @keyframes wave-slide { from { transform: translateX(0) rotate(-2deg); } to { transform: translateX(-8%) rotate(2deg); } }
 
 @media (max-width: 480px) {
-  .hero { min-height: 148px; padding: 18px; }
+  .hero { height: 200px; min-height: 200px; padding: 18px; }
   .heroCopy { max-width: 90%; }
   .body { padding: 18px; }
 }
