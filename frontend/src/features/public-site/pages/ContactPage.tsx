@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Box, Paper, Typography } from '@mui/material'
-import * as maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 import { CursorFollower } from '../story/CursorFollower'
 import { RevealTitle } from '../story/Reveal'
 import { riseSx, useReveal } from '../story/useScrollProgress'
@@ -128,76 +127,110 @@ function ContactForm({ onSubmit }: { onSubmit?: (m: ContactMessage) => Promise<v
 
 function MapCard() {
   const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<maplibregl.Map | null>(null)
-  const animationRef = useRef<number>()
+  const map = useRef<MapLibreMap | null>(null)
+  const animationRef = useRef<number | null>(null)
   const userInteracting = useRef(false)
+  const [mapIsNearViewport, setMapIsNearViewport] = useState(false)
 
   useEffect(() => {
-    if (map.current || !mapContainer.current) return
-
-    map.current = new maplibregl.Map({
-      container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          satellite: {
-            type: 'raster',
-            tiles: [
-              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-            ],
-            tileSize: 256,
-            attribution: '&copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
-          }
-        },
-        layers: [{
-          id: 'satellite-layer',
-          type: 'raster',
-          source: 'satellite'
-        }]
-      },
-      center: [28.0968938, -25.5401753],
-      zoom: 16.2,
-      pitch: 65,
-      bearing: 0,
-      scrollZoom: false 
-    })
-
-    map.current.addControl(new maplibregl.NavigationControl({ 
-      showCompass: true,
-      visualizePitch: true 
-    }), 'top-right')
-
-    new maplibregl.Marker({ color: '#ff4444' })
-      .setLngLat([28.0968938, -25.5401753])
-      .addTo(map.current)
-
-    const rotateCamera = () => {
-      if (map.current && !userInteracting.current) {
-        const currentBearing = map.current.getBearing()
-        map.current.setBearing(currentBearing - 0.15) 
-      }
-      animationRef.current = requestAnimationFrame(rotateCamera)
+    const target = mapContainer.current
+    if (!target) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setMapIsNearViewport(true)
+      return
     }
 
-    map.current.on('load', () => {
-      rotateCamera()
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setMapIsNearViewport(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '200px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!mapIsNearViewport) return
+    let disposed = false
+    let container: HTMLDivElement | null = null
+    let handleMouseLeave: (() => void) | null = null
+
+    const initializeMap = async () => {
+      const [maplibregl] = await Promise.all([
+        import('maplibre-gl'),
+        import('maplibre-gl/dist/maplibre-gl.css'),
+      ])
+      const target = mapContainer.current
+      if (disposed || !target || map.current) return
+
+      const mapInstance = new maplibregl.Map({
+        container: target,
+        style: {
+          version: 8,
+          sources: {
+            satellite: {
+              type: 'raster',
+              tiles: [
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+              ],
+              tileSize: 256,
+              attribution: '&copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+            }
+          },
+          layers: [{
+            id: 'satellite-layer',
+            type: 'raster',
+            source: 'satellite'
+          }]
+        },
+        center: [28.0968938, -25.5401753],
+        zoom: 16.2,
+        pitch: 65,
+        bearing: 0,
+        scrollZoom: false
+      })
+      map.current = mapInstance
+
+      mapInstance.addControl(new maplibregl.NavigationControl({
+        showCompass: true,
+        visualizePitch: true
+      }), 'top-right')
+
+      new maplibregl.Marker({ color: '#ff4444' })
+        .setLngLat([28.0968938, -25.5401753])
+        .addTo(mapInstance)
+
+      const rotateCamera = () => {
+        if (map.current && !userInteracting.current) {
+          const currentBearing = map.current.getBearing()
+          map.current.setBearing(currentBearing - 0.15)
+        }
+        animationRef.current = requestAnimationFrame(rotateCamera)
+      }
+
+      mapInstance.on('load', rotateCamera)
+      mapInstance.on('mousedown', () => { userInteracting.current = true })
+      mapInstance.on('dragstart', () => { userInteracting.current = true })
+      mapInstance.on('touchstart', () => { userInteracting.current = true })
+
+      container = target
+      handleMouseLeave = () => { userInteracting.current = false }
+      container.addEventListener('mouseleave', handleMouseLeave)
+    }
+
+    void initializeMap().catch((error: unknown) => {
+      if (!disposed) console.error('Failed to load the campus map:', error)
     })
 
-    map.current.on('mousedown', () => { userInteracting.current = true })
-    map.current.on('dragstart', () => { userInteracting.current = true })
-    map.current.on('touchstart', () => { userInteracting.current = true })
-
-    const container = mapContainer.current
-    const handleMouseLeave = () => { userInteracting.current = false }
-    container.addEventListener('mouseleave', handleMouseLeave)
-
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      container.removeEventListener('mouseleave', handleMouseLeave)
+      disposed = true
+      if (animationRef.current !== null) cancelAnimationFrame(animationRef.current)
+      if (container && handleMouseLeave) container.removeEventListener('mouseleave', handleMouseLeave)
       map.current?.remove()
       map.current = null
     }
-  }, [])
+  }, [mapIsNearViewport])
 
   return (
     <Box sx={introSx(1000)}>

@@ -24,7 +24,7 @@ export function MyProfilePage() {
   if (isLoading) return <TableLoading />
   if (isError || !profile) return <TableError message="We couldn't load your profile" onRetry={() => void refetch()} />
 
-  const isIntern = user.role === 'intern'
+  const isIntern = user.role === 'INTERN'
   const downloadCv = () => {
     if (profile.cv?.file) downloadBlob(profile.cv.file, profile.cv.name)
     else setToast('CV downloads will work once the profile API is connected.')

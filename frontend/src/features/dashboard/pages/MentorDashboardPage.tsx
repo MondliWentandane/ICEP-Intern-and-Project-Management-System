@@ -15,14 +15,6 @@ import {
 } from 'lucide-react'
 import { PROJECT_STATUS_LABELS } from '@/features/projects/data/newProject'
 import { useProjects, type ProjectRecord } from '@/features/projects/data/projectsApi'
-import { IcepLogo } from '@/components/brand/IcepLogo'
-import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
-import { TagInput } from '@/components/ui/TagInput'
-import {
-  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
-  type ProjectStatus,
-} from '@/features/projects/data/newProject'
 import { downloadBlob } from '@/utils/format'
 import styles from './MentorDashboardPage.module.css'
 

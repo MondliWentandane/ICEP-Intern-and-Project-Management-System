@@ -27,6 +27,7 @@ import styles from './GanttPage.module.css'
 export type GanttStatus = 'To Do' | 'In Progress' | 'Submitted' | 'Completed' | 'Blocked'
 type NewTaskStatus = 'To Do' | 'In Progress' | 'Completed'
 type ApiTaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
+type ApiTaskPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
 interface ProjectTeamMember {
   id: string
@@ -38,6 +39,9 @@ export interface GanttTaskItem {
   name: string
   phase: string
   assigneeName: string
+  assignedToId?: string | null
+  description?: string | null
+  priority?: ApiTaskPriority
   assigneeInitials: string
   assigneeAvatarColor?: 'slate' | 'blue' | 'default'
   status: GanttStatus
@@ -63,6 +67,7 @@ interface ApiGanttTask {
   startDate?: string | null
   endDate?: string | null
   dueDate?: string | null
+  priority?: ApiTaskPriority
   progress?: number
 }
 
@@ -101,6 +106,9 @@ function toGanttTask(task: ApiGanttTask, projectId: string): GanttTaskItem {
     name: task.title,
     phase: task.description || task.category || 'Task',
     assigneeName,
+    assignedToId: task.assignedToId,
+    description: task.description,
+    priority: task.priority,
     assigneeInitials: initialsFor(assigneeName),
     status,
     project: projectId,
@@ -206,6 +214,15 @@ export function GanttPage({ projectId }: { projectId?: string }) {
   // Modals & Notifications
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<GanttTaskItem | null>(null)
+  const [editingTask, setEditingTask] = useState<GanttTaskItem | null>(null)
+  const [editTaskName, setEditTaskName] = useState('')
+  const [editTaskDescription, setEditTaskDescription] = useState('')
+  const [editTaskAssignee, setEditTaskAssignee] = useState('')
+  const [editTaskPriority, setEditTaskPriority] = useState<ApiTaskPriority>('MEDIUM')
+  const [editTaskDueDate, setEditTaskDueDate] = useState('')
+  const [editTeamMembers, setEditTeamMembers] = useState<ProjectTeamMember[]>([])
+  const [loadingEditTeam, setLoadingEditTeam] = useState(false)
+  const [savingEditTask, setSavingEditTask] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // New task form state
@@ -324,6 +341,73 @@ export function GanttPage({ projectId }: { projectId?: string }) {
     }
   }
 
+  const openEditTask = async (task: GanttTaskItem) => {
+    setEditingTask(task)
+    setEditTaskName(task.name)
+    setEditTaskDescription(task.description ?? task.phase)
+    setEditTaskAssignee(task.assignedToId ?? '')
+    setEditTaskPriority(task.priority ?? 'MEDIUM')
+    setEditTaskDueDate(task.endDate ?? '')
+    setEditTeamMembers([])
+    setLoadingEditTeam(true)
+
+    try {
+      const response = await Projects.get(task.project)
+      const project = response.data as unknown as {
+        assignments?: Array<{
+          internId?: string
+          intern?: { user?: { fullName?: string } }
+        }>
+      }
+      const members = (project.assignments ?? [])
+        .filter((assignment) => assignment.internId && assignment.intern?.user?.fullName)
+        .map((assignment) => ({ id: assignment.internId!, name: assignment.intern!.user!.fullName! }))
+      setEditTeamMembers(members)
+      if (task.assignedToId && !members.some((member) => member.id === task.assignedToId)) {
+        setEditTaskAssignee('')
+      }
+    } catch (error) {
+      console.error('Failed to load project team for task editing:', error)
+      setToastMessage('Could not load project members. You can still edit the task details.')
+    } finally {
+      setLoadingEditTeam(false)
+    }
+  }
+
+  const handleUpdateTask = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!canManageTasks || !editingTask) return
+    if (!editTaskName.trim()) return
+    const startDate = editingTask.startDate?.slice(0, 10)
+    if (startDate && editTaskDueDate && editTaskDueDate < startDate) {
+      setToastMessage('The due date must be on or after the existing start date.')
+      return
+    }
+
+    setSavingEditTask(true)
+    try {
+      const updated = await Tasks.update(editingTask.id, {
+        title: editTaskName.trim(),
+        description: editTaskDescription.trim(),
+        assignedToId: editTaskAssignee || null,
+        priority: editTaskPriority,
+        dueDate: editTaskDueDate || null,
+      })
+      const assigneeName = editTeamMembers.find((member) => member.id === editTaskAssignee)?.name
+        ?? (editTaskAssignee === editingTask.assignedToId ? editingTask.assigneeName : 'Unassigned')
+      const updatedTask = toGanttTask({ ...updated, assigneeName } as ApiGanttTask, editingTask.project)
+      setTasks((previous) => previous.map((task) => task.id === editingTask.id ? updatedTask : task))
+      setSelectedTask(updatedTask)
+      setEditingTask(null)
+      setToastMessage('Task updated successfully.')
+    } catch (error: any) {
+      console.error('Failed to update task:', error)
+      setToastMessage(error.response?.data?.message || 'Unable to update task.')
+    } finally {
+      setSavingEditTask(false)
+    }
+  }
+
   useEffect(() => {
     if (!selectedProject || selectedProject === 'All Projects') {
       setTeamMembers([])
@@ -416,7 +500,7 @@ export function GanttPage({ projectId }: { projectId?: string }) {
         }
       })
       .catch(err => console.error("Failed to load projects:", err))
-  }, [user?.id, user?.roleprojectId])
+  }, [user?.id, user?.role, projectId])
 
   return (
     <main className={styles.page}>
@@ -824,6 +908,92 @@ export function GanttPage({ projectId }: { projectId?: string }) {
         </Modal>
       )}
 
+      {/* Edit task fields supported by the existing task API. */}
+      {canManageTasks && editingTask && (
+        <Modal
+          open={Boolean(editingTask)}
+          onClose={() => { if (!savingEditTask) setEditingTask(null) }}
+          title="Edit Gantt Task"
+          maxWidth="sm"
+          fullWidth
+          actions={
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+              <Button appearance="secondary" onClick={() => setEditingTask(null)} disabled={savingEditTask}>
+                Cancel
+              </Button>
+              <Button appearance="primary" onClick={() => (document.getElementById('edit-gantt-task-form') as HTMLFormElement | null)?.requestSubmit()} disabled={savingEditTask}>
+                {savingEditTask ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </div>
+          }
+        >
+          <DialogContent dividers sx={{ borderBottom: '1px solid #E2E8F0' }}>
+            <form className={styles.modalForm} onSubmit={handleUpdateTask} id="edit-gantt-task-form">
+              <div className={styles.formGroup}>
+                <label htmlFor="edit-gantt-task-name" className={styles.formLabel}>Task Name</label>
+                <input
+                  id="edit-gantt-task-name"
+                  className={styles.formInput}
+                  value={editTaskName}
+                  onChange={(event) => setEditTaskName(event.target.value)}
+                  required
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="edit-gantt-task-description" className={styles.formLabel}>Description / Phase</label>
+                <input
+                  id="edit-gantt-task-description"
+                  className={styles.formInput}
+                  value={editTaskDescription}
+                  onChange={(event) => setEditTaskDescription(event.target.value)}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="edit-gantt-task-assignee" className={styles.formLabel}>Assignee</label>
+                  <select
+                    id="edit-gantt-task-assignee"
+                    className={styles.modalSelect}
+                    value={editTaskAssignee}
+                    onChange={(event) => setEditTaskAssignee(event.target.value)}
+                    disabled={loadingEditTeam}
+                  >
+                    <option value="">Unassigned</option>
+                    {editTeamMembers.map((member) => (
+                      <option key={member.id} value={member.id}>{member.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="edit-gantt-task-priority" className={styles.formLabel}>Priority</label>
+                  <select
+                    id="edit-gantt-task-priority"
+                    className={styles.modalSelect}
+                    value={editTaskPriority}
+                    onChange={(event) => setEditTaskPriority(event.target.value as ApiTaskPriority)}
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="edit-gantt-task-due-date" className={styles.formLabel}>Due Date</label>
+                <input
+                  id="edit-gantt-task-due-date"
+                  type="date"
+                  className={styles.formInput}
+                  value={editTaskDueDate}
+                  min={editingTask.startDate?.slice(0, 10) || undefined}
+                  onChange={(event) => setEditTaskDueDate(event.target.value)}
+                />
+              </div>
+            </form>
+          </DialogContent>
+        </Modal>
+      )}
+
       {/* Task Details Modal */}
       {selectedTask && (
         <Modal
@@ -835,9 +1005,14 @@ export function GanttPage({ projectId }: { projectId?: string }) {
           actions={
             <div style={{ display: 'flex', gap: '10px', justifyContent: canManageTasks ? 'space-between' : 'flex-end', width: '100%' }}>
               {canManageTasks && (
-                <Button appearance="danger" onClick={() => handleDeleteTask(selectedTask.id)}>
-                  Delete Task
-                </Button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Button appearance="secondary" onClick={() => void openEditTask(selectedTask)}>
+                    Edit Task
+                  </Button>
+                  <Button appearance="danger" onClick={() => handleDeleteTask(selectedTask.id)}>
+                    Delete Task
+                  </Button>
+                </div>
               )}
               <Button appearance="secondary" onClick={() => setSelectedTask(null)}>
                 Close
