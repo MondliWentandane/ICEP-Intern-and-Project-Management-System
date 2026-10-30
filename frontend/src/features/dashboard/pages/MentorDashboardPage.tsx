@@ -1,59 +1,36 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Alert,
-  Box,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  LinearProgress,
   Menu,
   MenuItem,
   Snackbar,
-  Stack,
-  Tab,
-  Tabs,
-  Typography,
 } from '@mui/material'
 import {
+  AlertTriangle,
   Calendar,
   CheckCircle2,
   Folder,
   MoreHorizontal,
-  X,
 } from 'lucide-react'
+import { PROJECT_STATUS_LABELS } from '@/features/projects/data/newProject'
+import { useProjects, type ProjectRecord } from '@/features/projects/data/projectsApi'
+import { IcepLogo } from '@/components/brand/IcepLogo'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
+import { TagInput } from '@/components/ui/TagInput'
+import {
+  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
+  type ProjectStatus,
+} from '@/features/projects/data/newProject'
+import { downloadBlob } from '@/utils/format'
 import styles from './MentorDashboardPage.module.css'
 
-interface TeamMember {
-  initials: string
-  colorClass: string
-}
-
-// Same values as the ProjectStatus enum in the Prisma schema.
-type ProjectStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD'
-
-const statusLabels: Record<ProjectStatus, string> = {
-  PLANNED: 'Planned',
-  IN_PROGRESS: 'In Progress',
-  COMPLETED: 'Completed',
-  ON_HOLD: 'On Hold',
-}
-
-interface ProjectItem {
-  id: string
-  name: string
-  groupName?: string
-  description?: string
-  team: TeamMember[]
-  status: ProjectStatus
-  progress: number
-  dueDate: string
-  colorClass: string
-}
+const statusLabels = PROJECT_STATUS_LABELS
 
 interface DeadlineItem {
   id: string
+  isoDate: string
   month: string
   day: string
   title: string
@@ -61,330 +38,28 @@ interface DeadlineItem {
   colorVariant: 'red' | 'amber' | 'blue'
 }
 
-const initialProjects: ProjectItem[] = [
-  {
-    id: 'proj-1',
-    name: 'Software Dev Alpha',
-    groupName: 'Group A',
-    team: [
-      { initials: 'MS', colorClass: styles.avatarMS },
-      { initials: 'TM', colorClass: styles.avatarTM },
-      { initials: 'JS', colorClass: styles.avatarJS },
-    ],
-    status: 'IN_PROGRESS',
-    progress: 75,
-    dueDate: 'Nov 15',
-    colorClass: styles.barBlue,
-  },
-  {
-    id: 'proj-2',
-    name: 'Network Security Audit',
-    groupName: 'Group B',
-    team: [
-      { initials: 'RJ', colorClass: styles.avatarRJ },
-      { initials: 'MS', colorClass: styles.avatarMS },
-    ],
-    status: 'ON_HOLD',
-    progress: 30,
-    dueDate: 'Oct 28',
-    colorClass: styles.barOrange,
-  },
-  {
-    id: 'proj-3',
-    name: 'Data Migration Phase 2',
-    groupName: 'Group C',
-    team: [
-      { initials: 'TN', colorClass: styles.avatarTN },
-      { initials: 'AB', colorClass: styles.avatarAB },
-    ],
-    status: 'IN_PROGRESS',
-    progress: 95,
-    dueDate: 'Oct 12',
-    colorClass: styles.barGreen,
-  },
-  {
-    id: 'proj-4',
-    name: 'Mobile App Beta',
-    groupName: 'Group D',
-    team: [
-      { initials: 'JS', colorClass: styles.avatarJS },
-      { initials: 'MS', colorClass: styles.avatarMS },
-      { initials: 'TM', colorClass: styles.avatarTM },
-    ],
-    status: 'IN_PROGRESS',
-    progress: 45,
-    dueDate: 'Dec 01',
-    colorClass: styles.barBlue,
-  },
-]
+const PRIORITY: Record<DeadlineItem['colorVariant'], string> = { red: 'Urgent', amber: 'Due soon', blue: 'Upcoming' }
+const csvCell = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value)
+const AVATAR_COLORS = [styles.avatarMS, styles.avatarTM, styles.avatarJS, styles.avatarRJ, styles.avatarTN, styles.avatarAB]
+const memberInitials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
+const formatShortDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { month: 'short', day: '2-digit' })
 
-// Demo tasks per project until the tasks API is connected. Statuses use the schema's TaskStatus values.
-const demoTasks: Record<string, ProjectTask[]> = {
-  'proj-1': [
-    { id: 't1', title: 'Database Schema V2', status: 'COMPLETED', assignee: 'MS', startDate: '2026-09-01', dueDate: '2026-10-15' },
-    { id: 't2', title: 'API endpoints', status: 'IN_PROGRESS', assignee: 'TM', startDate: '2026-10-05', dueDate: '2026-11-05' },
-    { id: 't3', title: 'Frontend screens', status: 'IN_PROGRESS', assignee: 'JS', startDate: '2026-10-12', dueDate: '2026-11-12' },
-    { id: 't4', title: 'Testing and fixes', status: 'TODO', assignee: 'MS', startDate: '2026-11-02', dueDate: '2026-11-15' },
-  ],
-  'proj-2': [
-    { id: 't5', title: 'Scope and asset list', status: 'COMPLETED', assignee: 'RJ', startDate: '2026-09-20', dueDate: '2026-10-05' },
-    { id: 't6', title: 'Vulnerability scan', status: 'IN_PROGRESS', assignee: 'MS', startDate: '2026-10-01', dueDate: '2026-10-20' },
-    { id: 't7', title: 'Security patch sign-off', status: 'TODO', assignee: 'RJ', startDate: '2026-10-15', dueDate: '2026-10-28' },
-  ],
-  'proj-3': [
-    { id: 't8', title: 'Data mapping', status: 'COMPLETED', assignee: 'TN', startDate: '2026-09-01', dueDate: '2026-09-25' },
-    { id: 't9', title: 'Migration scripts', status: 'COMPLETED', assignee: 'AB', startDate: '2026-09-20', dueDate: '2026-10-05' },
-    { id: 't10', title: 'Final data validation', status: 'IN_PROGRESS', assignee: 'TN', startDate: '2026-10-05', dueDate: '2026-10-12' },
-  ],
-  'proj-4': [
-    { id: 't11', title: 'UI design handoff', status: 'COMPLETED', assignee: 'JS', startDate: '2026-10-01', dueDate: '2026-10-22' },
-    { id: 't12', title: 'Core screens', status: 'IN_PROGRESS', assignee: 'MS', startDate: '2026-10-15', dueDate: '2026-11-15' },
-    { id: 't13', title: 'Beta testing', status: 'TODO', assignee: 'TM', startDate: '2026-11-10', dueDate: '2026-12-01' },
-  ],
-}
-
-const initialDeadlines: DeadlineItem[] = [
-  {
-    id: 'dl-1',
-    month: 'OCT',
-    day: '08',
-    title: 'Security Patch Sign-off',
-    project: 'Network Security Audit',
-    colorVariant: 'red',
-  },
-  {
-    id: 'dl-2',
-    month: 'OCT',
-    day: '12',
-    title: 'Final Data Validation',
-    project: 'Data Migration Phase 2',
-    colorVariant: 'amber',
-  },
-  {
-    id: 'dl-3',
-    month: 'OCT',
-    day: '15',
-    title: 'Database Schema V2',
-    project: 'Software Dev Alpha',
-    colorVariant: 'blue',
-  },
-  {
-    id: 'dl-4',
-    month: 'OCT',
-    day: '22',
-    title: 'UI Design Handoff',
-    project: 'Mobile App Beta',
-    colorVariant: 'blue',
-  },
-]
-
-// ---------------------------------------------------------------------------
-// Project popup: opens over the dashboard with Overview, Task board and Gantt chart tabs
-// ---------------------------------------------------------------------------
-
-// Same values as the TaskStatus enum in the Prisma schema.
-type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED'
-
-interface ProjectTask {
-  id: string
-  title: string
-  status: TaskStatus
-  assignee?: string
-  /** ISO date, e.g. 2026-10-15 */
-  startDate: string
-  dueDate: string
-}
-
-interface ProjectSummary {
-  id: string
-  name: string
-  groupName?: string
-  description?: string
-  statusLabel: string
-  progress: number
-  dueDate: string
-  team: string[]
-  tasks: ProjectTask[]
-}
-
-const columns: Array<{ status: TaskStatus; label: string; color: string }> = [
-  { status: 'TODO', label: 'To do', color: '#94A3B8' },
-  { status: 'IN_PROGRESS', label: 'In progress', color: 'var(--icep-completed, #3B82F6)' },
-  { status: 'COMPLETED', label: 'Completed', color: 'var(--icep-active, #16A34A)' },
-]
-const statusColor = Object.fromEntries(columns.map((c) => [c.status, c.color])) as Record<TaskStatus, string>
-
-const shortDate = (iso: string | number) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-const at = (iso: string) => new Date(`${iso}T00:00:00`).getTime()
-
-function Overview({ project }: { project: ProjectSummary }) {
-  const done = project.tasks.filter((t) => t.status === 'COMPLETED').length
-  return (
-    <Stack spacing={2}>
-      {project.description && <Typography color="text.secondary">{project.description}</Typography>}
-      <Box>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>Progress</Typography>
-          <Typography variant="body2">{project.progress}%</Typography>
-        </Stack>
-        <LinearProgress variant="determinate" value={project.progress} sx={{ height: 8, borderRadius: 4 }} aria-label="Project progress" />
-      </Box>
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' } }}>
-        {[
-          ['Status', project.statusLabel],
-          ['Due', project.dueDate],
-          ['Group', project.groupName ?? '—'],
-          ['Tasks done', `${done} of ${project.tasks.length}`],
-        ].map(([label, value]) => (
-          <Box key={label}>
-            <Typography variant="caption" color="text.secondary">{label}</Typography>
-            <Typography sx={{ fontWeight: 600 }}>{value}</Typography>
-          </Box>
-        ))}
-      </Box>
-      <Box>
-        <Typography variant="caption" color="text.secondary">Team</Typography>
-        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-          {project.team.length === 0 ? <Typography variant="body2">No team members yet.</Typography> : project.team.map((initials, index) => (
-            <Box key={`${initials}-${index}`} title={`Team member ${initials}`} sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#E8EEF5', color: 'var(--icep-primary, #1B3A5C)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{initials}</Box>
-          ))}
-        </Stack>
-      </Box>
-    </Stack>
-  )
-}
-
-function TaskBoard({ tasks, now }: { tasks: ProjectTask[]; now: number }) {
-  if (tasks.length === 0) return <Typography color="text.secondary">No tasks have been added to this project yet.</Typography>
-  return (
-    <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' } }}>
-      {columns.map((column) => {
-        const items = tasks.filter((t) => t.status === column.status)
-        return (
-          <Box key={column.status} sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, p: 1.25 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: column.color }} />
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{column.label}</Typography>
-              <Typography variant="caption" color="text.secondary">{items.length}</Typography>
-            </Stack>
-            <Stack spacing={1}>
-              {items.length === 0 && <Typography variant="caption" color="text.secondary">Nothing here.</Typography>}
-              {items.map((task) => {
-                // Overdue is not stored: it is derived from the due date and status.
-                const overdue = task.status !== 'COMPLETED' && at(task.dueDate) < now
-                return (
-                  <Box key={task.id} sx={{ bgcolor: '#fff', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1.25 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{task.title}</Typography>
-                    <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary">{task.assignee ?? 'Unassigned'}</Typography>
-                      <Typography variant="caption" sx={{ color: overdue ? 'error.main' : 'text.secondary', fontWeight: overdue ? 700 : 400 }}>
-                        {overdue ? 'Overdue · ' : 'Due '}{shortDate(task.dueDate)}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                )
-              })}
-            </Stack>
-          </Box>
-        )
-      })}
-    </Box>
-  )
-}
-
-function Gantt({ tasks, now }: { tasks: ProjectTask[]; now: number }) {
-  if (tasks.length === 0) return <Typography color="text.secondary">Add tasks with start and due dates to see the Gantt chart.</Typography>
-  const min = Math.min(...tasks.map((t) => at(t.startDate)))
-  const max = Math.max(...tasks.map((t) => at(t.dueDate)))
-  const span = Math.max(max - min, 86_400_000)
-  const pct = (time: number) => Math.min(100, Math.max(0, ((time - min) / span) * 100))
-
-  // Month markers inside the range.
-  const markers: number[] = []
-  for (const d = new Date(min); d.getTime() <= max; ) {
-    d.setMonth(d.getMonth() + 1, 1)
-    d.setHours(0, 0, 0, 0)
-    if (d.getTime() <= max) markers.push(d.getTime())
-  }
-
-  return (
-    <Box sx={{ overflowX: 'auto' }}>
-      <Box sx={{ minWidth: 560 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'end', pb: 0.5, borderBottom: '1px solid #E2E8F0' }}>
-          <Typography variant="caption" color="text.secondary">Task</Typography>
-          <Box sx={{ position: 'relative', height: 18 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ position: 'absolute', left: 0 }}>{shortDate(min)}</Typography>
-            {markers.map((time) => (
-              <Typography key={time} variant="caption" color="text.secondary" sx={{ position: 'absolute', left: `${pct(time)}%` }}>
-                {new Date(time).toLocaleDateString('en-US', { month: 'short' })}
-              </Typography>
-            ))}
-            <Typography variant="caption" color="text.secondary" sx={{ position: 'absolute', right: 0 }}>{shortDate(max)}</Typography>
-          </Box>
-        </Box>
-        {tasks.map((task) => (
-          <Box key={task.id} sx={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'center', py: 0.75, borderBottom: '1px solid #F1F5F9' }}>
-            <Typography variant="body2" noWrap sx={{ pr: 1 }} title={task.title}>{task.title}</Typography>
-            <Box sx={{ position: 'relative', height: 20 }}>
-              {now >= min && now <= max && <Box sx={{ position: 'absolute', top: -4, bottom: -4, left: `${pct(now)}%`, borderLeft: '2px dashed #EF4444' }} />}
-              <Box
-                role="img"
-                aria-label={`${task.title}: ${shortDate(task.startDate)} to ${shortDate(task.dueDate)}`}
-                title={`${shortDate(task.startDate)} – ${shortDate(task.dueDate)}`}
-                sx={{ position: 'absolute', top: 3, height: 14, borderRadius: 7, bgcolor: statusColor[task.status], left: `${pct(at(task.startDate))}%`, width: `${Math.max(pct(at(task.dueDate)) - pct(at(task.startDate)), 2)}%` }}
-              />
-            </Box>
-          </Box>
-        ))}
-        <Stack direction="row" spacing={2} sx={{ mt: 1.5, flexWrap: 'wrap' }}>
-          {columns.map((c) => (
-            <Stack key={c.status} direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c.color }} />
-              <Typography variant="caption">{c.label}</Typography>
-            </Stack>
-          ))}
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-            <Box sx={{ width: 0, height: 12, borderLeft: '2px dashed #EF4444' }} />
-            <Typography variant="caption">Today</Typography>
-          </Stack>
-        </Stack>
-      </Box>
-    </Box>
-  )
-}
-
-// Opens over the Mentor dashboard so the mentor never leaves the page.
-// Render with a `key` of the project id so it always opens on the Overview tab.
-function ProjectDetailDialog({ project, onClose }: { project: ProjectSummary; onClose: () => void }) {
-  const [tab, setTab] = useState<'overview' | 'tasks' | 'gantt'>('overview')
-  const [now] = useState(() => Date.now())
-
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="md" aria-labelledby="project-dialog-title">
-      <DialogTitle id="project-dialog-title" sx={{ pr: 7, fontWeight: 700 }}>
-        {project.name}
-        <IconButton aria-label="Close" onClick={onClose} sx={{ position: 'absolute', right: 12, top: 12 }}><X size={20} /></IconButton>
-      </DialogTitle>
-      <Tabs value={tab} onChange={(_, value) => setTab(value)} aria-label="Project sections" sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
-        <Tab value="overview" label="Overview" />
-        <Tab value="tasks" label="Task board" />
-        <Tab value="gantt" label="Gantt chart" />
-      </Tabs>
-      <DialogContent sx={{ pt: 2.5, minHeight: 320 }}>
-        {tab === 'overview' && <Overview project={project} />}
-        {tab === 'tasks' && <TaskBoard tasks={project.tasks} now={now} />}
-        {tab === 'gantt' && <Gantt tasks={project.tasks} now={now} />}
-      </DialogContent>
-    </Dialog>
-  )
+/** Upcoming deadlines as a CSV file (opens in Excel / Google Sheets), sorted by date. */
+function exportSchedule(items: DeadlineItem[]) {
+  const dated = items.map((item) => ({ iso: item.isoDate, item })).sort((a, b) => a.iso.localeCompare(b.iso))
+  const rows = [
+    ['Date', 'Deadline', 'Project', 'Priority'],
+    ...dated.map(({ iso, item }) => [iso, item.title, item.project, PRIORITY[item.colorVariant]]),
+  ]
+  const csv = '\ufeff' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `upcoming-deadlines-${new Date().toISOString().slice(0, 10)}.csv`)
 }
 
 export function MentorDashboardPage() {
-  const [projects] = useState<ProjectItem[]>(initialProjects)
-  const [deadlines] = useState<DeadlineItem[]>(initialDeadlines)
-  const [activeProjectsCount] = useState(12)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [approvalsCount] = useState(5)
+  const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useProjects()
+  const [approvalsCount] = useState(0)
+  const activeProjectsCount = projects.filter((project) => project.status !== 'COMPLETED').length
+  const atRiskCount = projects.filter((project) => project.status === 'ON_HOLD').length
 
   // Date selection state
   const [selectedMonth, setSelectedMonth] = useState('Oct 2026')
@@ -413,12 +88,26 @@ export function MentorDashboardPage() {
     setMenuAnchorEl(null)
   }
 
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null
-
-  // Calculate average progress
-  const averageProgress = Math.round(
-    projects.reduce((acc, p) => acc + p.progress, 0) / (projects.length || 1)
-  )
+  const deadlines = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return projects.flatMap((project) => {
+      if (!project.endDate) return []
+      const date = new Date(project.endDate)
+      const daysUntilDue = Math.ceil((date.getTime() - today.getTime()) / 86_400_000)
+      if (daysUntilDue < 0) return []
+      return [{
+        id: project.id,
+        isoDate: project.endDate.slice(0, 10),
+        month: date.toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase(),
+        day: date.toLocaleDateString('en-ZA', { day: '2-digit' }),
+        title: 'Project deadline',
+        project: project.name,
+        colorVariant: daysUntilDue <= 3 ? 'red' as const : daysUntilDue <= 7 ? 'amber' as const : 'blue' as const,
+      }]
+    }).sort((a, b) => a.isoDate.localeCompare(b.isoDate))
+  }, [projects])
+  const averageProgress = Math.round(projects.reduce((total, project) => total + project.progress, 0) / (projects.length || 1))
 
   return (
     <main className={styles.page}>
@@ -461,6 +150,10 @@ export function MentorDashboardPage() {
           ))}
         </Menu>
 
+        <Link to="/mentor/projects" className={styles.newProjectButton} id="new-project-button">
+          <Folder size={18} strokeWidth={2.5} aria-hidden="true" />
+          <span>New Project</span>
+        </Link>
       </section>
 
       {/* 4 Metric / KPI Cards */}
@@ -482,7 +175,7 @@ export function MentorDashboardPage() {
             <CheckCircle2 size={22} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className={styles.statContent}>
-            <p className={styles.statValue}>{projects.length === 4 ? '64%' : `${averageProgress}%`}</p>
+            <p className={styles.statValue}>{averageProgress}%</p>
             <p className={styles.statLabel}>Avg. Progress</p>
           </div>
         </div>
@@ -511,6 +204,17 @@ export function MentorDashboardPage() {
             <p className={styles.statLabel}>Approvals Pending</p>
           </div>
         </div>
+
+        {/* Metric 4: At Risk / Blocked */}
+        <div className={styles.statCard}>
+          <div className={`${styles.statIconBox} ${styles.iconRed}`}>
+            <AlertTriangle size={22} strokeWidth={2} aria-hidden="true" />
+          </div>
+          <div className={styles.statContent}>
+            <p className={styles.statValue}>{atRiskCount}</p>
+            <p className={styles.statLabel}>At Risk / Blocked</p>
+          </div>
+        </div>
       </section>
 
       {/* Main Two-Column Content Grid */}
@@ -537,7 +241,13 @@ export function MentorDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {projects.map((proj) => {
+                {projectsLoading ? (
+                  <tr><td colSpan={4}>Loading projects…</td></tr>
+                ) : projectsError ? (
+                  <tr><td colSpan={4}>Projects could not be loaded. Refresh the page to try again.</td></tr>
+                ) : projects.length === 0 ? (
+                  <tr><td colSpan={4}>No projects yet. Create a project to see it here.</td></tr>
+                ) : projects.map((proj: ProjectRecord) => {
                   const statusClass =
                     proj.status === 'IN_PROGRESS' || proj.status === 'COMPLETED'
                       ? styles.statusOnTrack
@@ -546,30 +256,22 @@ export function MentorDashboardPage() {
                       : styles.statusPendingReview
 
                   return (
-                    <tr key={proj.id} onClick={() => setSelectedProjectId(proj.id)} style={{ cursor: 'pointer' }}>
+                    <tr key={proj.id}>
                       <td>
                         <div className={styles.projectInfo}>
-                          <button
-                            type="button"
-                            className={styles.projectName}
-                            onClick={() => setSelectedProjectId(proj.id)}
-                            aria-haspopup="dialog"
-                            style={{ background: 'none', border: 0, padding: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}
-                          >
-                            {proj.name}
-                          </button>
+                          <span className={styles.projectName}>{proj.name}</span>
                           {proj.groupName && <span className={styles.projectDepartment}>{proj.groupName}</span>}
                         </div>
                       </td>
                       <td>
                         <div className={styles.teamAvatars}>
-                          {proj.team.map((member, idx) => (
+                          {proj.members.map((member, idx) => (
                             <span
-                              key={`${member.initials}-${idx}`}
-                              className={`${styles.teamAvatar} ${member.colorClass}`}
-                              title={`Team Member ${member.initials}`}
+                              key={`${member.internId}-${idx}`}
+                              className={`${styles.teamAvatar} ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}
+                              title={member.name}
                             >
-                              {member.initials}
+                              {memberInitials(member.name)}
                             </span>
                           ))}
                         </div>
@@ -583,11 +285,11 @@ export function MentorDashboardPage() {
                         <div className={styles.progressColumn}>
                           <div className={styles.progressMeta}>
                             <span className={styles.progressValue}>{proj.progress}%</span>
-                            <span className={styles.progressDate}>{proj.dueDate}</span>
+                            <span className={styles.progressDate}>{proj.endDate ? formatShortDate(proj.endDate) : '—'}</span>
                           </div>
                           <div className={styles.progressTrack}>
                             <div
-                              className={`${styles.progressBar} ${proj.colorClass}`}
+                              className={`${styles.progressBar} ${proj.status === 'ON_HOLD' ? styles.barOrange : proj.status === 'COMPLETED' ? styles.barGreen : styles.barBlue}`}
                               style={{ width: `${proj.progress}%` }}
                               role="progressbar"
                               aria-valuenow={proj.progress}
@@ -638,7 +340,9 @@ export function MentorDashboardPage() {
               <MenuItem
                 onClick={() => {
                   handleCloseDeadlinesMenu()
-                  setToastMessage('Schedule exported.')
+                  if (!deadlines.length) { setToastMessage('There are no deadlines to export.'); return }
+                  exportSchedule(deadlines)
+                  setToastMessage(`Schedule exported (${deadlines.length} deadline${deadlines.length === 1 ? '' : 's'}).`)
                 }}
                 sx={{ fontSize: 13.5 }}
               >
@@ -685,25 +389,6 @@ export function MentorDashboardPage() {
           </Link>
         </section>
       </div>
-
-      {/* Project details: opens over the dashboard with Overview, Task board and Gantt chart */}
-      {selectedProject && (
-        <ProjectDetailDialog
-          key={selectedProject.id}
-          onClose={() => setSelectedProjectId(null)}
-          project={{
-            id: selectedProject.id,
-            name: selectedProject.name,
-            groupName: selectedProject.groupName,
-            description: selectedProject.description,
-            statusLabel: statusLabels[selectedProject.status],
-            progress: selectedProject.progress,
-            dueDate: selectedProject.dueDate,
-            team: selectedProject.team.map((member) => member.initials),
-            tasks: demoTasks[selectedProject.id] ?? [],
-          }}
-        />
-      )}
 
       {/* Snackbar feedback notification */}
       <Snackbar
