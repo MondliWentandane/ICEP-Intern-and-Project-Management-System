@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { acceptApplication, apiErrorMessage, downloadDocumentById, fetchApplications, rejectApplication, scheduleInterview, type ApiApplication } from '../data/applicationsApi'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 
 // Self-contained shell: this file can be copied directly into a React/TSX project.
 function PageScaffold({ title, children }: { title: string; children: ReactNode }) {
@@ -487,12 +488,14 @@ export function ApplicantsPage() {
               {!shown.length && (
                 <tr><td colSpan={8} className="empty">
                   <div className="empty-state">
+                    {applicationsQuery.isLoading ? <BikeLoader label="Loading applicants" size={105} /> : <>
                     <div className="empty-icon">{applicationsQuery.isError ? "⚠️" : "📭"}</div>
-                    <b>{applicationsQuery.isLoading ? "Loading applicants…" : applicationsQuery.isError ? "We couldn't load applicants" : "No applicants found"}</b>
-                    <span className="muted">{applicationsQuery.isError ? apiErrorMessage(applicationsQuery.error, "Please try again.") : applicationsQuery.isLoading ? "One moment." : "Try adjusting your filters or search terms."}</span>
+                    <b>{applicationsQuery.isError ? "We couldn't load applicants" : "No applicants found"}</b>
+                    <span className="muted">{applicationsQuery.isError ? apiErrorMessage(applicationsQuery.error, "Please try again.") : "Try adjusting your filters or search terms."}</span>
                     {applicationsQuery.isError
                       ? <button className="b view" onClick={() => void applicationsQuery.refetch()}>Try again</button>
                       : <button className="b view" onClick={() => { setQ(""); setCampus(""); setStatus(""); setPage(1) }}>Reset filters</button>}
+                    </>}
                   </div>
                 </td></tr>
               )}

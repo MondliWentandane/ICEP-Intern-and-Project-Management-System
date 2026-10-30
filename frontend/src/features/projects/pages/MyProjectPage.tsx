@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useProjects } from '@/features/projects/data/projectsApi'
 import styles from '@/features/dashboard/pages/DashboardPages.module.css'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 
 export function MyProjectPage() {
   const { data: projects = [], isLoading, isError, refetch } = useProjects()
@@ -8,7 +9,7 @@ export function MyProjectPage() {
   if (isLoading) {
     return (
       <main className={`${styles.card} ${styles.internCanvas}`} aria-live="polite">
-        <p className={styles.internText}>Loading your assigned projects…</p>
+        <BikeLoader label="Loading your assigned projects" size={125} />
       </main>
     )
   }

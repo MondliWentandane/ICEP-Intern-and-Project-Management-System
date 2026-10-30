@@ -1,6 +1,7 @@
 // Lists every intern from the database so a mentor can put them in a group and give each a role.
 // An intern can be in several groups: the groups they are already in are shown under their name.
 import { useState } from 'react'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import { PROJECT_ROLES, useTeamCandidates, type TeamMemberInput } from '@/features/projects/data/projectsApi'
 
 type Props = {
@@ -38,7 +39,7 @@ export function TeamMemberPicker({ value, onChange, currentProjectId, showErrors
       <input id="member-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search interns by name, email or student number" className={`${input} mt-1.5`} />
 
       <div role="group" aria-label="Interns" className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-        {isLoading && <p className="text-sm text-[#55627a]">Loading interns…</p>}
+        {isLoading && <BikeLoader label="Loading interns" size={95} />}
         {isError && (
           <p className="text-sm text-red-700">
             Interns could not be loaded. <button type="button" onClick={() => void refetch()} className="font-semibold underline">Try again</button>

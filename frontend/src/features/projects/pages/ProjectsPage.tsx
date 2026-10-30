@@ -1,6 +1,7 @@
 import { useMemo, useState, type SyntheticEvent, type JSX, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { PageScaffold } from '@/components/ui/PageScaffold'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import type { Group, NewProject } from '@/components/ui/CreateProjectButton'
 import { TeamMemberPicker } from '@/features/projects/components/TeamMemberPicker'
 import { CreateProjectFlow } from '@/features/projects/components/CreateProjectFlow'
@@ -298,7 +299,7 @@ export function ProjectsPage() {
       </div>
 
       {isLoading ? (
-        <p className="rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">Loading projects…</p>
+        <div className="rounded-3xl bg-[#f1f4fa] p-6"><BikeLoader label="Loading projects" /></div>
       ) : isError ? (
         <p role="alert" className="rounded-3xl bg-red-50 p-10 text-center text-red-700">
           {errorText(error, 'Projects could not be loaded.')}{' '}

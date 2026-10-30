@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Tasks } from '@/api/services/tasks.service'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 
 interface ApiTask {
   id: string
@@ -43,7 +44,7 @@ export function ProjectTaskList({ projectId }: { projectId: string }) {
     return tasks.filter((t) => !q || t.title.toLowerCase().includes(q) || (t.assigneeName ?? '').toLowerCase().includes(q))
   }, [tasks, search])
 
-  if (loading) return <p className="text-sm text-[#55627a]">Loading tasks…</p>
+  if (loading) return <BikeLoader label="Loading tasks" size={105} />
   if (failed) return <p role="alert" className="text-sm text-red-700">Tasks could not be loaded.</p>
 
   return (

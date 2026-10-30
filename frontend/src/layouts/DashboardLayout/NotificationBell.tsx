@@ -4,6 +4,7 @@ import { useState, type MouseEvent } from 'react'
 import { Badge, Box, Button, IconButton, Popover, Tooltip, Typography } from '@mui/material'
 import { Bell, Check, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import {
   useDeleteNotification, useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications, type AppNotification,
 } from '@/features/notifications/data/notificationsApi'
@@ -61,7 +62,7 @@ export function NotificationBell({ notificationsPath, className }: { notificatio
       </Box>
 
       <Box sx={{ maxHeight: 420, overflowY: 'auto' }}>
-        {isLoading ? <Typography sx={{ p: 3, textAlign: 'center', color: 'var(--icep-secondary)', fontSize: 14 }}>Loading…</Typography>
+        {isLoading ? <Box sx={{ py: 1 }}><BikeLoader label="Loading notifications" size={105} /></Box>
           : latest.length === 0 ? <Typography sx={{ p: 3, textAlign: 'center', color: 'var(--icep-secondary)', fontSize: 14 }}>No notifications yet.</Typography>
           : latest.map((note) => (
             <Box key={note.id} role="button" tabIndex={0} onClick={() => open(note)}

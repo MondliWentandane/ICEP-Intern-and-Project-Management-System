@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { NewProject } from '@/components/ui/CreateProjectButton'
 import { teamError } from '@/features/projects/data/projectsApi'
 import { useTeams } from '@/features/team-builder/data/teamsApi'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import { ModalShell, FIELD, errorText } from './Shared'
 
 function CreateDialog({ onCreate, onClose }: { onCreate: (p: NewProject) => Promise<unknown>; onClose: () => void }) {
@@ -77,7 +78,7 @@ function CreateDialog({ onCreate, onClose }: { onCreate: (p: NewProject) => Prom
       ) : (
         <form onSubmit={(e) => void submit(e)} noValidate className="mt-5 space-y-4">
           {isLoading ? (
-            <p className="text-sm text-[#55627a]">Loading teams…</p>
+            <BikeLoader label="Loading teams" size={95} />
           ) : teams.length === 0 ? (
             <p className="rounded-2xl bg-[#f1f4fa] p-4 text-sm text-[#55627a]">
               No teams yet. <Link to="../team-builder" className="font-semibold text-[#0b2a5b] underline">Build a team</Link> first, then create the project.

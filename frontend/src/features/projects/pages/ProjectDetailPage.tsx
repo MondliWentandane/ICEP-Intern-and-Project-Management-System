@@ -5,6 +5,7 @@ import { PageScaffold } from '@/components/ui/PageScaffold'
 import type { Project } from './ProjectsPage'
 import type { Group } from '@/components/ui/CreateProjectButton'
 import { fetchProject } from '@/features/projects/data/projectsApi'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import GanttPage from '@/features/gantt/pages/GanttPage'
 import { ProjectTaskList } from '@/features/tasks/pages/components/ProjectTaskList'
 
@@ -31,7 +32,7 @@ export function ProjectDetailPage() {
   if (!project) {
     return (
       <PageScaffold title="Project">
-        <p className="text-[#55627a]">{loaded.isLoading ? 'Loading project…' : 'Project not found.'}</p>
+        {loaded.isLoading ? <BikeLoader label="Loading project" size={110} /> : <p className="text-[#55627a]">Project not found.</p>}
         <button onClick={() => navigate(-1)} className="mt-4 rounded-full bg-[#0b2a5b] px-5 py-2.5 text-sm font-semibold text-white">
           Back to projects
         </button>
