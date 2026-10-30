@@ -31,7 +31,7 @@ export interface CalendarTaskEvent extends Pick<TaskApiRecord, 'id' | 'title' | 
 export interface CreateTaskInput {
   title: string
   projectId: string
-  description?: string
+  description?: string | null
   assignedToId?: string | null
   priority?: ApiTaskPriority
   status?: ApiTaskStatus

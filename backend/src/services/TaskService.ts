@@ -559,9 +559,11 @@ export class TaskService {
             throw new Error("Feedback is required to request changes");
         }
 
-        // Add the feedback as a comment and revert the task back to IN_PROGRESS
-        await TaskRepository.addComment(id, user.id, `Changes requested: ${feedback.trim()}`);
-        const updated = await TaskRepository.updateTaskStatus(id, "IN_PROGRESS");
+        const updated = await TaskRepository.requestTaskChanges(
+            id,
+            user.id,
+            `Changes requested: ${feedback.trim()}`
+        );
 
         await notificationService.taskReturned(id);
 

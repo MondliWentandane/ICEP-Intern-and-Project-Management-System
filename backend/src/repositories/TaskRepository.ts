@@ -133,6 +133,10 @@ export class TaskRepository {
         status: "COMPLETED",
         approvedAt: null
       },
+      include: {
+        project: { select: { name: true } },
+        assignedTo: { include: { user: { select: { fullName: true } } } },
+      },
       orderBy: { updatedAt: "desc" }
     });
   }

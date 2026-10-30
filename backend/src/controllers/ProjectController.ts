@@ -28,10 +28,18 @@ const parseDate = (value: unknown) => {
 
 export async function listProjects(req: Request, res: Response) {
   try {
-    // Admins, WIL Handlers, and mentors see all projects; interns see their own.
     const user = actor(req);
     let internUserId: string | undefined;
     if (user?.role === "INTERN") internUserId = user.id;
+    if (user?.role === "MENTOR") {
+      const mentor = await service.mentorFor(user.id);
+      if (!mentor) return res.json([]);
+      return res.json(await service.list({
+        status: req.query.status as string,
+        supervisorId: mentor.id,
+      }));
+    }
+
     return res.json(await service.list({
       status: req.query.status as string,
       ...(user?.role === "ADMIN" || user?.role === "WIL_HANDLER"

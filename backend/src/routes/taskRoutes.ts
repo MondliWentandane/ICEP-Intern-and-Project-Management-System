@@ -83,7 +83,10 @@ router.put("/tasks/:id/status", anyRole, TaskController.updateTaskStatus);
 router.put("/tasks/:id/assign", anyRole, TaskController.assignTo);
 
 // Approve completed task
-router.put("/tasks/:id/approve", anyRole, TaskController.approveTask);
+router.put("/tasks/:id/approve", adminOrMentor, TaskController.approveTask);
+
+// Return a submitted task to the intern with review feedback
+router.put("/tasks/:id/request-changes", adminOrMentor, TaskController.requestTaskChanges);
 
 // ================= SUBTASKS =================
 
