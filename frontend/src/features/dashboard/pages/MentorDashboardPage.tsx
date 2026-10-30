@@ -1,26 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Alert,
   Box,
   Dialog,
   DialogContent,
   DialogTitle,
   IconButton,
   LinearProgress,
-  Menu,
-  MenuItem,
-  Snackbar,
   Stack,
   Tab,
   Tabs,
   Typography,
 } from '@mui/material'
 import {
-  Calendar,
   CheckCircle2,
   Folder,
-  MoreHorizontal,
   X,
 } from 'lucide-react'
 import { BikeLoader } from '@/components/ui/BikeLoader'
@@ -324,7 +318,6 @@ export function MentorDashboardPage() {
   }))
   const activeProjectsCount = supervisedProjects.filter((project) => project.status === 'IN_PROGRESS').length
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [approvalsCount] = useState(5)
 
   const deadlines: DeadlineItem[] = supervisedProjects
     .filter((project) => project.endDate && localDate(project.endDate).getTime() >= new Date(new Date().setHours(0, 0, 0, 0)).getTime())
@@ -342,79 +335,23 @@ export function MentorDashboardPage() {
       }
     })
 
-  // Date selection state
-  const [selectedMonth, setSelectedMonth] = useState('Oct 2026')
-  const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
-
-  // Deadline menu state
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null)
-
-  // Feedback toast state
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-
-  const handleOpenDateMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setDateAnchorEl(event.currentTarget)
-  }
-
-  const handleSelectMonth = (month: string) => {
-    setSelectedMonth(month)
-    setDateAnchorEl(null)
-  }
-
-  const handleOpenDeadlinesMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setMenuAnchorEl(event.currentTarget)
-  }
-
-  const handleCloseDeadlinesMenu = () => {
-    setMenuAnchorEl(null)
-  }
-
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null
 
   // Calculate average progress
-  const averageProgress = Math.round(projects.reduce((acc, project) => acc + project.progress, 0) / (projects.length || 1))
+  const averageProgress = projects.length
+    ? Math.round(projects.reduce((acc, project) => acc + project.progress, 0) / projects.length)
+    : null
+  const plannedProjectsCount = supervisedProjects.filter((project) => project.status === 'PLANNED').length
+  const onHoldProjectsCount = supervisedProjects.filter((project) => project.status === 'ON_HOLD').length
 
   return (
     <main className={styles.page}>
-      {/* Top Bar Actions */}
-      <section className={styles.topBar} aria-label="Dashboard controls">
-        <button
-          type="button"
-          className={styles.dateButton}
-          onClick={handleOpenDateMenu}
-          aria-haspopup="true"
-          aria-expanded={Boolean(dateAnchorEl)}
-          id="date-filter-button"
-        >
-          <Calendar size={17} strokeWidth={2} aria-hidden="true" />
-          <span>{selectedMonth}</span>
-        </button>
-        <Menu
-          anchorEl={dateAnchorEl}
-          open={Boolean(dateAnchorEl)}
-          onClose={() => setDateAnchorEl(null)}
-          slotProps={{
-            paper: {
-              sx: {
-                borderRadius: '10px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                minWidth: 140,
-              },
-            },
-          }}
-        >
-          {['Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dec 2026'].map((month) => (
-            <MenuItem
-              key={month}
-              selected={month === selectedMonth}
-              onClick={() => handleSelectMonth(month)}
-              sx={{ fontSize: 14, fontWeight: month === selectedMonth ? 700 : 500 }}
-            >
-              {month}
-            </MenuItem>
-          ))}
-        </Menu>
-
+      <section className={styles.pageHeading} aria-label="Mentor dashboard introduction">
+        <div>
+          <h1 className={styles.pageTitle}>Mentor dashboard</h1>
+          <p className={styles.pageSubtitle}>A snapshot of the projects you supervise, their progress and upcoming deadlines.</p>
+        </div>
+        <Link to="/mentor/projects" className={styles.manageProjectsLink}>Manage projects</Link>
       </section>
 
       {/* 4 Metric / KPI Cards */}
@@ -436,12 +373,12 @@ export function MentorDashboardPage() {
             <CheckCircle2 size={22} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className={styles.statContent}>
-            <p className={styles.statValue}>{`${averageProgress}%`}</p>
+          <p className={styles.statValue}>{averageProgress === null ? '—' : `${averageProgress}%`}</p>
             <p className={styles.statLabel}>Avg. Progress</p>
           </div>
         </div>
 
-        {/* Metric 3: Approvals Pending */}
+        {/* Metric 3: Planned projects */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconAmber}`}>
             <svg
@@ -461,8 +398,20 @@ export function MentorDashboardPage() {
             </svg>
           </div>
           <div className={styles.statContent}>
-            <p className={styles.statValue}>{approvalsCount}</p>
-            <p className={styles.statLabel}>Approvals Pending</p>
+            <p className={styles.statValue}>{plannedProjectsCount}</p>
+            <p className={styles.statLabel}>Planned Projects</p>
+          </div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={`${styles.statIconBox} ${styles.iconRed}`}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3 2.8 19a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L12 3Z" />
+              <path d="M12 9v4m0 3h.01" />
+            </svg>
+          </div>
+          <div className={styles.statContent}>
+            <p className={styles.statValue}>{onHoldProjectsCount}</p>
+            <p className={styles.statLabel}>Projects On Hold</p>
           </div>
         </div>
       </section>
@@ -473,12 +422,13 @@ export function MentorDashboardPage() {
         <section className={styles.card} aria-labelledby="active-projects-title">
           <header className={styles.cardHeader}>
             <h2 id="active-projects-title" className={styles.cardTitle}>
-              Active Projects Overview
+              Your Projects
             </h2>
             <Link to="/mentor/projects" className={styles.viewAllLink}>
               View All Projects
             </Link>
           </header>
+          <p className={styles.sectionDescription}>Review each project’s team, status and reported progress.</p>
 
           <div className={styles.tableContainer}>
             <table className={styles.projectsTable}>
@@ -571,52 +521,14 @@ export function MentorDashboardPage() {
             <h2 id="upcoming-deadlines-title" className={styles.cardTitle}>
               Upcoming Deadlines
             </h2>
-            <button
-              type="button"
-              className={styles.moreButton}
-              onClick={handleOpenDeadlinesMenu}
-              aria-label="Upcoming deadlines options"
-              aria-haspopup="true"
-              aria-expanded={Boolean(menuAnchorEl)}
-            >
-              <MoreHorizontal size={20} aria-hidden="true" />
-            </button>
-            <Menu
-              anchorEl={menuAnchorEl}
-              open={Boolean(menuAnchorEl)}
-              onClose={handleCloseDeadlinesMenu}
-              slotProps={{
-                paper: {
-                  sx: {
-                    borderRadius: '10px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                    minWidth: 170,
-                  },
-                },
-              }}
-            >
-              <MenuItem
-                onClick={() => {
-                  handleCloseDeadlinesMenu()
-                  setToastMessage('Schedule exported.')
-                }}
-                sx={{ fontSize: 13.5 }}
-              >
-                Export Schedule
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleCloseDeadlinesMenu()
-                  setToastMessage('Calendar synchronized.')
-                }}
-                sx={{ fontSize: 13.5 }}
-              >
-                Sync with Calendar
-              </MenuItem>
-            </Menu>
           </header>
 
           <div className={styles.deadlinesList}>
+            {projectsLoading && <BikeLoader label="Loading deadlines" size={80} />}
+            {!projectsLoading && projectsError && <p className={styles.deadlineEmpty}>Deadlines are unavailable because project data could not be loaded.</p>}
+            {!projectsLoading && !projectsError && deadlines.length === 0 && (
+              <p className={styles.deadlineEmpty}>No upcoming deadlines. Add an end date to a project to see it here.</p>
+            )}
             {deadlines.map((item) => {
               const dateClass =
                 item.colorVariant === 'red'
@@ -665,21 +577,6 @@ export function MentorDashboardPage() {
         />
       )}
 
-      {/* Snackbar feedback notification */}
-      <Snackbar
-        open={Boolean(toastMessage)}
-        autoHideDuration={3500}
-        onClose={() => setToastMessage(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setToastMessage(null)}
-          severity="success"
-          sx={{ width: '100%', borderRadius: '8px' }}
-        >
-          {toastMessage}
-        </Alert>
-      </Snackbar>
     </main>
   )
 }
