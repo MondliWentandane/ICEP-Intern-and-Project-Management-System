@@ -1,0 +1,80 @@
+.card {
+  --navy: #12315a;
+  --muted: #63748b;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e1e8f0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(17 42 76 / 7%);
+  animation: card-enter 480ms cubic-bezier(.2,.8,.2,1) both;
+  transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  border-color: #c6d5e7;
+  box-shadow: 0 18px 38px rgb(17 42 76 / 13%);
+}
+
+.hero {
+  position: relative;
+  display: flex;
+  min-height: 164px;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 22px 24px;
+  background: linear-gradient(120deg, #102b50 0%, #174574 68%, #1b6c76 130%);
+  color: #fff;
+}
+
+.heroCopy { position: relative; z-index: 2; max-width: 82%; }
+.eyebrow { display: block; margin-bottom: 9px; color: #b9d7ef; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.title { margin: 0; color: #fff; font-size: clamp(18px, 2vw, 23px); font-weight: 750; line-height: 1.2; overflow-wrap: anywhere; }
+.status { display: inline-flex; margin-top: 12px; border: 1px solid rgb(255 255 255 / 25%); border-radius: 999px; padding: 5px 10px; background: rgb(255 255 255 / 10%); color: #eff7ff; font-size: 11px; font-weight: 650; }
+.heroOrb { position: absolute; z-index: 0; right: 14%; top: -74px; width: 210px; height: 210px; border: 1px solid rgb(207 235 255 / 16%); border-radius: 50%; background: rgb(255 255 255 / 4%); animation: orb-drift 8s ease-in-out infinite alternate; }
+.heroOrb::after { position: absolute; inset: 19px; border: 1px solid rgb(207 235 255 / 10%); border-radius: inherit; content: ''; }
+.waves { position: absolute; z-index: 1; right: -8%; bottom: -34px; left: 24%; height: 76px; overflow: hidden; pointer-events: none; }
+.waves span { position: absolute; left: -10%; width: 120%; height: 54px; border: 1px solid rgb(219 241 255 / 19%); border-color: rgb(219 241 255 / 19%) transparent transparent; border-radius: 50% 50% 0 0 / 100% 100% 0 0; animation: wave-slide 7s linear infinite; }
+.waves span:nth-child(1) { top: 17px; }
+.waves span:nth-child(2) { top: 26px; left: -20%; opacity: .65; animation-duration: 9s; animation-direction: reverse; }
+.waves span:nth-child(3) { top: 35px; left: 0; opacity: .4; animation-duration: 11s; }
+
+.body { padding: 21px 24px 22px; }
+.description { display: -webkit-box; min-height: 42px; margin: 0 0 20px; overflow: hidden; color: var(--muted); font-size: 13px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.progressHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
+.progressHead strong { color: var(--navy); font-size: 13px; }
+.progressTrack { height: 8px; overflow: hidden; border-radius: 999px; background: #eaf0f5; }
+.progressValue { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #1b3a5c, #23a47b); transition: width 550ms cubic-bezier(.2,.8,.2,1); }
+.meta { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-top: 17px; color: var(--muted); font-size: 12px; }
+.meta span { display: inline-flex; align-items: center; gap: 7px; }
+.meta svg { color: #567899; }
+.team { display: flex; min-width: 0; align-items: center; gap: 10px; margin-top: 17px; padding-top: 15px; border-top: 1px solid #edf1f5; }
+.avatars { display: flex; flex: 0 0 auto; padding-left: 2px; }
+.avatar { display: grid; width: 29px; height: 29px; margin-left: -3px; place-items: center; border: 2px solid #fff; border-radius: 50%; background: #e6eef7; color: #173e67; font-size: 9px; font-weight: 750; }
+.avatar:nth-child(2n) { background: #e2f4ed; color: #16734e; }
+.avatar:nth-child(3n) { background: #fff0d8; color: #9a5a11; }
+.teamNames { overflow: hidden; color: #44556b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.link { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; color: var(--navy); font-size: 13px; font-weight: 700; text-decoration: none; }
+.link svg { transition: transform 200ms ease; }
+.link:hover { color: #187b69; }
+.link:hover svg { transform: translateX(4px); }
+.link:focus-visible { border-radius: 3px; outline: 2px solid #247b78; outline-offset: 4px; }
+
+@keyframes card-enter { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes orb-drift { from { transform: translate3d(-10px, 4px, 0) scale(.96); } to { transform: translate3d(12px, -7px, 0) scale(1.04); } }
+@keyframes wave-slide { from { transform: translateX(0) rotate(-2deg); } to { transform: translateX(-8%) rotate(2deg); } }
+
+@media (max-width: 480px) {
+  .hero { min-height: 148px; padding: 18px; }
+  .heroCopy { max-width: 90%; }
+  .body { padding: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; transition: none; }
+  .card:hover { transform: none; }
+  .progressValue, .link svg { transition: none; }
+  .heroOrb, .waves span { animation: none; }
+}
