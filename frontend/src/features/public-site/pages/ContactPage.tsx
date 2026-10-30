@@ -1,28 +1,36 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Box, Paper, Typography } from '@mui/material'
+import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { CursorFollower } from '../story/CursorFollower'
 import { RevealTitle } from '../story/Reveal'
 import { riseSx, useReveal } from '../story/useScrollProgress'
 import { introSx } from '../story/motion'
 
-/** frontend/src/features/public-site/pages/ContactPage.tsx (route /contact already exists). Styles are included below. */
+/** frontend/src/features/public-site/pages/ContactPage.tsx */
 
 const navy = '#1E3A5F'
 
 const MAPS_URL = 'https://www.google.com/maps/place/Tshwane+University+of+Technology+-+Soshanguve+South+Campus+-+TUT/@-25.5401753,28.0968938,17z/data=!3m1!4b1!4m6!3m5!1s0x1ebfcf9c4eedb233:0x9e2de5e61f9e48e7!8m2!3d-25.5401753!4d28.0968938!16s%2Fm%2F0dkfwvn?entry=ttu'
 
+const CAMPUS = {
+  name: 'Tshwane University of Technology - Soshanguve South Campus - TUT',
+  address: 'Block K, 2 Aubrey Matlakala St, Soshanguve - K, Soshanguve, 0152',
+  mapsUrl: MAPS_URL
+}
+
 const CSS = `
 .cp{--p:var(--mui-palette-primary-main,#1f3a68);--t:var(--mui-palette-text-primary,#0f1a2b);--m:var(--mui-palette-text-secondary,#5b6678);--b:var(--mui-palette-background-paper,#fff);--l:var(--mui-palette-divider,#d9dee7);--e:cubic-bezier(.65,0,.35,1);color:var(--t)}
 .cp-w{max-width:1200px;margin:0 auto;display:grid;gap:32px}
-.cp-c{background:var(--b);border:1px solid var(--l);border-radius:16px;padding:12px}
+.cp-c, .cp-mc{background:var(--b);border:1px solid var(--l);border-radius:16px;padding:12px}
 .cp-cols{display:grid;gap:24px}
 .cp-i{position:relative;overflow:hidden;background:${navy};color:#fff;border-radius:12px;padding:24px;min-height:440px}
 .cp-i h2{margin:0 0 32px;font-size:26px}
 .cp-rows{display:grid;gap:32px;position:relative;z-index:1}
 .cp-r{display:flex;gap:20px;align-items:flex-start}
 .cp-ic{width:44px;height:44px;flex:none;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center}
-.cp-link{color:inherit;text-decoration:none;display:block;transition:opacity 0.2s}
-.cp-link:hover{opacity:0.85}
+.cp-link{color:inherit;text-decoration:none;display:block;transition:all 0.2s}
+.cp-link:hover{opacity:0.9;text-decoration:underline;text-underline-offset:4px}
 .cp-link b{display:block;font-weight:600}
 .cp-link div{color:rgba(255,255,255,.85);line-height:1.6}
 .cp-o{position:absolute;border-radius:50%;background:rgba(255,255,255,.1);right:-60px;bottom:-150px;width:300px;height:300px}
@@ -40,8 +48,14 @@ textarea.cp-in{min-height:170px;resize:vertical}
 .cp-bt{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 32px;border:0;border-radius:8px;background:var(--p);color:#fff;font:inherit;font-size:16px;font-weight:600;cursor:pointer;text-decoration:none;transition:background 0.2s}
 .cp-bt:hover{background:var(--mui-palette-primary-dark, #15294a)}
 .cp-bt:disabled{opacity:.6;cursor:default}
+.cp-bt.s{height:42px;padding:0 18px}
+.cp-mp{position:relative;width:100%;height:450px;border-radius:12px;overflow:hidden;background:#000;z-index:1}
+.cp-pp{position:absolute;z-index:2;top:20px;left:20px;max-width:calc(100% - 40px);padding:20px;border-radius:12px;background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);border:1px solid var(--l);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.cp-pp h3{margin:0 0 8px;font-size:18px;line-height:1.3;color:var(--t)}
+.cp-pp p{margin:0 0 16px;color:var(--m);font-size:15px}
+.maplibregl-canvas:focus { outline: none; }
 @media(min-width:600px){.cp-2{grid-template-columns:1fr 1fr}}
-@media(min-width:900px){.cp-cols{gap:32px;grid-template-columns:1fr 1.15fr}.cp-i{padding:32px}.cp-f{padding:24px 24px 0 0}}
+@media(min-width:900px){.cp-cols{gap:32px;grid-template-columns:1fr 1.15fr}.cp-i{padding:32px}.cp-f{padding:24px 24px 0 0}.cp-pp{max-width:400px}}
 `
 
 const Ic = ({ children, s = 20 }: { children: ReactNode; s?: number }) => (
@@ -109,6 +123,96 @@ function ContactForm({ onSubmit }: { onSubmit?: (m: ContactMessage) => Promise<v
         <button className="cp-bt" type="submit" disabled={st === 'sending'}>{st === 'sending' ? 'Sending…' : 'Send message'}</button>
       </Box>
     </form>
+  )
+}
+
+function MapCard() {
+  const mapContainer = useRef<HTMLDivElement>(null)
+  const map = useRef<maplibregl.Map | null>(null)
+  const animationRef = useRef<number>()
+  const userInteracting = useRef(false)
+
+  useEffect(() => {
+    if (map.current || !mapContainer.current) return
+
+    map.current = new maplibregl.Map({
+      container: mapContainer.current,
+      style: {
+        version: 8,
+        sources: {
+          satellite: {
+            type: 'raster',
+            tiles: [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            ],
+            tileSize: 256,
+            attribution: '&copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+          }
+        },
+        layers: [{
+          id: 'satellite-layer',
+          type: 'raster',
+          source: 'satellite'
+        }]
+      },
+      center: [28.0968938, -25.5401753],
+      zoom: 16.2,
+      pitch: 65,
+      bearing: 0,
+      scrollZoom: false 
+    })
+
+    map.current.addControl(new maplibregl.NavigationControl({ 
+      showCompass: true,
+      visualizePitch: true 
+    }), 'top-right')
+
+    new maplibregl.Marker({ color: '#ff4444' })
+      .setLngLat([28.0968938, -25.5401753])
+      .addTo(map.current)
+
+    const rotateCamera = () => {
+      if (map.current && !userInteracting.current) {
+        const currentBearing = map.current.getBearing()
+        map.current.setBearing(currentBearing - 0.15) 
+      }
+      animationRef.current = requestAnimationFrame(rotateCamera)
+    }
+
+    map.current.on('load', () => {
+      rotateCamera()
+    })
+
+    map.current.on('mousedown', () => { userInteracting.current = true })
+    map.current.on('dragstart', () => { userInteracting.current = true })
+    map.current.on('touchstart', () => { userInteracting.current = true })
+
+    const container = mapContainer.current
+    const handleMouseLeave = () => { userInteracting.current = false }
+    container.addEventListener('mouseleave', handleMouseLeave)
+
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      container.removeEventListener('mouseleave', handleMouseLeave)
+      map.current?.remove()
+      map.current = null
+    }
+  }, [])
+
+  return (
+    <Box sx={introSx(1000)}>
+      <div className="cp-mc">
+        <div className="cp-mp" ref={mapContainer}>
+          <div className="cp-pp">
+            <h3>{CAMPUS.name}</h3>
+            <p>{CAMPUS.address}</p>
+            <a className="cp-bt s" href={CAMPUS.mapsUrl} target="_blank" rel="noopener noreferrer">
+              <Ic s={18}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></Ic> Open in Maps
+            </a>
+          </div>
+        </div>
+      </div>
+    </Box>
   )
 }
 
@@ -195,6 +299,8 @@ export function ContactPage({ onSendMessage }: { onSendMessage?: (m: ContactMess
             <ContactForm onSubmit={onSendMessage} />
           </div>
         </div>
+
+        <MapCard />
       </div>
     </section>
   )
