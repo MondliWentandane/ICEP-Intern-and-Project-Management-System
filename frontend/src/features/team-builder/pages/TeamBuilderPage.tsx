@@ -1,5 +1,6 @@
 import { useState, type SyntheticEvent, type JSX, type ReactNode } from 'react'
 import { PageScaffold } from '@/components/ui/PageScaffold'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import { TeamMemberPicker } from '@/features/projects/components/TeamMemberPicker'
 import type { TeamMemberInput } from '@/features/projects/data/projectsApi'
 import { ModalShell, FIELD, errorText } from '@/features/projects/components/Shared'
@@ -75,7 +76,7 @@ export function TeamBuilderPage() {
       </div>
 
       {isLoading ? (
-        <p className="rounded-3xl bg-[#f1f4fa] p-10 text-center text-[#55627a]">Loading teams…</p>
+        <div className="rounded-3xl bg-[#f1f4fa] p-6"><BikeLoader label="Loading teams" /></div>
       ) : isError ? (
         <p role="alert" className="rounded-3xl bg-red-50 p-10 text-center text-red-700">Teams could not be loaded.</p>
       ) : teams.length === 0 ? (

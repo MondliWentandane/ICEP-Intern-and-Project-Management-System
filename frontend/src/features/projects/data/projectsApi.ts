@@ -18,8 +18,13 @@ export const PROJECT_ROLES = ['Backend Developer', 'Frontend Developer', 'Scrum 
 
 export interface TeamMemberInput { internId: string; projectRole: string }
 /** First problem with the chosen members, or '' when they can be saved. */
-export const teamError = (members: TeamMemberInput[]) =>
-  members.some((m) => !m.projectRole) ? 'Choose a role for every selected member.' : ''
+export const teamError = (members: TeamMemberInput[]) => {
+  if (members.some((member) => !member.projectRole)) return 'Choose a role for every selected member.'
+  const scrumMasterCount = members.filter((member) => member.projectRole === 'Scrum Master').length
+  if (scrumMasterCount === 0) return 'Assign one Scrum Master to this project.'
+  if (scrumMasterCount > 1) return 'A project can have only one Scrum Master.'
+  return ''
+}
 
 export interface ProjectMember { internId: string; name: string; role: string | null }
 

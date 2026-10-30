@@ -16,6 +16,7 @@ import { Badge, Button } from '@/components/ui'
 import { Projects } from '@/api/services/projects.service'
 import { Tasks } from '@/api/services/tasks.service'
 import { useAuth } from '@/hooks/useAuth'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import type { ApiTaskStatus, Project, TaskApiRecord } from '@/types'
 
 const taskStatuses: ApiTaskStatus[] = ['TODO', 'IN_PROGRESS', 'COMPLETED']
@@ -285,12 +286,13 @@ export function ProjectTaskBoard() {
         </FormControl>
       </Stack>
 
+      {loadingProjects && <BikeLoader label="Loading projects" size={125} />}
       {projectError && <Alert severity="error" sx={{ mb: 2 }}>{projectError}</Alert>}
       {!loadingProjects && !projectError && visibleProjects.length === 0 && (
         <Alert severity="info">No project is available for your account.</Alert>
       )}
       {taskError && <Alert severity="error" sx={{ mb: 2 }}>{taskError}</Alert>}
-      {loadingTasks && <Typography color="text.secondary" sx={{ mb: 2 }}>Loading project tasks…</Typography>}
+      {loadingTasks && <BikeLoader label="Loading project tasks" size={105} />}
       {selectedProject && (
         <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>{selectedProject.name}</Typography>

@@ -23,6 +23,10 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react'
+import { PROJECT_STATUS_LABELS } from '@/features/projects/data/newProject'
+import { BikeLoader } from '@/components/ui/BikeLoader'
+import { useProjects, type ProjectRecord } from '@/features/projects/data/projectsApi'
+import { downloadBlob } from '@/utils/format'
 import styles from './MentorDashboardPage.module.css'
 
 interface TeamMember {
@@ -537,7 +541,13 @@ export function MentorDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {projects.map((proj) => {
+{projectsLoading ? (
+                  <tr><td colSpan={4}><BikeLoader label="Loading projects" size={95} /></td></tr>
+                ) : projectsError ? (
+                  <tr><td colSpan={4}>Projects could not be loaded. Refresh the page to try again.</td></tr>
+                ) : projects.length === 0 ? (
+                  <tr><td colSpan={4}>No projects yet. Create a project to see it here.</td></tr>
+                ) : projects.map((proj: ProjectRecord) => {
                   const statusClass =
                     proj.status === 'IN_PROGRESS' || proj.status === 'COMPLETED'
                       ? styles.statusOnTrack

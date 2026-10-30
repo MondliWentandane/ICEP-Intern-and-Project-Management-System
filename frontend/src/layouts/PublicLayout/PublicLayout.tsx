@@ -5,7 +5,6 @@ import { Link as RouterLink, NavLink, Outlet, useLocation } from 'react-router-d
 import icepLogo from '../../assets/icep-logo.png'
 import icepLogoBW from '../../assets/icep-logo-b&w.png'
 import { APPLY_PARAM, ApplicationDialog, CHOOSE_POSITION } from '@/features/application/components/ApplicationDialog'
-import { riseSx, useReveal } from '@/features/public-site/story/useScrollProgress'
 
 const navItems = [
   { label: 'Home', to: '/' },

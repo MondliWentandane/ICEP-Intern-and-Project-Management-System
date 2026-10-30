@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { BikeLoader } from "@/components/ui/BikeLoader";
 import { apiErrorMessage, downloadApplicationDocument, endInternship, fetchApplications, reinstateInternship, yearLabel, type ApiApplication, type InternshipOutcome } from "@/features/applicants/data/applicationsApi";
 
 /* ------------------------------ Styles ------------------------------ */
@@ -524,7 +525,7 @@ export function InternsPage() {
                   <tbody>
                     {rows.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ color: "var(--muted)" }}>{loading ? "Loading interns…" : loadError || "No interns found."}</td>
+                        <td colSpan={6} style={{ color: "var(--muted)" }}>{loading ? <BikeLoader label="Loading interns" size={95} /> : loadError || "No interns found."}</td>
                       </tr>
                     )}
                     {rows.map((p, i) => (

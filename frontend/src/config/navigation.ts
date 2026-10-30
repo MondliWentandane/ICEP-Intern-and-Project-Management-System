@@ -12,6 +12,7 @@ const navigation: Record<UserRole, NavigationItem[]> = {
     { label: 'Past Interns', path: '/admin/past-interns', section: 'MAIN' },
     { label: 'Projects', path: '/admin/projects', section: 'PROJECTS' },
     { label: 'Task Board', path: '/admin/tasks', section: 'PROJECTS' },
+    { label: 'Review Queue', path: '/admin/tasks/review', section: 'PROJECTS' },
     { label: 'Calendar', path: '/admin/calendar', section: 'PROJECTS' },
     { label: 'Gantt Chart', path: '/admin/gantt', section: 'PROJECTS' },
     { label: 'Reports', path: '/admin/reports', section: 'ADMIN' },
@@ -30,7 +31,9 @@ const navigation: Record<UserRole, NavigationItem[]> = {
   MENTOR: [
     { label: 'Dashboard', path: '/mentor/dashboard', section: 'MAIN' },
     { label: 'Projects', path: '/mentor/projects', section: 'PROJECTS' },
+    { label: 'Team Builder', path: '/mentor/team-builder', section: 'PROJECTS' },
     { label: 'Task Board', path: '/mentor/tasks', section: 'PROJECTS' },
+    { label: 'Review Queue', path: '/mentor/tasks/review', section: 'PROJECTS' },
     { label: 'Calendar', path: '/mentor/calendar', section: 'PROJECTS' },
     { label: 'Gantt Chart', path: '/mentor/gantt', section: 'PROJECTS' },
     { label: 'Notifications', path: '/mentor/notifications', section: 'COMMUNICATION' },
