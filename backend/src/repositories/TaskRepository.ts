@@ -56,6 +56,7 @@ export class TaskRepository {
     return prisma.task.findMany({
       where: { projectId },
       include: {
+        project: true,
         subtasks: true,
         assignedTo: { include: { user: { select: { fullName: true } } } },
       },
