@@ -12,13 +12,21 @@ export const projectInclude = {
 } as const;
 
 export class ProjectRepository {
-  list(filters: { status?: string; departmentId?: string; supervisorId?: string; internUserId?: string } = {}) {
+  list(filters: { status?: string; departmentId?: string; supervisorId?: string; creatorUserId?: string; internUserId?: string } = {}) {
+    const mentorOwnership = filters.creatorUserId
+      ? { OR: [
+          ...(filters.supervisorId ? [{ supervisorId: filters.supervisorId }] : []),
+          { createdById: filters.creatorUserId },
+        ] }
+      : filters.supervisorId
+        ? { supervisorId: filters.supervisorId }
+        : {};
     return prisma.project.findMany({
       where: {
         ...(filters.internUserId ? { assignments: { some: { leftAt: null, intern: { userId: filters.internUserId } } } } : {}),
         ...(filters.status ? { status: filters.status as never } : {}),
         ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
-        ...(filters.supervisorId ? { supervisorId: filters.supervisorId } : {}),
+        ...mentorOwnership,
       },
       include: projectInclude, orderBy: { createdAt: "desc" },
     });

@@ -6,35 +6,44 @@
   width: 100%;
 }
 
-/* Top Action Bar */
-.topBar {
+.pageHeading {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.dateButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
+.pageTitle {
+  margin: 0;
+  color: var(--icep-heading, #1A202C);
+  font-size: clamp(22px, 2.2vw, 28px);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle, .sectionDescription {
+  margin: 5px 0 0;
+  color: #718096;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.manageProjectsLink {
+  flex: 0 0 auto;
   border-radius: 8px;
-  padding: 8px 16px;
+  background: #1B3A5C;
+  padding: 10px 16px;
+  color: #fff;
   font-size: 13.5px;
   font-weight: 600;
-  color: #1A202C;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: all 0.15s ease;
-  font-family: inherit;
+  text-decoration: none;
 }
 
-.dateButton:hover {
-  background: #F8FAFC;
-  border-color: #CBD5E1;
-}
+.manageProjectsLink:hover { background: #12283F; }
+.manageProjectsLink:focus-visible { outline: 3px solid #93C5FD; outline-offset: 2px; }
+
+.sectionDescription { margin: -12px 0 16px; }
+.deadlineEmpty { margin: 8px 0; color: #718096; font-size: 13.5px; line-height: 1.5; }
 
 .newProjectButton {
   display: inline-flex;
@@ -532,8 +541,12 @@
   .metricsGrid {
     grid-template-columns: 1fr;
   }
-  .topBar {
-    justify-content: space-between;
+  .pageHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .manageProjectsLink {
+    align-self: flex-start;
   }
 }
 

@@ -11,7 +11,7 @@ export type MemberInput = { internId: string; projectRole?: string | null };
 const cleanRole = (role?: string | null) => (typeof role === "string" && role.trim() ? role.trim() : null);
 
 export class ProjectService {
-  list(filters: { status?: string; departmentId?: string; supervisorId?: string; internUserId?: string }) {
+  list(filters: { status?: string; departmentId?: string; supervisorId?: string; creatorUserId?: string; internUserId?: string }) {
     if (filters.status && !statuses.includes(filters.status)) {
       throw Object.assign(new Error("Invalid project status"), { statusCode: 400 });
     }

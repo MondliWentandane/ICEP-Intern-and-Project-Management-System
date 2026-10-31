@@ -24,7 +24,7 @@ export function AdminDashboardPage() {
   const interns = useList<InternView>(() => Interns.list(), sampleInterns)
   const campuses = useList<CampusView>(() => Campuses.list(), sampleCampuses)
   const projects = useList<ProjectView>(() => Projects.list(), sampleProjects)
-  const tasks = useList(() => Tasks.list(), sampleTasks)
+  const tasks = useList(async () => ({ data: await Tasks.list() }), sampleTasks)
 
   const all = [applicants, interns, campuses, projects, tasks]
   const loading = all.some((r) => r.loading)

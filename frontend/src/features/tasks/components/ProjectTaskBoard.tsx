@@ -16,18 +16,21 @@ import { Badge, Button } from '@/components/ui'
 import { Projects } from '@/api/services/projects.service'
 import { Tasks } from '@/api/services/tasks.service'
 import { useAuth } from '@/hooks/useAuth'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import type { ApiTaskStatus, Project, TaskApiRecord } from '@/types'
 
-const taskStatuses: ApiTaskStatus[] = ['TODO', 'IN_PROGRESS', 'COMPLETED']
+const taskStatuses: ApiTaskStatus[] = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'BLOCKED']
 const statusLabels: Record<ApiTaskStatus, string> = {
   TODO: 'To Do',
   IN_PROGRESS: 'In Progress',
   COMPLETED: 'Completed',
+  BLOCKED: 'Blocked',
 }
-const statusColors: Record<ApiTaskStatus, 'default' | 'warning' | 'success'> = {
+const statusColors: Record<ApiTaskStatus, 'default' | 'warning' | 'success' | 'error'> = {
   TODO: 'default',
   IN_PROGRESS: 'warning',
   COMPLETED: 'success',
+  BLOCKED: 'error',
 }
 const priorityLabels = { HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' } as const
 const refreshIntervalMs = 30_000
@@ -67,6 +70,7 @@ function allowedProjects(projects: Project[], role: string | undefined, userId: 
 function nextStatus(status: ApiTaskStatus): ApiTaskStatus | null {
   if (status === 'TODO') return 'IN_PROGRESS'
   if (status === 'IN_PROGRESS') return 'COMPLETED'
+  if (status === 'BLOCKED') return 'IN_PROGRESS'
   return null
 }
 
@@ -116,6 +120,9 @@ function TaskCard({
           </Typography>
         )}
       </Stack>
+      {task.status === 'BLOCKED' && task.blockedReason && (
+        <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 1 }}>Blocked: {task.blockedReason}</Typography>
+      )}
       {canAdvance && (
         <Button
           variant="outlined"
@@ -285,12 +292,13 @@ export function ProjectTaskBoard() {
         </FormControl>
       </Stack>
 
+      {loadingProjects && <BikeLoader label="Loading projects" size={125} />}
       {projectError && <Alert severity="error" sx={{ mb: 2 }}>{projectError}</Alert>}
       {!loadingProjects && !projectError && visibleProjects.length === 0 && (
         <Alert severity="info">No project is available for your account.</Alert>
       )}
       {taskError && <Alert severity="error" sx={{ mb: 2 }}>{taskError}</Alert>}
-      {loadingTasks && <Typography color="text.secondary" sx={{ mb: 2 }}>Loading project tasks…</Typography>}
+      {loadingTasks && <BikeLoader label="Loading project tasks" size={105} />}
       {selectedProject && (
         <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>{selectedProject.name}</Typography>

@@ -3,15 +3,15 @@ import { Link } from 'react-router-dom'
 import type { NewProject } from '@/components/ui/CreateProjectButton'
 import { teamError } from '@/features/projects/data/projectsApi'
 import { useTeams } from '@/features/team-builder/data/teamsApi'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import { ModalShell, FIELD, errorText } from './Shared'
 
 function CreateDialog({ onCreate, onClose }: { onCreate: (p: NewProject) => Promise<unknown>; onClose: () => void }) {
-  const { data: teams = [], isLoading } = useTeams()
+  const { data: teams = [], isLoading, isError, error: teamsError, refetch } = useTeams()
   const [step, setStep] = useState<1 | 2>(1)
   const [name, setName] = useState('')
   const [statement, setStatement] = useState('')
   const [teamId, setTeamId] = useState('')
-  const [scrumId, setScrumId] = useState('')
   const [showErrors, setShowErrors] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -31,10 +31,7 @@ function CreateDialog({ onCreate, onClose }: { onCreate: (p: NewProject) => Prom
   const submit = async (e: SyntheticEvent) => {
     e.preventDefault()
     if (!team) { setShowErrors(true); return }
-    const members = team.members.map((m: { internId: string }) => ({
-      internId: m.internId,
-      projectRole: m.internId === scrumId ? 'Scrum Master' : '',
-    }))
+    const members = team.members.map((m) => ({ internId: m.internId, projectRole: m.projectRole }))
     const invalid = teamError(members)
     if (invalid) {
       setError(typeof invalid === 'string' ? invalid : 'This team cannot be assigned. Check its members.')
@@ -77,7 +74,12 @@ function CreateDialog({ onCreate, onClose }: { onCreate: (p: NewProject) => Prom
       ) : (
         <form onSubmit={(e) => void submit(e)} noValidate className="mt-5 space-y-4">
           {isLoading ? (
-            <p className="text-sm text-[#55627a]">Loading teams…</p>
+            <BikeLoader label="Loading teams" size={95} />
+          ) : isError ? (
+            <p role="alert" className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
+              {errorText(teamsError, 'Saved teams could not be loaded.')}{' '}
+              <button type="button" onClick={() => void refetch()} className="font-semibold underline">Try again</button>
+            </p>
           ) : teams.length === 0 ? (
             <p className="rounded-2xl bg-[#f1f4fa] p-4 text-sm text-[#55627a]">
               No teams yet. <Link to="../team-builder" className="font-semibold text-[#0b2a5b] underline">Build a team</Link> first, then create the project.
@@ -90,26 +92,20 @@ function CreateDialog({ onCreate, onClose }: { onCreate: (p: NewProject) => Prom
                   type="button"
                   role="radio"
                   aria-checked={t.id === teamId}
-                  onClick={() => { setTeamId(t.id); setScrumId('') }}
+                  onClick={() => setTeamId(t.id)}
                   className={`w-full rounded-2xl border-2 px-4 py-3 text-left ${t.id === teamId ? 'border-[#0b2a5b] bg-[#f3f6fb]' : 'border-transparent bg-[#f1f4fa] hover:bg-[#e9eef7]'}`}
                 >
                   <span className="block text-sm font-semibold text-[#0f1b33]">{t.name}</span>
+                  {t.description && <span className="mt-1 block text-xs text-[#55627a]">{t.description}</span>}
                   <span className="block text-xs text-[#55627a]">{t.members.map((m) => m.name).join(', ')}</span>
+                  <span className="mt-1 block text-xs text-[#55627a]">{t.members.map((m) => `${m.name}: ${m.projectRole}`).join(' · ')}</span>
                 </button>
               ))}
             </div>
           )}
           {showErrors && !team && teams.length > 0 && <p className="text-xs text-red-700">Pick a team.</p>}
 
-          {team && (
-            <div>
-              <label htmlFor="np-scrum" className="mb-1.5 block text-sm font-medium text-[#0f1b33]">Scrum master (optional)</label>
-              <select id="np-scrum" value={scrumId} onChange={(e) => setScrumId(e.target.value)} className={FIELD}>
-                <option value="">No scrum master yet</option>
-                {team.members.map((m) => <option key={m.internId} value={m.internId}>{m.name}</option>)}
-              </select>
-            </div>
-          )}
+          {team && <p className="text-xs text-[#55627a]">The saved member roles, including the Scrum Master, will be used for this project.</p>}
 
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           <div className="flex justify-end gap-3 pt-2">

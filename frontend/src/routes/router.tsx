@@ -3,94 +3,112 @@ import { PublicLayout } from '@/layouts/PublicLayout/PublicLayout'
 import { AuthLayout } from '@/layouts/AuthLayout/AuthLayout'
 import { DashboardLayout } from '@/layouts/DashboardLayout/DashboardLayout'
 import { ProtectedRoute } from './ProtectedRoute'
-import { LoginPage } from '@/features/auth/pages/LoginPage'
-import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage'
-import { SetPasswordPage } from '@/features/auth/pages/SetPasswordPage'
-import { HomePage } from '@/features/public-site/pages/HomePage.tsx'
-import { AboutPage } from '@/features/public-site/pages/AboutPage.tsx'
-import { CareersPage } from '@/features/public-site/pages/CareersPage.tsx'
-import { PositionDetailPage } from '@/features/public-site/pages/PositionDetailPage.tsx'
-import { ContactPage } from '@/features/public-site/pages/ContactPage.tsx'
-import { ApplyPage } from '@/features/application/pages/ApplyPage.tsx'
-import { TrackLoginPage } from '@/features/application/pages/TrackLoginPage.tsx'
-import { TrackApplicationPage } from '@/features/application/pages/TrackApplicationPage.tsx'
-import { HandlerDashboardPage } from '@/features/dashboard/pages/HandlerDashboardPage.tsx'
-import { AdminDashboardPage } from '@/features/dashboard/pages/AdminDashboardPage.tsx'
-import { MentorDashboardPage } from '@/features/dashboard/pages/MentorDashboardPage.tsx'
-import { ApplicantsPage } from '@/features/applicants/pages/ApplicantsPage.tsx'
-import { InternsPage } from '@/features/interns/pages/InternsPage.tsx'
-import { InternProfilePage } from '@/features/interns/pages/InternProfilePage.tsx'
-import { PastInternsPage } from '@/features/past-interns/pages/PastInternsPage.tsx'
-import { CampusesIntakesPage } from '@/features/campuses/pages/CampusesIntakesPage.tsx'
-import { ProjectsPage } from '@/features/projects/pages/ProjectsPage.tsx'
-import { MyProjectPage } from '@/features/projects/pages/MyProjectPage.tsx'
-import { ProjectDetailPage } from '@/features/projects/pages/ProjectDetailPage.tsx'
-import { TeamBuilderPage } from '@/features/team-builder/pages/TeamBuilderPage.tsx'
-import { InternTaskBoardPage } from '@/features/tasks/pages/InternTaskBoardPage.tsx'
-import { TaskBoardOverviewPage } from '@/features/tasks/pages/TaskBoardOverviewPage.tsx'
-import { ReviewQueuePage } from '@/features/tasks/pages/ReviewQueuePage.tsx'
-import { CalendarPage } from '@/features/calendar/pages/CalendarPage.tsx'
-import { GanttPage } from '@/features/gantt/pages/GanttPage.tsx'
-import { ReportsPage } from '@/features/reports/pages/ReportsPage.tsx'
-import { UsersPage } from '@/features/users/pages/UsersPage.tsx'
-import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage.tsx'
-import { EmailTemplatesPage } from '@/features/notifications/pages/EmailTemplatesPage.tsx'
-import { MyProfilePage } from '@/features/profile/pages/MyProfilePage.tsx'
-import { EditProfilePage } from '@/features/profile/pages/EditProfilePage.tsx'
-import { NotFoundPage } from '@/features/misc/NotFoundPage.tsx'
 
 const guarded = (roles: Array<'ADMIN' | 'WIL_HANDLER' | 'MENTOR' | 'INTERN'>, element: import('react').ReactNode) => <ProtectedRoute allowedRoles={roles}>{element}</ProtectedRoute>
+const lazyPage = <T extends object, K extends keyof T>(load: () => Promise<T>, componentName: K) => ({
+  lazy: async () => ({
+    Component: (await load())[componentName] as import('react').ComponentType,
+  }),
+})
+
 export const router = createBrowserRouter([
   {
     path: '/', element: <PublicLayout />, children: [
-      { index: true, element: <HomePage /> }, { path: 'about', element: <AboutPage /> }, { path: 'careers', element: <CareersPage /> },
-      { path: 'careers/:positionId', element: <PositionDetailPage /> }, { path: 'contact', element: <ContactPage /> },
-      { path: 'track', element: <TrackLoginPage /> }, { path: 'track/:reference', element: <TrackApplicationPage /> },
+      { index: true, ...lazyPage(() => import('@/features/public-site/pages/HomePage.tsx'), 'HomePage') },
+      { path: 'about', ...lazyPage(() => import('@/features/public-site/pages/AboutPage.tsx'), 'AboutPage') },
+      { path: 'careers', ...lazyPage(() => import('@/features/public-site/pages/CareersPage.tsx'), 'CareersPage') },
+      { path: 'careers/:positionId', ...lazyPage(() => import('@/features/public-site/pages/PositionDetailPage.tsx'), 'PositionDetailPage') },
+      { path: 'contact', ...lazyPage(() => import('@/features/public-site/pages/ContactPage.tsx'), 'ContactPage') },
+      { path: 'track', ...lazyPage(() => import('@/features/application/pages/TrackLoginPage.tsx'), 'TrackLoginPage') },
+      { path: 'track/:reference', ...lazyPage(() => import('@/features/application/pages/TrackApplicationPage.tsx'), 'TrackApplicationPage') },
     ]
   },
   // The application form is a pop-up (?apply=…) mounted in PublicLayout; these paths redirect to it.
-  { path: '/careers/:positionId/apply/*', element: <ApplyPage /> }, { path: '/apply/*', element: <ApplyPage /> },
+  { path: '/careers/:positionId/apply/*', ...lazyPage(() => import('@/features/application/pages/ApplyPage.tsx'), 'ApplyPage') },
+  { path: '/apply/*', ...lazyPage(() => import('@/features/application/pages/ApplyPage.tsx'), 'ApplyPage') },
   {
     element: <AuthLayout />, children: [
-      { path: '/login', element: <LoginPage /> }, { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/login', ...lazyPage(() => import('@/features/auth/pages/LoginPage'), 'LoginPage') },
+      { path: '/forgot-password', ...lazyPage(() => import('@/features/auth/pages/ForgotPasswordPage'), 'ForgotPasswordPage') },
       // The account email links to /reset-password?token=…; the path-token forms are kept for older links.
-      { path: '/reset-password', element: <SetPasswordPage /> },
-      { path: '/create-password/:token', element: <SetPasswordPage /> }, { path: '/set-password/:token', element: <SetPasswordPage /> },
+      { path: '/reset-password', ...lazyPage(() => import('@/features/auth/pages/SetPasswordPage'), 'SetPasswordPage') },
+      { path: '/create-password/:token', ...lazyPage(() => import('@/features/auth/pages/SetPasswordPage'), 'SetPasswordPage') },
+      { path: '/set-password/:token', ...lazyPage(() => import('@/features/auth/pages/SetPasswordPage'), 'SetPasswordPage') },
     ]
   },
   {
     path: '/handler', element: guarded(['WIL_HANDLER'], <DashboardLayout />), children: [
-      { path: 'dashboard', element: <HandlerDashboardPage /> }, { path: 'applicants', element: <ApplicantsPage /> }, { path: 'interns', element: <InternsPage /> },
-      { path: 'interns/:internId', element: <InternProfilePage /> }, { path: 'campuses', element: <CampusesIntakesPage /> }, { path: 'past-interns', element: <PastInternsPage /> },
-      { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+      { path: 'dashboard', ...lazyPage(() => import('@/features/dashboard/pages/HandlerDashboardPage.tsx'), 'HandlerDashboardPage') },
+      { path: 'applicants', ...lazyPage(() => import('@/features/applicants/pages/ApplicantsPage.tsx'), 'ApplicantsPage') },
+      { path: 'interns', ...lazyPage(() => import('@/features/interns/pages/InternsPage.tsx'), 'InternsPage') },
+      { path: 'interns/:internId', ...lazyPage(() => import('@/features/interns/pages/InternProfilePage.tsx'), 'InternProfilePage') },
+      { path: 'campuses', ...lazyPage(() => import('@/features/campuses/pages/CampusesIntakesPage.tsx'), 'CampusesIntakesPage') },
+      { path: 'past-interns', ...lazyPage(() => import('@/features/past-interns/pages/PastInternsPage.tsx'), 'PastInternsPage') },
+      { path: 'notifications', ...lazyPage(() => import('@/features/notifications/pages/NotificationsPage.tsx'), 'NotificationsPage') },
+      { path: 'profile', ...lazyPage(() => import('@/features/profile/pages/MyProfilePage.tsx'), 'MyProfilePage') },
+      { path: 'profile/edit', ...lazyPage(() => import('@/features/profile/pages/EditProfilePage.tsx'), 'EditProfilePage') },
     ]
   },
   {
     path: '/admin', element: guarded(['ADMIN'], <DashboardLayout />), children: [
-      { path: 'dashboard', element: <AdminDashboardPage /> }, { path: 'applicants', element: <ApplicantsPage /> }, { path: 'interns', element: <InternsPage /> },
-      { path: 'interns/:internId', element: <InternProfilePage /> }, { path: 'campuses', element: <CampusesIntakesPage /> }, { path: 'past-interns', element: <PastInternsPage /> },
-      { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'team-builder/:projectId', element: <TeamBuilderPage /> },
-      { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'team-builder', element: <TeamBuilderPage /> },
-      { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> }, { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> },
-      { path: 'reports', element: <ReportsPage /> }, { path: 'users', element: <UsersPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'emails', element: <EmailTemplatesPage /> },
-      { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+      { path: 'dashboard', ...lazyPage(() => import('@/features/dashboard/pages/AdminDashboardPage.tsx'), 'AdminDashboardPage') },
+      { path: 'applicants', ...lazyPage(() => import('@/features/applicants/pages/ApplicantsPage.tsx'), 'ApplicantsPage') },
+      { path: 'interns', ...lazyPage(() => import('@/features/interns/pages/InternsPage.tsx'), 'InternsPage') },
+      { path: 'interns/:internId', ...lazyPage(() => import('@/features/interns/pages/InternProfilePage.tsx'), 'InternProfilePage') },
+      { path: 'campuses', ...lazyPage(() => import('@/features/campuses/pages/CampusesIntakesPage.tsx'), 'CampusesIntakesPage') },
+      { path: 'past-interns', ...lazyPage(() => import('@/features/past-interns/pages/PastInternsPage.tsx'), 'PastInternsPage') },
+      { path: 'projects', ...lazyPage(() => import('@/features/projects/pages/ProjectsPage.tsx'), 'ProjectsPage') },
+      { path: 'projects/:projectId', ...lazyPage(() => import('@/features/projects/pages/ProjectDetailPage.tsx'), 'ProjectDetailPage') },
+      { path: 'team-builder/:projectId', ...lazyPage(() => import('@/features/team-builder/pages/TeamBuilderPage.tsx'), 'TeamBuilderPage') },
+      { path: 'projects', ...lazyPage(() => import('@/features/projects/pages/ProjectsPage.tsx'), 'ProjectsPage') },
+      { path: 'projects/:projectId', ...lazyPage(() => import('@/features/projects/pages/ProjectDetailPage.tsx'), 'ProjectDetailPage') },
+      { path: 'team-builder', ...lazyPage(() => import('@/features/team-builder/pages/TeamBuilderPage.tsx'), 'TeamBuilderPage') },
+      { path: 'tasks', ...lazyPage(() => import('@/features/tasks/pages/TaskBoardOverviewPage.tsx'), 'TaskBoardOverviewPage') },
+      { path: 'tasks/review', ...lazyPage(() => import('@/features/tasks/pages/ReviewQueuePage.tsx'), 'ReviewQueuePage') },
+      { path: 'calendar', ...lazyPage(() => import('@/features/calendar/pages/CalendarPage.tsx'), 'CalendarPage') },
+      { path: 'gantt', ...lazyPage(() => import('@/features/gantt/pages/GanttPage.tsx'), 'GanttPage') },
+      { path: 'reports', ...lazyPage(() => import('@/features/reports/pages/ReportsPage.tsx'), 'ReportsPage') },
+      { path: 'users', ...lazyPage(() => import('@/features/users/pages/UsersPage.tsx'), 'UsersPage') },
+      { path: 'notifications', ...lazyPage(() => import('@/features/notifications/pages/NotificationsPage.tsx'), 'NotificationsPage') },
+      { path: 'emails', ...lazyPage(() => import('@/features/notifications/pages/EmailTemplatesPage.tsx'), 'EmailTemplatesPage') },
+      { path: 'profile', ...lazyPage(() => import('@/features/profile/pages/MyProfilePage.tsx'), 'MyProfilePage') },
+      { path: 'profile/edit', ...lazyPage(() => import('@/features/profile/pages/EditProfilePage.tsx'), 'EditProfilePage') },
     ]
   },
   {
     path: '/mentor', element: guarded(['MENTOR'], <DashboardLayout />), children: [
-      { path: 'dashboard', element: <MentorDashboardPage /> }, { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> },
-      { path: 'team-builder/:projectId', element: <TeamBuilderPage /> }, { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> },
-      { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> }, { path: 'notifications', element: <NotificationsPage /> }, { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
-      { path: 'dashboard', element: <MentorDashboardPage /> }, { path: 'projects', element: <ProjectsPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> },
-    { path: 'team-builder', element: <TeamBuilderPage /> }, { path: 'tasks', element: <TaskBoardOverviewPage /> }, { path: 'tasks/review', element: <ReviewQueuePage /> },
+      { path: 'dashboard', ...lazyPage(() => import('@/features/dashboard/pages/MentorDashboardPage.tsx'), 'MentorDashboardPage') },
+      { path: 'projects', ...lazyPage(() => import('@/features/projects/pages/ProjectsPage.tsx'), 'ProjectsPage') },
+      { path: 'projects/:projectId', ...lazyPage(() => import('@/features/projects/pages/ProjectDetailPage.tsx'), 'ProjectDetailPage') },
+      { path: 'team-builder/:projectId', ...lazyPage(() => import('@/features/team-builder/pages/TeamBuilderPage.tsx'), 'TeamBuilderPage') },
+      { path: 'tasks', ...lazyPage(() => import('@/features/tasks/pages/TaskBoardOverviewPage.tsx'), 'TaskBoardOverviewPage') },
+      { path: 'tasks/review', ...lazyPage(() => import('@/features/tasks/pages/ReviewQueuePage.tsx'), 'ReviewQueuePage') },
+      { path: 'calendar', ...lazyPage(() => import('@/features/calendar/pages/CalendarPage.tsx'), 'CalendarPage') },
+      { path: 'gantt', ...lazyPage(() => import('@/features/gantt/pages/GanttPage.tsx'), 'GanttPage') },
+      { path: 'notifications', ...lazyPage(() => import('@/features/notifications/pages/NotificationsPage.tsx'), 'NotificationsPage') },
+      { path: 'profile', ...lazyPage(() => import('@/features/profile/pages/MyProfilePage.tsx'), 'MyProfilePage') },
+      { path: 'profile/edit', ...lazyPage(() => import('@/features/profile/pages/EditProfilePage.tsx'), 'EditProfilePage') },
+      { path: 'dashboard', ...lazyPage(() => import('@/features/dashboard/pages/MentorDashboardPage.tsx'), 'MentorDashboardPage') },
+      { path: 'projects', ...lazyPage(() => import('@/features/projects/pages/ProjectsPage.tsx'), 'ProjectsPage') },
+      { path: 'projects/:projectId', ...lazyPage(() => import('@/features/projects/pages/ProjectDetailPage.tsx'), 'ProjectDetailPage') },
+      { path: 'team-builder', ...lazyPage(() => import('@/features/team-builder/pages/TeamBuilderPage.tsx'), 'TeamBuilderPage') },
+      { path: 'tasks', ...lazyPage(() => import('@/features/tasks/pages/TaskBoardOverviewPage.tsx'), 'TaskBoardOverviewPage') },
+      { path: 'tasks/review', ...lazyPage(() => import('@/features/tasks/pages/ReviewQueuePage.tsx'), 'ReviewQueuePage') },
     ]
   },
   {
     path: '/intern', element: guarded(['INTERN'], <DashboardLayout />), children: [
-      { path: 'project', element: <MyProjectPage /> }, { path: 'projects/:projectId', element: <ProjectDetailPage /> }, { path: 'tasks', element: <InternTaskBoardPage /> },
-      { path: 'calendar', element: <CalendarPage /> }, { path: 'gantt', element: <GanttPage /> }, { path: 'notifications', element: <NotificationsPage /> },
-      { path: 'profile', element: <MyProfilePage /> }, { path: 'profile/edit', element: <EditProfilePage /> },
+      { path: 'project', ...lazyPage(() => import('@/features/projects/pages/MyProjectPage.tsx'), 'MyProjectPage') },
+      { path: 'projects/:projectId', ...lazyPage(() => import('@/features/projects/pages/ProjectDetailPage.tsx'), 'ProjectDetailPage') },
+      { path: 'tasks', ...lazyPage(() => import('@/features/tasks/pages/InternTaskBoardPage.tsx'), 'InternTaskBoardPage') },
+      { path: 'tasks/review', ...lazyPage(() => import('@/features/tasks/pages/ReviewQueuePage.tsx'), 'ReviewQueuePage') },
+      { path: 'calendar', ...lazyPage(() => import('@/features/calendar/pages/CalendarPage.tsx'), 'CalendarPage') },
+      { path: 'gantt', ...lazyPage(() => import('@/features/gantt/pages/GanttPage.tsx'), 'GanttPage') },
+      { path: 'notifications', ...lazyPage(() => import('@/features/notifications/pages/NotificationsPage.tsx'), 'NotificationsPage') },
+      { path: 'profile', ...lazyPage(() => import('@/features/profile/pages/MyProfilePage.tsx'), 'MyProfilePage') },
+      { path: 'profile/edit', ...lazyPage(() => import('@/features/profile/pages/EditProfilePage.tsx'), 'EditProfilePage') },
     ]
   },
-  { path: '/403', element: <NotFoundPage /> }, { path: '*', element: <NotFoundPage /> },
+  { path: '/403', ...lazyPage(() => import('@/features/misc/NotFoundPage.tsx'), 'NotFoundPage') },
+  { path: '*', ...lazyPage(() => import('@/features/misc/NotFoundPage.tsx'), 'NotFoundPage') },
 ])

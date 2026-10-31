@@ -3,6 +3,7 @@ export interface Project {
   id: ID
   name: string
   status: string
+  createdById?: ID | null
   department?: string | { id: ID; name: string; description?: string | null } | null
   description?: string
   supervisor?: { user?: { id?: ID } | null } | null

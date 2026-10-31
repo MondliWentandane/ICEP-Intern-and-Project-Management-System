@@ -5,7 +5,7 @@ import type { UseFormRegisterReturn } from 'react-hook-form'
 
 type FormFieldProps = Omit<TextFieldProps, 'label' | 'name' | 'onChange' | 'onBlur'> & {
   id: string
-  label: string
+  label: ReactNode
   registration?: UseFormRegisterReturn
   errorText?: string
   hint?: string

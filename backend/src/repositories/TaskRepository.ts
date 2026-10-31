@@ -56,10 +56,34 @@ export class TaskRepository {
     return prisma.task.findMany({
       where: { projectId },
       include: {
+        project: true,
         subtasks: true,
         assignedTo: { include: { user: { select: { fullName: true } } } },
       },
-      orderBy: { position: "asc" }
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }]
+    });
+  }
+
+  static async countProjectTasks(projectId: string) {
+    return prisma.task.count({ where: { projectId } });
+  }
+
+  static async reorderTask(projectId: string, taskId: string, requestedPosition: number) {
+    return prisma.$transaction(async (transaction) => {
+      const ordered = await transaction.task.findMany({
+        where: { projectId },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: { id: true },
+      });
+      const oldIndex = ordered.findIndex((task) => task.id === taskId);
+      if (oldIndex < 0) throw new Error("Task not found in this project");
+      const [task] = ordered.splice(oldIndex, 1);
+      const nextIndex = Math.max(0, Math.min(requestedPosition, ordered.length));
+      ordered.splice(nextIndex, 0, task);
+      for (const [position, item] of ordered.entries()) {
+        await transaction.task.update({ where: { id: item.id }, data: { position } });
+      }
+      return transaction.task.findUniqueOrThrow({ where: { id: taskId } });
     });
   }
 
@@ -79,11 +103,12 @@ export class TaskRepository {
     });
   }
 
-  static async updateTaskStatus(id: string, status: TaskStatus) {
+  static async updateTaskStatus(id: string, status: TaskStatus, blockedReason: string | null = null) {
     return prisma.task.update({
       where: { id },
       data: {
         status,
+        blockedReason: status === "BLOCKED" ? blockedReason : null,
         completedAt: status === "COMPLETED" ? new Date() : null,
         approvedAt: null,
         approvedById: null
@@ -132,6 +157,10 @@ export class TaskRepository {
       where: {
         status: "COMPLETED",
         approvedAt: null
+      },
+      include: {
+        project: { select: { name: true } },
+        assignedTo: { include: { user: { select: { fullName: true } } } },
       },
       orderBy: { updatedAt: "desc" }
     });

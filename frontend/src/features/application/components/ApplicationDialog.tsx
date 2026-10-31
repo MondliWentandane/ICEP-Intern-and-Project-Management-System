@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Alert, Box, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, LinearProgress, Typography, useMediaQuery } from '@mui/material'
+import { Alert, Box, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, LinearProgress, Typography, useMediaQuery } from '@mui/material'
+import { BikeLoader } from '@/components/ui/BikeLoader'
 import { keyframes } from '@emotion/react'
 import axios from 'axios'
 import { useTheme } from '@mui/material/styles'
@@ -118,7 +119,7 @@ function ApplicationDialogBody({ target }: { target: string }) {
   let body: ReactNode
   let actions: ReactNode
   if (isLoading) {
-    body = <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}><CircularProgress aria-label="Loading positions" /></Box>
+    body = <Box sx={{ display: 'grid', placeItems: 'center', py: 4 }}><BikeLoader label="Loading positions" size={125} /></Box>
   } else if (isError || unavailable) {
     body = (
       <Box sx={{ textAlign: 'center', py: 6 }}>

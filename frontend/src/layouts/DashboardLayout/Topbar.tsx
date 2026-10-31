@@ -9,7 +9,7 @@ import styles from './DashboardLayout.module.css'
 const titles: Record<string, string> = {
   dashboard: 'Dashboard', applicants: 'Applicants', interns: 'Interns', campuses: 'Campuses & Intakes',
   'past-interns': 'Past Interns', projects: 'Projects', tasks: 'Task Board', calendar: 'Calendar',
-  gantt: 'Gantt Chart', reports: 'Reports', users: 'Users', notifications: 'Notifications',
+  gantt: 'Gantt Chart', review: 'Review Queue', 'team-builder': 'Team Builder', reports: 'Reports', users: 'Users', notifications: 'Notifications',
   project: 'My Project', profile: 'My Profile', emails: 'Email Templates',
 }
 export function Topbar({ menuOpen, phone, onMenuClick }: { menuOpen: boolean; phone: boolean; onMenuClick: () => void }) {

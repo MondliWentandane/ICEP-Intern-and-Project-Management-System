@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { BikeLoader } from "@/components/ui/BikeLoader";
 import { apiErrorMessage } from "@/features/applicants/data/applicationsApi";
 import {
   useDeleteNotification, useEmailLog, useMarkAllNotificationsRead, useMarkNotificationRead, useMyNotifications,
@@ -146,7 +147,7 @@ function MyNotifications() {
       </div>
 
       {isError && <div className="np-error" role="alert">{apiErrorMessage(error, "Your notifications could not be loaded.")}</div>}
-      {isLoading ? <div className="np-card np-empty">Loading your notifications…</div> : visible.length === 0 ? (
+      {isLoading ? <div className="np-card np-empty"><BikeLoader label="Loading notifications" size={115} /></div> : visible.length === 0 ? (
         <div className="np-card np-empty">{show === "unread" ? "You're all caught up: no unread notifications." : "No notifications yet. Updates that concern you will appear here."}</div>
       ) : byDay(visible, (n) => n.createdAt).map(([day, notes]) => (
         <section key={day} style={{ marginBottom: 22 }}>
@@ -215,7 +216,7 @@ function EmailLog() {
       </div>
 
       {isError && <div className="np-error" role="alert">{apiErrorMessage(error, "The email log could not be loaded.")}</div>}
-      {isLoading ? <div className="np-card np-empty">Loading the email log…</div> : visible.length === 0 ? (
+      {isLoading ? <div className="np-card np-empty"><BikeLoader label="Loading email log" size={115} /></div> : visible.length === 0 ? (
         <div className="np-card np-empty">{data.length ? "No emails match these filters." : "No emails have been sent yet."}</div>
       ) : byDay(visible, (e) => e.createdAt).map(([day, entries]) => (
         <section key={day} style={{ marginBottom: 22 }}>

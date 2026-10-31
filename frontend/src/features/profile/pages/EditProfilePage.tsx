@@ -117,7 +117,7 @@ export function EditProfilePage() {
       <PageHeading current="Edit profile" title="Edit profile" subtitle="Keep your contact information and professional details up to date." />
       <ProfileHeader profile={profile} role={user.role} editing />
       <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 360px' }, alignItems: 'start' }}>
-        <EditForm profile={profile} isIntern={user.role === 'intern'} onSave={save.mutateAsync} />
+        <EditForm profile={profile} isIntern={user.role === 'INTERN'} onSave={save.mutateAsync} />
         <SecurityCard />
       </Box>
       <ProfileFootnote />
