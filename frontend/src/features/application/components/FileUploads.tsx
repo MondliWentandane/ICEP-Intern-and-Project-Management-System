@@ -1,6 +1,6 @@
-import { useRef, useState, type DragEvent, type ReactNode } from 'react'
-import { Box, ButtonBase, Chip, FormHelperText, IconButton, Typography } from '@mui/material'
-import { Upload, X } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { Box, Button, ButtonBase, Chip, Dialog, DialogContent, DialogTitle, FormHelperText, IconButton, Typography } from '@mui/material'
+import { Eye, Upload, X } from 'lucide-react'
 import { formatBytes } from '../data/applicationSchema'
 
 /** Dashed drag-and-drop area for a single PDF. Validation happens in the form schema. */
@@ -51,9 +51,18 @@ export function PdfBadge() {
 }
 
 /** One uploaded file: PDF badge, optional caption, name, size, status chip and a trailing action. */
-export function FileRow({ caption, name, size, status, detail, onRemove, action, muted = false }: {
-  caption?: string; name: string; size?: number; status?: 'Uploaded' | 'Attached'; detail?: string; onRemove?: () => void; action?: ReactNode; muted?: boolean
+export function FileRow({ caption, name, size, status, detail, file, onRemove, action, muted = false }: {
+  caption?: string; name: string; size?: number; status?: 'Uploaded' | 'Attached'; detail?: string; file?: File; onRemove?: () => void; action?: ReactNode; muted?: boolean
 }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const previewTitleId = useId()
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: muted ? 'var(--icep-page)' : '#fff', mt: 1.5 }}>
       <PdfBadge />
@@ -65,6 +74,19 @@ export function FileRow({ caption, name, size, status, detail, onRemove, action,
           {status && <Chip label={status} size="small" sx={{ height: 20, fontSize: 12, bgcolor: 'var(--icep-active-tint)', color: '#166534' }} />}
         </Box>
       </Box>
+      {file && (
+        <>
+          <Button size="small" startIcon={<Eye size={16} />} onClick={() => setPreviewUrl(URL.createObjectURL(file))}>
+            Preview
+          </Button>
+          <Dialog open={Boolean(previewUrl)} onClose={() => setPreviewUrl(null)} fullWidth maxWidth="md" aria-labelledby={previewTitleId}>
+            <DialogTitle id={previewTitleId}>{name}</DialogTitle>
+            <DialogContent sx={{ height: '75vh', p: 0 }}>
+              {previewUrl && <Box component="iframe" src={previewUrl} title={`Preview of ${name}`} sx={{ width: '100%', height: '100%', border: 0 }} />}
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
       {action}
       {onRemove && <IconButton aria-label={`Remove ${name}`} onClick={onRemove} size="small"><X size={18} /></IconButton>}
     </Box>

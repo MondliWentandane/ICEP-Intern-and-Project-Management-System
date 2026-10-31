@@ -5,7 +5,7 @@ import { Controller, useFormContext } from 'react-hook-form'
 import { Link as RouterLink } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import type { CareerPosition } from '@/features/public-site/data/positions'
-import { studyCategories, yearsOfStudy, type ApplicationInput, type ApplicationValues } from '../data/applicationSchema'
+import { qualifications, yearsOfStudy, type ApplicationInput, type ApplicationValues } from '../data/applicationSchema'
 import { FileDropzone, FileRow } from './FileUploads'
 import { FieldRow, FormField, InfoNote } from './FormBits'
 import { TagInput } from './TagInput'
@@ -13,14 +13,23 @@ import { TagInput } from './TagInput'
 const useApplicationContext = () => useFormContext<ApplicationInput, unknown, ApplicationValues>()
 const twoColumns = { display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } } as const
 
-function LabeledSelect({ name, id, label, options, placeholder }: { name: 'category' | 'yearOfStudy'; id: string; label: string; options: readonly string[]; placeholder: string }) {
+/** Live check for the ID and student numbers: re-validates on every keystroke and when the applicant leaves the field, so the length and invalid-ID messages update straight away. */
+function useLiveNumber(name: 'idNumber' | 'studentNumber') {
+  const { register, trigger } = useApplicationContext()
+  return register(name, {
+    onChange: () => { void trigger(name) },
+    onBlur: () => { void trigger(name) },
+  })
+}
+
+function LabeledSelect({ name, id, label, options, placeholder }: { name: 'qualification' | 'yearOfStudy'; id: string; label: string; options: readonly string[]; placeholder: string }) {
   const { control, trigger } = useApplicationContext()
   return (
     <Controller name={name} control={control} render={({ field, fieldState }) => (
       <FieldRow label={label} htmlFor={id}>
         <TextField select fullWidth id={id} value={field.value ?? ''} onChange={(event) => { field.onChange(event); if (fieldState.error) void trigger(name) }} onBlur={field.onBlur} inputRef={field.ref}
           error={Boolean(fieldState.error)} helperText={fieldState.error?.message}
-          slotProps={{ select: { displayEmpty: true }, formHelperText: { sx: { mx: 0 } } }}>
+          slotProps={{ select: { displayEmpty: true, renderValue: (selected) => (selected ? String(selected) : <Box component="span" sx={{ color: 'text.disabled' }}>{placeholder}</Box>) }, formHelperText: { sx: { mx: 0 } } }}>
           <MenuItem value="" disabled>{placeholder}</MenuItem>
           {options.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}
         </TextField>
@@ -36,7 +45,7 @@ function PdfField({ name, id, dropTitle }: { name: 'cv' | 'idDocument' | 'academ
   return (
     <>
       <FileDropzone id={id} title={dropTitle} onFile={(next) => setValue(name, next, { shouldValidate: true, shouldDirty: true })} errorText={errors[name]?.message} />
-      {file instanceof File && <FileRow name={file.name} size={file.size} status="Uploaded" onRemove={() => resetField(name)} />}
+      {file instanceof File && <FileRow file={file} name={file.name} size={file.size} status="Uploaded" onRemove={() => resetField(name)} />}
     </>
   )
 }
@@ -55,6 +64,7 @@ const sectionStack = { display: 'grid', gap: 4 } as const
 
 export function PersonalStep() {
   const { register, formState: { errors } } = useApplicationContext()
+  const idRegistration = useLiveNumber('idNumber')
   return (
     <Box sx={sectionStack}>
       <FormSection id="section-name" title="Name">
@@ -66,7 +76,7 @@ export function PersonalStep() {
         <FormField id="phone" label="Phone number" type="tel" autoComplete="tel" registration={register('phone')} errorText={errors.phone?.message} hint="Use a South African mobile number." />
       </FormSection>
       <FormSection id="section-identity" title="Identity">
-        <FormField id="idNumber" label="South African ID number" inputMode="numeric" registration={register('idNumber')} errorText={errors.idNumber?.message} hint="Enter your 13-digit ID number as it appears on your ID." />
+        <FormField id="idNumber" label="South African ID number" inputMode="numeric" registration={idRegistration} errorText={errors.idNumber?.message} hint="Enter your 13-digit ID number as it appears on your ID." />
         <InfoNote icon={<ShieldCheck size={18} />}>Your information is used only to assess your WIL application and manage your placement.</InfoNote>
       </FormSection>
     </Box>
@@ -75,12 +85,13 @@ export function PersonalStep() {
 
 export function StudiesStep() {
   const { register, control, formState: { errors } } = useApplicationContext()
+  const studentRegistration = useLiveNumber('studentNumber')
   return (
     <Box sx={sectionStack}>
       <FormSection id="section-studies" title="Studies">
-        <FormField id="studentNumber" label="Student number" inputMode="numeric" registration={register('studentNumber')} errorText={errors.studentNumber?.message} />
-        <LabeledSelect name="category" id="category" label="Category" options={studyCategories} placeholder="Select category" />
-        <FormField id="qualification" label="Qualification" placeholder="e.g. Diploma in Computer Science" registration={register('qualification')} errorText={errors.qualification?.message} />
+        <FormField id="studentNumber" label="Student number" inputMode="numeric" registration={studentRegistration} errorText={errors.studentNumber?.message} />
+        <FormField id="category" label="Category" registration={register('category')} slotProps={{ input: { readOnly: true } }} />
+        <LabeledSelect name="qualification" id="qualification" label="Qualification" options={qualifications} placeholder="e.g. Diploma in Computer Science" />
         <LabeledSelect name="yearOfStudy" id="yearOfStudy" label="Year of study" options={yearsOfStudy} placeholder="Select year" />
       </FormSection>
       <FormSection id="section-skills" title="Skills">
@@ -107,7 +118,7 @@ export function DocumentsStep() {
       {cv instanceof File && (
         <Box>
           <Typography sx={{ fontSize: 15 }}>Your CV is already attached from Your studies.</Typography>
-          <FileRow muted caption="Curriculum vitae" name={cv.name} size={cv.size} status="Uploaded" action={<CircleCheck size={20} color="#16A34A" aria-label="Attached" />} />
+          <FileRow file={cv} muted caption="Curriculum vitae" name={cv.name} size={cv.size} status="Uploaded" action={<CircleCheck size={20} color="#16A34A" aria-label="Attached" />} />
         </Box>
       )}
       <FormSection id="section-id-document" title="ID document">
@@ -188,7 +199,7 @@ export function ReviewStep({ position, onEdit }: { position: CareerPosition; onE
       <Divider />
       <ReviewSection title="Documents" onEdit={() => onEdit(2)}>
         {documents.map(({ caption, file }) => file instanceof File
-          ? <FileRow key={caption} caption={caption} name={file.name} size={file.size} status="Attached" action={<CircleCheck size={20} color="#16A34A" aria-label="Attached" />} />
+          ? <FileRow key={caption} file={file} caption={caption} name={file.name} size={file.size} status="Attached" action={<CircleCheck size={20} color="#16A34A" aria-label="Attached" />} />
           : <Typography key={caption} color="error" sx={{ fontSize: 14 }}>{caption} is missing.</Typography>)}
       </ReviewSection>
       <Divider />
