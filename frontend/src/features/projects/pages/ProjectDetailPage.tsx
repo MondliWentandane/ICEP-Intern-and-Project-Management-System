@@ -19,8 +19,9 @@ type Tab = (typeof TABS)[number][0]
 export function ProjectDetailPage() {
   const navigate = useNavigate()
   const { projectId } = useParams()
-  const [tab, setTab] = useState<Tab>('overview')
-  const { state } = useLocation() as { state: { project?: Project; group?: Group } | null }
+  const { state } = useLocation() as { state: { project?: Project; group?: Group; tab?: Tab } | null }
+  // Callers such as the Mentor dashboard can open the page on a specific tab.
+  const [tab, setTab] = useState<Tab>(state?.tab ?? 'overview')
   // Opened from a notification (no page state): load the project from the database.
   const loaded = useQuery({
     queryKey: ['projects', 'detail', projectId],

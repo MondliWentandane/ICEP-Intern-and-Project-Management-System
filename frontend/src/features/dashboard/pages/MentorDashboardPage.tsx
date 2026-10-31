@@ -1,25 +1,10 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  Box,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  LinearProgress,
-  Stack,
-  Tab,
-  Tabs,
-  Typography,
-} from '@mui/material'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   CheckCircle2,
   Folder,
-  X,
 } from 'lucide-react'
 import { BikeLoader } from '@/components/ui/BikeLoader'
 import { useProjects } from '@/features/projects/data/projectsApi'
-import { Tasks } from '@/api/services/tasks.service'
 import styles from './MentorDashboardPage.module.css'
 
 interface TeamMember {
@@ -73,237 +58,10 @@ function initialsFor(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || '?'
 }
 
-// ---------------------------------------------------------------------------
-// Project popup: opens over the dashboard with Overview, Task board and Gantt chart tabs
-// ---------------------------------------------------------------------------
-
-// Same values as the TaskStatus enum in the Prisma schema.
-type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED'
-
-interface ProjectTask {
-  id: string
-  title: string
-  status: TaskStatus
-  blockedReason?: string | null
-  assignee?: string
-  /** ISO date, e.g. 2026-10-15 */
-  startDate: string | null
-  dueDate: string | null
-}
-
-interface ProjectSummary {
-  id: string
-  name: string
-  groupName?: string
-  description?: string
-  statusLabel: string
-  progress: number
-  dueDate: string
-  team: string[]
-  tasks: ProjectTask[]
-}
-
-const columns: Array<{ status: TaskStatus; label: string; color: string }> = [
-  { status: 'TODO', label: 'To do', color: '#94A3B8' },
-  { status: 'IN_PROGRESS', label: 'In progress', color: 'var(--icep-completed, #3B82F6)' },
-  { status: 'COMPLETED', label: 'Completed', color: 'var(--icep-active, #16A34A)' },
-  { status: 'BLOCKED', label: 'Blocked', color: '#EF4444' },
-]
-const statusColor = Object.fromEntries(columns.map((c) => [c.status, c.color])) as Record<TaskStatus, string>
-
-const shortDate = (iso: string | number | null) => iso === null ? '—' : new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-const at = (iso: string | null) => iso ? localDate(iso).getTime() : Date.now()
-
-function Overview({ project }: { project: ProjectSummary }) {
-  const done = project.tasks.filter((t) => t.status === 'COMPLETED').length
-  return (
-    <Stack spacing={2}>
-      {project.description && <Typography color="text.secondary">{project.description}</Typography>}
-      <Box>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>Progress</Typography>
-          <Typography variant="body2">{project.progress}%</Typography>
-        </Stack>
-        <LinearProgress variant="determinate" value={project.progress} sx={{ height: 8, borderRadius: 4 }} aria-label="Project progress" />
-      </Box>
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' } }}>
-        {[
-          ['Status', project.statusLabel],
-          ['Due', project.dueDate],
-          ['Group', project.groupName ?? '—'],
-          ['Tasks done', `${done} of ${project.tasks.length}`],
-        ].map(([label, value]) => (
-          <Box key={label}>
-            <Typography variant="caption" color="text.secondary">{label}</Typography>
-            <Typography sx={{ fontWeight: 600 }}>{value}</Typography>
-          </Box>
-        ))}
-      </Box>
-      <Box>
-        <Typography variant="caption" color="text.secondary">Team</Typography>
-        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-          {project.team.length === 0 ? <Typography variant="body2">No team members yet.</Typography> : project.team.map((initials, index) => (
-            <Box key={`${initials}-${index}`} title={`Team member ${initials}`} sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#E8EEF5', color: 'var(--icep-primary, #1B3A5C)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{initials}</Box>
-          ))}
-        </Stack>
-      </Box>
-    </Stack>
-  )
-}
-
-function TaskBoard({ tasks, now }: { tasks: ProjectTask[]; now: number }) {
-  if (tasks.length === 0) return <Typography color="text.secondary">No tasks have been added to this project yet.</Typography>
-  return (
-    <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' } }}>
-      {columns.map((column) => {
-        const items = tasks.filter((t) => t.status === column.status)
-        return (
-          <Box key={column.status} sx={{ bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 2, p: 1.25 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: column.color }} />
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{column.label}</Typography>
-              <Typography variant="caption" color="text.secondary">{items.length}</Typography>
-            </Stack>
-            <Stack spacing={1}>
-              {items.length === 0 && <Typography variant="caption" color="text.secondary">Nothing here.</Typography>}
-              {items.map((task) => {
-                // Overdue is not stored: it is derived from the due date and status.
-                const overdue = Boolean(task.dueDate && task.status !== 'COMPLETED' && at(task.dueDate) < now)
-                return (
-                  <Box key={task.id} sx={{ bgcolor: '#fff', border: '1px solid #E2E8F0', borderRadius: 1.5, p: 1.25 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{task.title}</Typography>
-                    {task.status === 'BLOCKED' && task.blockedReason && <Typography variant="caption" color="error.main">Blocked: {task.blockedReason}</Typography>}
-                    <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary">{task.assignee ?? 'Unassigned'}</Typography>
-                      <Typography variant="caption" sx={{ color: overdue ? 'error.main' : 'text.secondary', fontWeight: overdue ? 700 : 400 }}>
-                        {overdue ? 'Overdue · ' : 'Due '}{shortDate(task.dueDate)}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                )
-              })}
-            </Stack>
-          </Box>
-        )
-      })}
-    </Box>
-  )
-}
-
-function Gantt({ tasks, now }: { tasks: ProjectTask[]; now: number }) {
-  const scheduledTasks = tasks.filter((task) => task.startDate || task.dueDate)
-  if (scheduledTasks.length === 0) return <Typography color="text.secondary">There are no scheduled task dates for this project yet.</Typography>
-  const min = Math.min(...scheduledTasks.map((task) => at(task.startDate ?? task.dueDate)))
-  const max = Math.max(...scheduledTasks.map((task) => at(task.dueDate ?? task.startDate)))
-  const span = Math.max(max - min, 86_400_000)
-  const pct = (time: number) => Math.min(100, Math.max(0, ((time - min) / span) * 100))
-
-  // Month markers inside the range.
-  const markers: number[] = []
-  for (const d = new Date(min); d.getTime() <= max; ) {
-    d.setMonth(d.getMonth() + 1, 1)
-    d.setHours(0, 0, 0, 0)
-    if (d.getTime() <= max) markers.push(d.getTime())
-  }
-
-  return (
-    <Box sx={{ overflowX: 'auto' }}>
-      <Box sx={{ minWidth: 560 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'end', pb: 0.5, borderBottom: '1px solid #E2E8F0' }}>
-          <Typography variant="caption" color="text.secondary">Task</Typography>
-          <Box sx={{ position: 'relative', height: 18 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ position: 'absolute', left: 0 }}>{shortDate(min)}</Typography>
-            {markers.map((time) => (
-              <Typography key={time} variant="caption" color="text.secondary" sx={{ position: 'absolute', left: `${pct(time)}%` }}>
-                {new Date(time).toLocaleDateString('en-US', { month: 'short' })}
-              </Typography>
-            ))}
-            <Typography variant="caption" color="text.secondary" sx={{ position: 'absolute', right: 0 }}>{shortDate(max)}</Typography>
-          </Box>
-        </Box>
-        {scheduledTasks.map((task) => (
-          <Box key={task.id} sx={{ display: 'grid', gridTemplateColumns: '170px 1fr', alignItems: 'center', py: 0.75, borderBottom: '1px solid #F1F5F9' }}>
-            <Typography variant="body2" noWrap sx={{ pr: 1 }} title={task.title}>{task.title}</Typography>
-            <Box sx={{ position: 'relative', height: 20 }}>
-              {now >= min && now <= max && <Box sx={{ position: 'absolute', top: -4, bottom: -4, left: `${pct(now)}%`, borderLeft: '2px dashed #EF4444' }} />}
-              <Box
-                role="img"
-                aria-label={`${task.title}: ${shortDate(task.startDate)} to ${shortDate(task.dueDate)}`}
-                title={`${shortDate(task.startDate)} – ${shortDate(task.dueDate)}`}
-                sx={{ position: 'absolute', top: 3, height: 14, borderRadius: 7, bgcolor: statusColor[task.status], left: `${pct(at(task.startDate))}%`, width: `${Math.max(pct(at(task.dueDate)) - pct(at(task.startDate)), 2)}%` }}
-              />
-            </Box>
-          </Box>
-        ))}
-        <Stack direction="row" spacing={2} sx={{ mt: 1.5, flexWrap: 'wrap' }}>
-          {columns.map((c) => (
-            <Stack key={c.status} direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c.color }} />
-              <Typography variant="caption">{c.label}</Typography>
-            </Stack>
-          ))}
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-            <Box sx={{ width: 0, height: 12, borderLeft: '2px dashed #EF4444' }} />
-            <Typography variant="caption">Today</Typography>
-          </Stack>
-        </Stack>
-      </Box>
-    </Box>
-  )
-}
-
-// Opens over the Mentor dashboard so the mentor never leaves the page.
-// Render with a `key` of the project id so it always opens on the Overview tab.
-function ProjectDetailDialog({ project, onClose }: { project: ProjectSummary; onClose: () => void }) {
-  const [tab, setTab] = useState<'overview' | 'tasks' | 'gantt'>('overview')
-  const [now] = useState(() => Date.now())
-  const [tasks, setTasks] = useState<ProjectTask[]>([])
-  const [tasksLoading, setTasksLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    setTasksLoading(true)
-    Tasks.getProjectTasks(project.id)
-      .then((records) => {
-        if (cancelled) return
-        setTasks(records.map((task) => ({
-          id: task.id,
-          title: task.title,
-          status: task.status,
-          blockedReason: task.blockedReason,
-          assignee: task.assignedTo?.user?.fullName ?? 'Unassigned',
-          startDate: task.startDate?.slice(0, 10) ?? null,
-          dueDate: task.dueDate?.slice(0, 10) ?? null,
-        })))
-      })
-      .catch(() => { if (!cancelled) setTasks([]) })
-      .finally(() => { if (!cancelled) setTasksLoading(false) })
-    return () => { cancelled = true }
-  }, [project.id])
-
-  const projectWithTasks = { ...project, tasks }
-
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="md" aria-labelledby="project-dialog-title">
-      <DialogTitle id="project-dialog-title" sx={{ pr: 7, fontWeight: 700 }}>
-        {project.name}
-        <IconButton aria-label="Close" onClick={onClose} sx={{ position: 'absolute', right: 12, top: 12 }}><X size={20} /></IconButton>
-      </DialogTitle>
-      <Tabs value={tab} onChange={(_, value) => setTab(value)} aria-label="Project sections" sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
-        <Tab value="overview" label="Overview" />
-        <Tab value="tasks" label="Task board" />
-        <Tab value="gantt" label="Gantt chart" />
-      </Tabs>
-      <DialogContent sx={{ pt: 2.5, minHeight: 320 }}>
-        {tab === 'overview' && <Overview project={projectWithTasks} />}
-        {tab === 'tasks' && (tasksLoading ? <BikeLoader label="Loading tasks" size={100} /> : <TaskBoard tasks={tasks} now={now} />)}
-        {tab === 'gantt' && (tasksLoading ? <BikeLoader label="Loading schedule" size={100} /> : <Gantt tasks={tasks} now={now} />)}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 export function MentorDashboardPage() {
+  const navigate = useNavigate()
+  // Clicking a project opens its page on the Gantt chart tab.
+  const openGantt = (projectId: string) => navigate(`/mentor/projects/${projectId}`, { state: { tab: 'gantt' } })
   const { data: projectRecords = [], isLoading: projectsLoading, isError: projectsError, refetch } = useProjects()
   const supervisedProjects = projectRecords.filter((project) => project.canManage)
   const projects: ProjectItem[] = supervisedProjects.map((project, index) => ({
@@ -321,7 +79,6 @@ export function MentorDashboardPage() {
     colorClass: project.status === 'ON_HOLD' ? styles.barOrange : project.status === 'COMPLETED' ? styles.barGreen : index % 2 ? styles.barGreen : styles.barBlue,
   }))
   const activeProjectsCount = supervisedProjects.filter((project) => project.status === 'IN_PROGRESS').length
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
   const deadlines: DeadlineItem[] = supervisedProjects
     .filter((project) => project.endDate && localDate(project.endDate).getTime() >= new Date(new Date().setHours(0, 0, 0, 0)).getTime())
@@ -338,8 +95,6 @@ export function MentorDashboardPage() {
         colorVariant: project.status === 'ON_HOLD' ? 'red' : project.status === 'PLANNED' ? 'amber' : 'blue',
       }
     })
-
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null
 
   // Calculate average progress
   const averageProgress = projects.length
@@ -460,14 +215,13 @@ export function MentorDashboardPage() {
                       : styles.statusPendingReview
 
                   return (
-                    <tr key={proj.id} onClick={() => setSelectedProjectId(proj.id)} style={{ cursor: 'pointer' }}>
+                    <tr key={proj.id} onClick={() => openGantt(proj.id)} style={{ cursor: 'pointer' }}>
                       <td>
                         <div className={styles.projectInfo}>
                           <button
                             type="button"
                             className={styles.projectName}
-                            onClick={() => setSelectedProjectId(proj.id)}
-                            aria-haspopup="dialog"
+                            title="Open Gantt chart"
                             style={{ background: 'none', border: 0, padding: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}
                           >
                             {proj.name}
@@ -561,26 +315,6 @@ export function MentorDashboardPage() {
           </Link>
         </section>
       </div>
-
-      {/* Project details: opens over the dashboard with Overview, Task board and Gantt chart */}
-      {selectedProject && (
-        <ProjectDetailDialog
-          key={selectedProject.id}
-          onClose={() => setSelectedProjectId(null)}
-          project={{
-            id: selectedProject.id,
-            name: selectedProject.name,
-            groupName: selectedProject.groupName,
-            description: selectedProject.description,
-            statusLabel: statusLabels[selectedProject.status],
-            progress: selectedProject.progress,
-            dueDate: selectedProject.dueDate,
-            team: selectedProject.team.map((member) => member.initials),
-            tasks: [],
-          }}
-        />
-      )}
-
     </main>
   )
 }
