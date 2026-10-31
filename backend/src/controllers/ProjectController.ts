@@ -33,10 +33,10 @@ export async function listProjects(req: Request, res: Response) {
     if (user?.role === "INTERN") internUserId = user.id;
     if (user?.role === "MENTOR") {
       const mentor = await service.mentorFor(user.id);
-      if (!mentor) return res.json([]);
       return res.json(await service.list({
         status: req.query.status as string,
-        supervisorId: mentor.id,
+        supervisorId: mentor?.id,
+        creatorUserId: user.id,
       }));
     }
 

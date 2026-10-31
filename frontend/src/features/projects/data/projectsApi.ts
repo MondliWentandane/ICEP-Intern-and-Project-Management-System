@@ -59,6 +59,7 @@ interface ApiProject {
   progress: number
   status: ProjectStatus
   endDate: string | null
+  createdById?: string | null
   supervisor?: { user?: { id: string } } | null
   assignments?: { internId: string; projectRole: string | null; intern?: { user?: { fullName: string } } }[]
 }
@@ -69,7 +70,7 @@ const toRecord = (project: ApiProject): ProjectRecord => ({
   problemStatement: project.description ?? '',
   groupName: project.groupName,
   progress: project.progress ?? 0,
-  canManage: project.supervisor?.user?.id === tokenStorage.getUser()?.id,
+  canManage: project.supervisor?.user?.id === tokenStorage.getUser()?.id || project.createdById === tokenStorage.getUser()?.id,
   status: project.status,
   endDate: project.endDate,
   members: (project.assignments ?? []).map((a) => ({ internId: a.internId, name: a.intern?.user?.fullName ?? 'Intern', role: a.projectRole })),

@@ -26,6 +26,7 @@ export class TaskService {
         }
 
         if (user.role === "MENTOR") {
+            if (project.createdById === user.id) return project;
             const mentor = await TaskRepository.getMentorByUserId(user.id);
             if (!mentor || project.supervisorId !== mentor.id) {
                 throw new Error("You are not authorized to manage this project");
@@ -178,14 +179,12 @@ export class TaskService {
 
         if (user.role === "MENTOR") {
             const mentor = await TaskRepository.getMentorByUserId(user.id);
-
-            if (!mentor) {
-                throw new Error("Permission denied");
-            }
-
             return TaskRepository.getTasks({
                 project: {
-                    supervisorId: mentor.id
+                    OR: [
+                        ...(mentor ? [{ supervisorId: mentor.id }] : []),
+                        { createdById: user.id },
+                    ],
                 }
             });
         }
@@ -253,15 +252,14 @@ export class TaskService {
         if (user.role === "MENTOR") {
             const mentor = await TaskRepository.getMentorByUserId(user.id);
 
-            if (!mentor) {
-                throw new Error("Permission denied");
-            }
-
             return TaskRepository.getTasks({
                 status: "COMPLETED",
                 approvedAt: null,
                 project: {
-                    supervisorId: mentor.id
+                    OR: [
+                        ...(mentor ? [{ supervisorId: mentor.id }] : []),
+                        { createdById: user.id },
+                    ],
                 }
             });
         }

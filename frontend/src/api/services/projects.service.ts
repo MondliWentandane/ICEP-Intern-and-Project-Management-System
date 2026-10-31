@@ -13,7 +13,7 @@ export const Projects = {
     return {
       ...response,
       data: response.data
-        .filter((project) => project.supervisor?.user?.id === mentorUserId)
+        .filter((project) => project.supervisor?.user?.id === mentorUserId || project.createdById === mentorUserId)
         .map((project): MentorProject => ({
           ...project,
           supervisor: project.supervisor?.user?.id
