@@ -36,20 +36,24 @@ function toCalendarEvent(task: CalendarTaskEvent): CalendarEventItem | null {
   const date = task.dueDate ?? task.startDate
   if (!date) return null
 
-  const status = task.status === 'TODO'
-    ? 'To Do'
-    : task.status === 'IN_PROGRESS'
-      ? 'In Progress'
-      : task.approvedAt
-        ? 'Completed'
-        : 'Submitted'
-  const color: EventColor = task.status === 'TODO'
-    ? 'blue'
-    : task.status === 'IN_PROGRESS'
-      ? 'green'
-      : task.approvedAt
-        ? 'blue'
-        : 'amber'
+  const status = task.status === 'BLOCKED'
+    ? 'Blocked'
+    : task.status === 'TODO'
+      ? 'To Do'
+      : task.status === 'IN_PROGRESS'
+        ? 'In Progress'
+        : task.approvedAt
+          ? 'Completed'
+          : 'Submitted'
+  const color: EventColor = task.status === 'BLOCKED'
+    ? 'red'
+    : task.status === 'TODO'
+      ? 'blue'
+      : task.status === 'IN_PROGRESS'
+        ? 'green'
+        : task.approvedAt
+          ? 'blue'
+          : 'amber'
 
   return {
     id: task.id,
@@ -103,7 +107,7 @@ function getWeekDates(date: Date): Date[] {
   })
 }
 
-export function CalendarPage() {
+export function CalendarPage({ projectId, projectName }: { projectId?: string; projectName?: string } = {}) {
   const { user } = useAuth()
   const [events, setEvents] = useState<CalendarEventItem[]>([])
   const [selectedDate, setSelectedDate] = useState(() => new Date())
@@ -113,7 +117,7 @@ export function CalendarPage() {
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate])
 
   // Top Filters
-  const [selectedProject, setSelectedProject] = useState('All Projects')
+  const [selectedProject, setSelectedProject] = useState(projectId ?? 'All Projects')
   const [projectsList, setProjectsList] = useState<Project[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState('All Assignees')
   const [selectedStatus, setSelectedStatus] = useState('All Statuses')
@@ -121,6 +125,8 @@ export function CalendarPage() {
   // Modals & Feedback
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventItem | null>(null)
+  const [editedEventDate, setEditedEventDate] = useState('')
+  const [savingEventDate, setSavingEventDate] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Form State
@@ -135,21 +141,28 @@ export function CalendarPage() {
     ))
     .map((project) => project.id)), [projectsList, user?.id])
   const canManageTasks = canManageAllProjects || (user?.role === 'INTERN' && managedProjectIds.size > 0)
-  const canManageNewEventProject = canManageAllProjects || managedProjectIds.has(newEventProject)
+  const canManageNewEventProject = projectId
+    ? newEventProject === projectId && (canManageAllProjects || managedProjectIds.has(projectId))
+    : canManageAllProjects || managedProjectIds.has(newEventProject)
   const canDeleteSelectedEvent = canManageAllProjects ||
     (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
-  const availableProjectsForNewEvent = canManageAllProjects
-    ? projectsList
-    : projectsList.filter((project) => managedProjectIds.has(project.id))
+  const canEditSelectedEvent = canManageAllProjects ||
+    (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
+  const availableProjectsForNewEvent = projectId
+    ? projectsList.filter((project) => project.id === projectId)
+    : canManageAllProjects
+      ? projectsList
+      : projectsList.filter((project) => managedProjectIds.has(project.id))
 
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
+      if (projectId && ev.project !== projectId) return false
       if (selectedProject !== 'All Projects' && ev.project !== selectedProject) return false
       if (selectedAssignee !== 'All Assignees' && ev.assignee !== selectedAssignee) return false
       if (selectedStatus !== 'All Statuses' && ev.status !== selectedStatus) return false
       return true
     })
-  }, [events, selectedProject, selectedAssignee, selectedStatus])
+  }, [events, projectId, selectedProject, selectedAssignee, selectedStatus])
 
   const handleExport = () => {
     setToastMessage(`Calendar for ${currentMonthName} exported successfully.`)
@@ -226,25 +239,60 @@ export function CalendarPage() {
     }
   }
 
+  const handleUpdateEventDate = async () => {
+    if (!selectedEvent || !canEditSelectedEvent || !editedEventDate) return
+    setSavingEventDate(true)
+    try {
+      await Tasks.update(selectedEvent.id, { dueDate: editedEventDate })
+      setEvents((current) => current.map((event) => event.id === selectedEvent.id ? { ...event, date: editedEventDate } : event))
+      setSelectedEvent((current) => current ? { ...current, date: editedEventDate } : current)
+      setToastMessage('Task deadline updated.')
+    } catch (error: any) {
+      setToastMessage(error.response?.data?.message || 'Could not update this task date.')
+    } finally {
+      setSavingEventDate(false)
+    }
+  }
+
   useEffect(() => {
     Projects.list()
       .then((response) => {
         const data = response.data.filter((project) =>
-          user?.role !== 'MENTOR' || project.supervisor?.user?.id === user.id,
+          (!projectId || project.id === projectId) &&
+          (user?.role !== 'MENTOR' || project.supervisor?.user?.id === user.id || project.createdById === user.id),
         )
         setProjectsList(data)
-        if (data.length > 0) {
+        if (projectId) {
+          setSelectedProject(projectId)
+          setNewEventProject(projectId)
+        } else if (data.length > 0) {
           setNewEventProject(data[0].id)
         }
       })
       .catch(err => console.error("Failed to load projects:", err))
-  }, [user?.id, user?.role])
+  }, [projectId, user?.id, user?.role])
 
   useEffect(() => {
     let cancelled = false
     const loadEvents = async () => {
       try {
-        const data = await Tasks.getCalendarEvents()
+        const projectTasks = projectId && (user?.role !== 'INTERN' || managedProjectIds.has(projectId))
+          ? await Tasks.getGanttData(projectId)
+          : null
+        const data = projectTasks
+          ? projectTasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              projectId: task.projectId,
+              assignedToId: task.assignedToId,
+              startDate: task.startDate,
+              dueDate: task.dueDate,
+              status: task.status,
+              approvedAt: task.approvedAt,
+              projectName: projectName ?? 'Project',
+              assigneeName: task.assigneeName,
+            }))
+          : await Tasks.getCalendarEvents()
         if (!cancelled) setEvents(data.map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null))
       } catch (error) {
         if (!cancelled) console.error('Failed to load calendar events:', error)
@@ -261,10 +309,11 @@ export function CalendarPage() {
       window.clearInterval(intervalId)
       window.removeEventListener('focus', refreshWhenVisible)
     }
-  }, [])
+  }, [managedProjectIds, projectId, projectName, user?.role])
 
+  const PageRoot = projectId ? 'div' : 'main'
   return (
-    <main className={styles.page}>
+    <PageRoot className={styles.page}>
       <section className={styles.topSection} aria-label="Calendar controls">
         <div className={styles.actionRow}>
           <button
@@ -296,7 +345,7 @@ export function CalendarPage() {
         </div>
 
         <div className={styles.filtersRow}>
-          <div className={styles.filterSelectWrapper}>
+          {!projectId && <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
               value={selectedProject}
@@ -311,7 +360,7 @@ export function CalendarPage() {
               ))}
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
-          </div>
+          </div>}
 
           <div className={styles.filterSelectWrapper}>
             <select
@@ -435,7 +484,7 @@ export function CalendarPage() {
                             key={ev.id}
                             type="button"
                             className={`${styles.eventPill} ${colorClass}`}
-                            onClick={() => setSelectedEvent(ev)}
+                            onClick={() => { setSelectedEvent(ev); setEditedEventDate(ev.date) }}
                             title={ev.title}
                           >
                             {ev.title}
@@ -473,7 +522,7 @@ export function CalendarPage() {
                                 ? styles.eventRed
                                 : styles.eventBlue
                             }`}
-                          onClick={() => setSelectedEvent(ev)}
+                          onClick={() => { setSelectedEvent(ev); setEditedEventDate(ev.date) }}
                         >
                           {ev.title}
                         </button>
@@ -595,12 +644,17 @@ export function CalendarPage() {
       {selectedEvent && (
         <Modal
           open={Boolean(selectedEvent)}
-          onClose={() => setSelectedEvent(null)}
+          onClose={() => { if (!savingEventDate) setSelectedEvent(null) }}
           title={selectedEvent.title}
           maxWidth="xs"
           fullWidth
           actions={
             <div style={{ display: 'flex', gap: '10px', justifyContent: canDeleteSelectedEvent ? 'space-between' : 'flex-end', width: '100%' }}>
+              {canEditSelectedEvent && (
+                <Button appearance="primary" onClick={() => void handleUpdateEventDate()} disabled={savingEventDate || !editedEventDate || editedEventDate === selectedEvent.date}>
+                  {savingEventDate ? 'Saving…' : 'Save date'}
+                </Button>
+              )}
               {canDeleteSelectedEvent && (
                 <Button appearance="danger" onClick={() => handleDeleteEvent(selectedEvent.id)}>
                   Delete
@@ -617,7 +671,10 @@ export function CalendarPage() {
               <strong>Project:</strong> {selectedEvent.projectName}
             </p>
             <p style={{ margin: '0 0 10px' }}>
-              <strong>Date:</strong> {selectedEvent.date}
+              <strong>Date:</strong>{' '}
+              {canEditSelectedEvent
+                ? <input aria-label="Task deadline" type="date" value={editedEventDate} onChange={(event) => setEditedEventDate(event.target.value)} disabled={savingEventDate} />
+                : selectedEvent.date}
             </p>
             <p style={{ margin: '0 0 10px' }}>
               <strong>Assignee:</strong> {selectedEvent.assignee}
@@ -637,13 +694,13 @@ export function CalendarPage() {
       >
         <Alert
           onClose={() => setToastMessage(null)}
-          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') ? 'error' : 'success'}
+          severity={toastMessage?.includes('Denied') || toastMessage?.includes('Error') || toastMessage?.includes('Could not') || toastMessage?.includes('Unable') ? 'error' : 'success'}
           sx={{ width: '100%', borderRadius: '8px' }}
         >
           {toastMessage}
         </Alert>
       </Snackbar>
-    </main>
+    </PageRoot>
   )
 }
 

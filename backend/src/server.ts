@@ -10,6 +10,7 @@ import authRoutes from "./routes/authRoutes";
 import applicationRoutes from "./routes/applicationRoutes";
 import internRoutes from "./routes/internRoutes";
 import projectRoutes from "./routes/projectRoutes";
+import teamRoutes from "./routes/teamRoutes";
 import internService from "./services/InternService";
 
 const app = express();
@@ -36,6 +37,7 @@ app.use("/api", applicationRoutes);
 app.use("/api", internRoutes);
 // Group B - projects, project teams (members + roles)
 app.use("/api", projectRoutes);
+app.use("/api", teamRoutes);
 
 app.get("/", (_req, res) => {
   res.status(200).json({

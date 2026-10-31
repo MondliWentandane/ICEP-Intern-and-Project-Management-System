@@ -11,7 +11,8 @@ import styles from './DashboardLayout.module.css'
 const icons: Record<string, typeof LayoutDashboard> = {
   Dashboard: LayoutDashboard, Applicants: ClipboardList, Interns: Users, 'Campuses & Intakes': Building2,
   'Past Interns': History, Projects: FolderKanban, 'My Project': FolderKanban, 'Task Board': ClipboardList,
-  Calendar: CalendarDays, 'Gantt Chart': ChartNoAxesGantt, Gantt: ChartNoAxesGantt, Reports: ClipboardList,
+  Calendar: CalendarDays, 'Gantt Chart': ChartNoAxesGantt, Gantt: ChartNoAxesGantt, Reports: ClipboardList, 'Review Queue': ClipboardList,
+  'Team Builder': Users,
   Users: Users, Notifications: Bell, 'My Profile': Users, 'Email Templates': ClipboardList,
 }
 const sectionLabels: Record<NavigationSection, string> = {
@@ -75,9 +76,14 @@ export function Sidebar({ mobileOpen, collapsed, onClose }: { mobileOpen: boolea
             <Typography component="h2" className={styles['nav-heading']}>{sectionLabels[section]}</Typography>
             {items.map((item: NavigationItem) => {
               const Icon = icons[item.label] ?? LayoutDashboard
-              return <NavLink key={item.path} to={item.path} onClick={onClose} end data-label={item.label}
+              return <NavLink key={item.path} to={item.path} onClick={onClose} end={item.label === 'Task Board' || item.label === 'Review Queue'} data-label={item.label}
                 aria-label={collapsed ? item.label : undefined}
-                className={({ isActive }) => `${styles['nav-link']} ${isActive || location.pathname.startsWith(`${item.path}/`) ? styles['nav-link-active'] : ''}`}>
+                className={({ isActive }) => {
+                  const active = item.label === 'Task Board'
+                    ? location.pathname === item.path
+                    : isActive || location.pathname.startsWith(`${item.path}/`)
+                  return `${styles['nav-link']} ${active ? styles['nav-link-active'] : ''}`
+                }}>
                 <Icon size={22} strokeWidth={2} aria-hidden="true" />
                 <span className={styles['nav-label']}>{item.label}</span>
                 {item.readOnly && <span className={styles['read-only']}>View only</span>}

@@ -26,6 +26,7 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
 // =============================================================================
 // ENUMS
 // =============================================================================
@@ -89,6 +90,7 @@ enum TaskStatus {
   TODO
   IN_PROGRESS
   COMPLETED
+  BLOCKED
 }
 
 enum TaskPriority {
@@ -394,12 +396,12 @@ model Intern {
   department  Department   @relation(fields: [departmentId], references: [id])
   mentor      Mentor?      @relation(fields: [mentorId], references: [id], onDelete: SetNull)
 
-  skills      InternSkill[]
-  documents   Document[]
-  assignments ProjectAssignment[]
-    teamMemberships TeamMember[]
-  tasks       Task[]              @relation("TaskAssignee")
-  evaluations Evaluation[]
+  skills          InternSkill[]
+  documents       Document[]
+  assignments     ProjectAssignment[]
+  teamMemberships TeamMember[]
+  tasks           Task[]              @relation("TaskAssignee")
+  evaluations     Evaluation[]
 
   /// Prevents duplicate intern records for the same student.
   @@unique([institution, studentNumber])
@@ -447,6 +449,7 @@ model Mentor {
 model Team {
   id          String   @id @default(uuid())
   name        String
+  description String?  @db.VarChar(1000)
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -459,10 +462,11 @@ model Team {
 }
 
 model TeamMember {
-  id       String   @id @default(uuid())
-  teamId   String
-  internId String
-  addedAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  teamId      String
+  internId    String
+  projectRole String?
+  addedAt     DateTime @default(now())
 
   team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
   intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
@@ -540,22 +544,23 @@ model ProjectAssignment {
 }
 
 model Task {
-  id          String       @id @default(uuid())
-  projectId   String
+  id            String       @id @default(uuid())
+  projectId     String
   /// Subtasks: points to the parent task.
-  parentId    String?
-  title       String
-  description String?
-  category    TaskCategory @default(OTHER)
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(MEDIUM)
+  parentId      String?
+  title         String
+  description   String?
+  category      TaskCategory @default(OTHER)
+  status        TaskStatus   @default(TODO)
+  blockedReason String?      @db.VarChar(1000)
+  priority      TaskPriority @default(MEDIUM)
   /// 0–100, entered by the assignee/mentor.
-  progress    Int          @default(0)
+  progress      Int          @default(0)
   /// Gantt needs start + end; Calendar uses dueDate. Both include time.
-  startDate   DateTime?
-  dueDate     DateTime?
+  startDate     DateTime?
+  dueDate       DateTime?
   /// Ordering of the card inside its Kanban column.
-  position    Int          @default(0)
+  position      Int          @default(0)
 
   assignedToId String?
   createdById  String?

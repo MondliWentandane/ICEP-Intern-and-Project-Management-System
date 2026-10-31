@@ -30,7 +30,7 @@ export interface Profile {
 export const qualifications = ['Diploma in Informatics', 'Diploma in Computer Science', 'Diploma in Information Technology', 'Advanced Diploma in ICT', 'Bachelor of Information Technology']
 export const intakes = ['January 2026', 'July 2026', 'January 2027']
 
-const statusLabels: Record<UserRole, string> = { intern: 'Active intern', mentor: 'Mentor', wil_handler: 'WIL Handler', admin: 'Administrator' }
+const statusLabels: Record<UserRole, string> = { INTERN: 'Active intern', MENTOR: 'Mentor', WIL_HANDLER: 'WIL Handler', ADMIN: 'Administrator' }
 export const profileStatusLabel = (role: UserRole) => statusLabels[role]
 
 const store = new Map<string, Profile>()
@@ -38,7 +38,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function seed(user: User): Profile {
   const base = { fullName: user.name, email: user.email, phone: '079 299 0983', skills: [] }
-  if (user.role !== 'intern') return base
+  if (user.role !== 'INTERN') return base
   return {
     ...base,
     campus: 'Polokwane', studentNumber: '241189694', qualification: 'Diploma in Informatics', intake: 'July 2026',

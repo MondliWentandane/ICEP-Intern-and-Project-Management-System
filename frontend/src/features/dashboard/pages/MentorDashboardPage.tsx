@@ -1,36 +1,41 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
-  Alert,
-  Menu,
-  MenuItem,
-  Snackbar,
-} from '@mui/material'
-import {
-  AlertTriangle,
-  Calendar,
   CheckCircle2,
   Folder,
-  MoreHorizontal,
 } from 'lucide-react'
-import { PROJECT_STATUS_LABELS } from '@/features/projects/data/newProject'
-import { useProjects, type ProjectRecord } from '@/features/projects/data/projectsApi'
-import { IcepLogo } from '@/components/brand/IcepLogo'
-import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
-import { TagInput } from '@/components/ui/TagInput'
-import {
-  DESCRIPTION_MAX, GROUP_MAX, NAME_MAX, SKILL_SUGGESTIONS, toNewProject, validateNewProject,
-  type ProjectStatus,
-} from '@/features/projects/data/newProject'
-import { downloadBlob } from '@/utils/format'
+import { BikeLoader } from '@/components/ui/BikeLoader'
+import { useProjects } from '@/features/projects/data/projectsApi'
 import styles from './MentorDashboardPage.module.css'
 
-const statusLabels = PROJECT_STATUS_LABELS
+interface TeamMember {
+  initials: string
+  colorClass: string
+}
+
+// Same values as the ProjectStatus enum in the Prisma schema.
+type ProjectStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD'
+
+const statusLabels: Record<ProjectStatus, string> = {
+  PLANNED: 'Planned',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+  ON_HOLD: 'On Hold',
+}
+
+interface ProjectItem {
+  id: string
+  name: string
+  groupName?: string
+  description?: string
+  team: TeamMember[]
+  status: ProjectStatus
+  progress: number
+  dueDate: string
+  colorClass: string
+}
 
 interface DeadlineItem {
   id: string
-  isoDate: string
   month: string
   day: string
   title: string
@@ -38,122 +43,74 @@ interface DeadlineItem {
   colorVariant: 'red' | 'amber' | 'blue'
 }
 
-const PRIORITY: Record<DeadlineItem['colorVariant'], string> = { red: 'Urgent', amber: 'Due soon', blue: 'Upcoming' }
-const csvCell = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value)
-const AVATAR_COLORS = [styles.avatarMS, styles.avatarTM, styles.avatarJS, styles.avatarRJ, styles.avatarTN, styles.avatarAB]
-const memberInitials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
-const formatShortDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { month: 'short', day: '2-digit' })
+const avatarStyles = [styles.avatarMS, styles.avatarTM, styles.avatarJS, styles.avatarRJ, styles.avatarTN, styles.avatarAB]
 
-/** Upcoming deadlines as a CSV file (opens in Excel / Google Sheets), sorted by date. */
-function exportSchedule(items: DeadlineItem[]) {
-  const dated = items.map((item) => ({ iso: item.isoDate, item })).sort((a, b) => a.iso.localeCompare(b.iso))
-  const rows = [
-    ['Date', 'Deadline', 'Project', 'Priority'],
-    ...dated.map(({ iso, item }) => [iso, item.title, item.project, PRIORITY[item.colorVariant]]),
-  ]
-  const csv = '\ufeff' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `upcoming-deadlines-${new Date().toISOString().slice(0, 10)}.csv`)
+function localDate(value: string) {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function displayProjectDate(value: string | null) {
+  return value ? localDate(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+}
+
+function initialsFor(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || '?'
 }
 
 export function MentorDashboardPage() {
-  const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useProjects()
-  const [approvalsCount] = useState(0)
-  const activeProjectsCount = projects.filter((project) => project.status !== 'COMPLETED').length
-  const atRiskCount = projects.filter((project) => project.status === 'ON_HOLD').length
+  const navigate = useNavigate()
+  // A project click opens its overview first; the project page keeps Gantt available as a tab.
+  const openProject = (projectId: string) => navigate(`/mentor/projects/${projectId}`)
+  const { data: projectRecords = [], isLoading: projectsLoading, isError: projectsError, refetch } = useProjects()
+  const supervisedProjects = projectRecords.filter((project) => project.canManage)
+  const projects: ProjectItem[] = supervisedProjects.map((project, index) => ({
+    id: project.id,
+    name: project.name,
+    groupName: project.groupName ?? undefined,
+    description: project.problemStatement,
+    team: project.members.map((member, memberIndex) => ({
+      initials: initialsFor(member.name),
+      colorClass: avatarStyles[memberIndex % avatarStyles.length],
+    })),
+    status: project.status,
+    progress: project.progress,
+    dueDate: displayProjectDate(project.endDate),
+    colorClass: project.status === 'ON_HOLD' ? styles.barOrange : project.status === 'COMPLETED' ? styles.barGreen : index % 2 ? styles.barGreen : styles.barBlue,
+  }))
+  const activeProjectsCount = supervisedProjects.filter((project) => project.status === 'IN_PROGRESS').length
 
-  // Date selection state
-  const [selectedMonth, setSelectedMonth] = useState('Oct 2026')
-  const [dateAnchorEl, setDateAnchorEl] = useState<null | HTMLElement>(null)
-
-  // Deadline menu state
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null)
-
-  // Feedback toast state
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-
-  const handleOpenDateMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setDateAnchorEl(event.currentTarget)
-  }
-
-  const handleSelectMonth = (month: string) => {
-    setSelectedMonth(month)
-    setDateAnchorEl(null)
-  }
-
-  const handleOpenDeadlinesMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setMenuAnchorEl(event.currentTarget)
-  }
-
-  const handleCloseDeadlinesMenu = () => {
-    setMenuAnchorEl(null)
-  }
-
-  const deadlines = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return projects.flatMap((project) => {
-      if (!project.endDate) return []
-      const date = new Date(project.endDate)
-      const daysUntilDue = Math.ceil((date.getTime() - today.getTime()) / 86_400_000)
-      if (daysUntilDue < 0) return []
-      return [{
+  const deadlines: DeadlineItem[] = supervisedProjects
+    .filter((project) => project.endDate && localDate(project.endDate).getTime() >= new Date(new Date().setHours(0, 0, 0, 0)).getTime())
+    .sort((a, b) => localDate(a.endDate!).getTime() - localDate(b.endDate!).getTime())
+    .slice(0, 4)
+    .map((project) => {
+      const date = localDate(project.endDate!)
+      return {
         id: project.id,
-        isoDate: project.endDate.slice(0, 10),
-        month: date.toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase(),
-        day: date.toLocaleDateString('en-ZA', { day: '2-digit' }),
-        title: 'Project deadline',
-        project: project.name,
-        colorVariant: daysUntilDue <= 3 ? 'red' as const : daysUntilDue <= 7 ? 'amber' as const : 'blue' as const,
-      }]
-    }).sort((a, b) => a.isoDate.localeCompare(b.isoDate))
-  }, [projects])
-  const averageProgress = Math.round(projects.reduce((total, project) => total + project.progress, 0) / (projects.length || 1))
+        month: date.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
+        day: String(date.getDate()).padStart(2, '0'),
+        title: `${project.name} deadline`,
+        project: project.groupName || project.name,
+        colorVariant: project.status === 'ON_HOLD' ? 'red' : project.status === 'PLANNED' ? 'amber' : 'blue',
+      }
+    })
+
+  // Calculate average progress
+  const averageProgress = projects.length
+    ? Math.round(projects.reduce((acc, project) => acc + project.progress, 0) / projects.length)
+    : null
+  const plannedProjectsCount = supervisedProjects.filter((project) => project.status === 'PLANNED').length
+  const onHoldProjectsCount = supervisedProjects.filter((project) => project.status === 'ON_HOLD').length
 
   return (
     <main className={styles.page}>
-      {/* Top Bar Actions */}
-      <section className={styles.topBar} aria-label="Dashboard controls">
-        <button
-          type="button"
-          className={styles.dateButton}
-          onClick={handleOpenDateMenu}
-          aria-haspopup="true"
-          aria-expanded={Boolean(dateAnchorEl)}
-          id="date-filter-button"
-        >
-          <Calendar size={17} strokeWidth={2} aria-hidden="true" />
-          <span>{selectedMonth}</span>
-        </button>
-        <Menu
-          anchorEl={dateAnchorEl}
-          open={Boolean(dateAnchorEl)}
-          onClose={() => setDateAnchorEl(null)}
-          slotProps={{
-            paper: {
-              sx: {
-                borderRadius: '10px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                minWidth: 140,
-              },
-            },
-          }}
-        >
-          {['Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dec 2026'].map((month) => (
-            <MenuItem
-              key={month}
-              selected={month === selectedMonth}
-              onClick={() => handleSelectMonth(month)}
-              sx={{ fontSize: 14, fontWeight: month === selectedMonth ? 700 : 500 }}
-            >
-              {month}
-            </MenuItem>
-          ))}
-        </Menu>
-
-        <Link to="/mentor/projects" className={styles.newProjectButton} id="new-project-button">
-          <Folder size={18} strokeWidth={2.5} aria-hidden="true" />
-          <span>New Project</span>
-        </Link>
+      <section className={styles.pageHeading} aria-label="Mentor dashboard introduction">
+        <div>
+          <h1 className={styles.pageTitle}>Mentor dashboard</h1>
+          <p className={styles.pageSubtitle}>A snapshot of the projects you supervise, their progress and upcoming deadlines.</p>
+        </div>
+        <Link to="/mentor/projects" className={styles.manageProjectsLink}>Manage projects</Link>
       </section>
 
       {/* 4 Metric / KPI Cards */}
@@ -175,12 +132,12 @@ export function MentorDashboardPage() {
             <CheckCircle2 size={22} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className={styles.statContent}>
-            <p className={styles.statValue}>{averageProgress}%</p>
+          <p className={styles.statValue}>{averageProgress === null ? '—' : `${averageProgress}%`}</p>
             <p className={styles.statLabel}>Avg. Progress</p>
           </div>
         </div>
 
-        {/* Metric 3: Approvals Pending */}
+        {/* Metric 3: Planned projects */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconAmber}`}>
             <svg
@@ -200,19 +157,20 @@ export function MentorDashboardPage() {
             </svg>
           </div>
           <div className={styles.statContent}>
-            <p className={styles.statValue}>{approvalsCount}</p>
-            <p className={styles.statLabel}>Approvals Pending</p>
+            <p className={styles.statValue}>{plannedProjectsCount}</p>
+            <p className={styles.statLabel}>Planned Projects</p>
           </div>
         </div>
-
-        {/* Metric 4: At Risk / Blocked */}
         <div className={styles.statCard}>
           <div className={`${styles.statIconBox} ${styles.iconRed}`}>
-            <AlertTriangle size={22} strokeWidth={2} aria-hidden="true" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3 2.8 19a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L12 3Z" />
+              <path d="M12 9v4m0 3h.01" />
+            </svg>
           </div>
           <div className={styles.statContent}>
-            <p className={styles.statValue}>{atRiskCount}</p>
-            <p className={styles.statLabel}>At Risk / Blocked</p>
+            <p className={styles.statValue}>{onHoldProjectsCount}</p>
+            <p className={styles.statLabel}>Projects On Hold</p>
           </div>
         </div>
       </section>
@@ -223,12 +181,13 @@ export function MentorDashboardPage() {
         <section className={styles.card} aria-labelledby="active-projects-title">
           <header className={styles.cardHeader}>
             <h2 id="active-projects-title" className={styles.cardTitle}>
-              Active Projects Overview
+              Your Projects
             </h2>
             <Link to="/mentor/projects" className={styles.viewAllLink}>
               View All Projects
             </Link>
           </header>
+          <p className={styles.sectionDescription}>Review each project’s team, status and reported progress.</p>
 
           <div className={styles.tableContainer}>
             <table className={styles.projectsTable}>
@@ -242,12 +201,12 @@ export function MentorDashboardPage() {
               </thead>
               <tbody>
                 {projectsLoading ? (
-                  <tr><td colSpan={4}>Loading projects…</td></tr>
+                  <tr><td colSpan={4}><BikeLoader label="Loading projects" size={95} /></td></tr>
                 ) : projectsError ? (
-                  <tr><td colSpan={4}>Projects could not be loaded. Refresh the page to try again.</td></tr>
+                  <tr><td colSpan={4}>Projects could not be loaded. <button type="button" onClick={() => void refetch()}>Try again</button></td></tr>
                 ) : projects.length === 0 ? (
                   <tr><td colSpan={4}>No projects yet. Create a project to see it here.</td></tr>
-                ) : projects.map((proj: ProjectRecord) => {
+                ) : projects.map((proj) => {
                   const statusClass =
                     proj.status === 'IN_PROGRESS' || proj.status === 'COMPLETED'
                       ? styles.statusOnTrack
@@ -256,22 +215,29 @@ export function MentorDashboardPage() {
                       : styles.statusPendingReview
 
                   return (
-                    <tr key={proj.id}>
+                    <tr key={proj.id} onClick={() => openProject(proj.id)} style={{ cursor: 'pointer' }}>
                       <td>
                         <div className={styles.projectInfo}>
-                          <span className={styles.projectName}>{proj.name}</span>
+                          <button
+                            type="button"
+                            className={styles.projectName}
+                            title="Open project overview"
+                            style={{ background: 'none', border: 0, padding: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}
+                          >
+                            {proj.name}
+                          </button>
                           {proj.groupName && <span className={styles.projectDepartment}>{proj.groupName}</span>}
                         </div>
                       </td>
                       <td>
                         <div className={styles.teamAvatars}>
-                          {proj.members.map((member, idx) => (
+                          {proj.team.map((member, idx) => (
                             <span
-                              key={`${member.internId}-${idx}`}
-                              className={`${styles.teamAvatar} ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}
-                              title={member.name}
+                              key={`${member.initials}-${idx}`}
+                              className={`${styles.teamAvatar} ${member.colorClass}`}
+                              title={`Team Member ${member.initials}`}
                             >
-                              {memberInitials(member.name)}
+                              {member.initials}
                             </span>
                           ))}
                         </div>
@@ -285,11 +251,11 @@ export function MentorDashboardPage() {
                         <div className={styles.progressColumn}>
                           <div className={styles.progressMeta}>
                             <span className={styles.progressValue}>{proj.progress}%</span>
-                            <span className={styles.progressDate}>{proj.endDate ? formatShortDate(proj.endDate) : '—'}</span>
+                            <span className={styles.progressDate}>{proj.dueDate}</span>
                           </div>
                           <div className={styles.progressTrack}>
                             <div
-                              className={`${styles.progressBar} ${proj.status === 'ON_HOLD' ? styles.barOrange : proj.status === 'COMPLETED' ? styles.barGreen : styles.barBlue}`}
+                              className={`${styles.progressBar} ${proj.colorClass}`}
                               style={{ width: `${proj.progress}%` }}
                               role="progressbar"
                               aria-valuenow={proj.progress}
@@ -313,54 +279,14 @@ export function MentorDashboardPage() {
             <h2 id="upcoming-deadlines-title" className={styles.cardTitle}>
               Upcoming Deadlines
             </h2>
-            <button
-              type="button"
-              className={styles.moreButton}
-              onClick={handleOpenDeadlinesMenu}
-              aria-label="Upcoming deadlines options"
-              aria-haspopup="true"
-              aria-expanded={Boolean(menuAnchorEl)}
-            >
-              <MoreHorizontal size={20} aria-hidden="true" />
-            </button>
-            <Menu
-              anchorEl={menuAnchorEl}
-              open={Boolean(menuAnchorEl)}
-              onClose={handleCloseDeadlinesMenu}
-              slotProps={{
-                paper: {
-                  sx: {
-                    borderRadius: '10px',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                    minWidth: 170,
-                  },
-                },
-              }}
-            >
-              <MenuItem
-                onClick={() => {
-                  handleCloseDeadlinesMenu()
-                  if (!deadlines.length) { setToastMessage('There are no deadlines to export.'); return }
-                  exportSchedule(deadlines)
-                  setToastMessage(`Schedule exported (${deadlines.length} deadline${deadlines.length === 1 ? '' : 's'}).`)
-                }}
-                sx={{ fontSize: 13.5 }}
-              >
-                Export Schedule
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleCloseDeadlinesMenu()
-                  setToastMessage('Calendar synchronized.')
-                }}
-                sx={{ fontSize: 13.5 }}
-              >
-                Sync with Calendar
-              </MenuItem>
-            </Menu>
           </header>
 
           <div className={styles.deadlinesList}>
+            {projectsLoading && <BikeLoader label="Loading deadlines" size={80} />}
+            {!projectsLoading && projectsError && <p className={styles.deadlineEmpty}>Deadlines are unavailable because project data could not be loaded.</p>}
+            {!projectsLoading && !projectsError && deadlines.length === 0 && (
+              <p className={styles.deadlineEmpty}>No upcoming deadlines. Add an end date to a project to see it here.</p>
+            )}
             {deadlines.map((item) => {
               const dateClass =
                 item.colorVariant === 'red'
@@ -389,22 +315,6 @@ export function MentorDashboardPage() {
           </Link>
         </section>
       </div>
-
-      {/* Snackbar feedback notification */}
-      <Snackbar
-        open={Boolean(toastMessage)}
-        autoHideDuration={3500}
-        onClose={() => setToastMessage(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setToastMessage(null)}
-          severity="success"
-          sx={{ width: '100%', borderRadius: '8px' }}
-        >
-          {toastMessage}
-        </Alert>
-      </Snackbar>
     </main>
   )
 }

@@ -18,8 +18,13 @@ export const PROJECT_ROLES = ['Backend Developer', 'Frontend Developer', 'Scrum 
 
 export interface TeamMemberInput { internId: string; projectRole: string }
 /** First problem with the chosen members, or '' when they can be saved. */
-export const teamError = (members: TeamMemberInput[]) =>
-  members.some((m) => !m.projectRole) ? 'Choose a role for every selected member.' : ''
+export const teamError = (members: TeamMemberInput[]) => {
+  if (members.some((member) => !member.projectRole)) return 'Choose a role for every selected member.'
+  const scrumMasterCount = members.filter((member) => member.projectRole === 'Scrum Master').length
+  if (scrumMasterCount === 0) return 'Assign one Scrum Master to this project.'
+  if (scrumMasterCount > 1) return 'A project can have only one Scrum Master.'
+  return ''
+}
 
 export interface ProjectMember { internId: string; name: string; role: string | null }
 
@@ -54,6 +59,7 @@ interface ApiProject {
   progress: number
   status: ProjectStatus
   endDate: string | null
+  createdById?: string | null
   supervisor?: { user?: { id: string } } | null
   assignments?: { internId: string; projectRole: string | null; intern?: { user?: { fullName: string } } }[]
 }
@@ -64,7 +70,7 @@ const toRecord = (project: ApiProject): ProjectRecord => ({
   problemStatement: project.description ?? '',
   groupName: project.groupName,
   progress: project.progress ?? 0,
-  canManage: project.supervisor?.user?.id === tokenStorage.getUser()?.id,
+  canManage: project.supervisor?.user?.id === tokenStorage.getUser()?.id || project.createdById === tokenStorage.getUser()?.id,
   status: project.status,
   endDate: project.endDate,
   members: (project.assignments ?? []).map((a) => ({ internId: a.internId, name: a.intern?.user?.fullName ?? 'Intern', role: a.projectRole })),
