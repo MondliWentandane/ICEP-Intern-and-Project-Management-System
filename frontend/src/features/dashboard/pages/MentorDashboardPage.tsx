@@ -60,8 +60,8 @@ function initialsFor(name: string) {
 
 export function MentorDashboardPage() {
   const navigate = useNavigate()
-  // Clicking a project opens its page on the Gantt chart tab.
-  const openGantt = (projectId: string) => navigate(`/mentor/projects/${projectId}`, { state: { tab: 'gantt' } })
+  // A project click opens its overview first; the project page keeps Gantt available as a tab.
+  const openProject = (projectId: string) => navigate(`/mentor/projects/${projectId}`)
   const { data: projectRecords = [], isLoading: projectsLoading, isError: projectsError, refetch } = useProjects()
   const supervisedProjects = projectRecords.filter((project) => project.canManage)
   const projects: ProjectItem[] = supervisedProjects.map((project, index) => ({
@@ -215,13 +215,13 @@ export function MentorDashboardPage() {
                       : styles.statusPendingReview
 
                   return (
-                    <tr key={proj.id} onClick={() => openGantt(proj.id)} style={{ cursor: 'pointer' }}>
+                    <tr key={proj.id} onClick={() => openProject(proj.id)} style={{ cursor: 'pointer' }}>
                       <td>
                         <div className={styles.projectInfo}>
                           <button
                             type="button"
                             className={styles.projectName}
-                            title="Open Gantt chart"
+                            title="Open project overview"
                             style={{ background: 'none', border: 0, padding: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}
                           >
                             {proj.name}

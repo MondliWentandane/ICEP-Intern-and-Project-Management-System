@@ -107,7 +107,7 @@ function getWeekDates(date: Date): Date[] {
   })
 }
 
-export function CalendarPage() {
+export function CalendarPage({ projectId, projectName }: { projectId?: string; projectName?: string } = {}) {
   const { user } = useAuth()
   const [events, setEvents] = useState<CalendarEventItem[]>([])
   const [selectedDate, setSelectedDate] = useState(() => new Date())
@@ -117,7 +117,7 @@ export function CalendarPage() {
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate])
 
   // Top Filters
-  const [selectedProject, setSelectedProject] = useState('All Projects')
+  const [selectedProject, setSelectedProject] = useState(projectId ?? 'All Projects')
   const [projectsList, setProjectsList] = useState<Project[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState('All Assignees')
   const [selectedStatus, setSelectedStatus] = useState('All Statuses')
@@ -141,23 +141,28 @@ export function CalendarPage() {
     ))
     .map((project) => project.id)), [projectsList, user?.id])
   const canManageTasks = canManageAllProjects || (user?.role === 'INTERN' && managedProjectIds.size > 0)
-  const canManageNewEventProject = canManageAllProjects || managedProjectIds.has(newEventProject)
+  const canManageNewEventProject = projectId
+    ? newEventProject === projectId && (canManageAllProjects || managedProjectIds.has(projectId))
+    : canManageAllProjects || managedProjectIds.has(newEventProject)
   const canDeleteSelectedEvent = canManageAllProjects ||
     (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
   const canEditSelectedEvent = canManageAllProjects ||
     (user?.role === 'INTERN' && Boolean(selectedEvent && managedProjectIds.has(selectedEvent.project)))
-  const availableProjectsForNewEvent = canManageAllProjects
-    ? projectsList
-    : projectsList.filter((project) => managedProjectIds.has(project.id))
+  const availableProjectsForNewEvent = projectId
+    ? projectsList.filter((project) => project.id === projectId)
+    : canManageAllProjects
+      ? projectsList
+      : projectsList.filter((project) => managedProjectIds.has(project.id))
 
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
+      if (projectId && ev.project !== projectId) return false
       if (selectedProject !== 'All Projects' && ev.project !== selectedProject) return false
       if (selectedAssignee !== 'All Assignees' && ev.assignee !== selectedAssignee) return false
       if (selectedStatus !== 'All Statuses' && ev.status !== selectedStatus) return false
       return true
     })
-  }, [events, selectedProject, selectedAssignee, selectedStatus])
+  }, [events, projectId, selectedProject, selectedAssignee, selectedStatus])
 
   const handleExport = () => {
     setToastMessage(`Calendar for ${currentMonthName} exported successfully.`)
@@ -253,21 +258,41 @@ export function CalendarPage() {
     Projects.list()
       .then((response) => {
         const data = response.data.filter((project) =>
-          user?.role !== 'MENTOR' || project.supervisor?.user?.id === user.id,
+          (!projectId || project.id === projectId) &&
+          (user?.role !== 'MENTOR' || project.supervisor?.user?.id === user.id || project.createdById === user.id),
         )
         setProjectsList(data)
-        if (data.length > 0) {
+        if (projectId) {
+          setSelectedProject(projectId)
+          setNewEventProject(projectId)
+        } else if (data.length > 0) {
           setNewEventProject(data[0].id)
         }
       })
       .catch(err => console.error("Failed to load projects:", err))
-  }, [user?.id, user?.role])
+  }, [projectId, user?.id, user?.role])
 
   useEffect(() => {
     let cancelled = false
     const loadEvents = async () => {
       try {
-        const data = await Tasks.getCalendarEvents()
+        const projectTasks = projectId && (user?.role !== 'INTERN' || managedProjectIds.has(projectId))
+          ? await Tasks.getGanttData(projectId)
+          : null
+        const data = projectTasks
+          ? projectTasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              projectId: task.projectId,
+              assignedToId: task.assignedToId,
+              startDate: task.startDate,
+              dueDate: task.dueDate,
+              status: task.status,
+              approvedAt: task.approvedAt,
+              projectName: projectName ?? 'Project',
+              assigneeName: task.assigneeName,
+            }))
+          : await Tasks.getCalendarEvents()
         if (!cancelled) setEvents(data.map(toCalendarEvent).filter((event): event is CalendarEventItem => event !== null))
       } catch (error) {
         if (!cancelled) console.error('Failed to load calendar events:', error)
@@ -284,10 +309,11 @@ export function CalendarPage() {
       window.clearInterval(intervalId)
       window.removeEventListener('focus', refreshWhenVisible)
     }
-  }, [])
+  }, [managedProjectIds, projectId, projectName, user?.role])
 
+  const PageRoot = projectId ? 'div' : 'main'
   return (
-    <main className={styles.page}>
+    <PageRoot className={styles.page}>
       <section className={styles.topSection} aria-label="Calendar controls">
         <div className={styles.actionRow}>
           <button
@@ -319,7 +345,7 @@ export function CalendarPage() {
         </div>
 
         <div className={styles.filtersRow}>
-          <div className={styles.filterSelectWrapper}>
+          {!projectId && <div className={styles.filterSelectWrapper}>
             <select
               className={styles.filterSelect}
               value={selectedProject}
@@ -334,7 +360,7 @@ export function CalendarPage() {
               ))}
             </select>
             <ChevronDown size={16} className={styles.filterSelectChevron} aria-hidden="true" />
-          </div>
+          </div>}
 
           <div className={styles.filterSelectWrapper}>
             <select
@@ -674,7 +700,7 @@ export function CalendarPage() {
           {toastMessage}
         </Alert>
       </Snackbar>
-    </main>
+    </PageRoot>
   )
 }
 
